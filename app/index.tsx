@@ -66,6 +66,92 @@ function Starfield() {
   );
 }
 
+function ShootingStar({ delay, duration, startX, startY, angle }: {
+  delay: number; duration: number; startX: number; startY: number; angle: number;
+}) {
+  const progress = React.useRef(new Animated.Value(0)).current;
+  const opacity = React.useRef(new Animated.Value(0)).current;
+
+  const distance = 300;
+  const endX = startX + Math.cos(angle) * distance;
+  const endY = startY + Math.sin(angle) * distance;
+
+  React.useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.timing(progress, { toValue: 1, duration, useNativeDriver: true }),
+          Animated.sequence([
+            Animated.timing(opacity, { toValue: 1, duration: duration * 0.2, useNativeDriver: true }),
+            Animated.timing(opacity, { toValue: 0, duration: duration * 0.8, useNativeDriver: true }),
+          ]),
+        ]),
+        Animated.timing(progress, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [startX, endX] });
+  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [startY, endY] });
+  const rotate = `${angle}rad`;
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        opacity,
+        transform: [{ translateX }, { translateY }, { rotate }],
+      }}
+    >
+      {/* Bright head */}
+      <View style={{
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: 'rgba(255,255,255,0.9)',
+      }} />
+      {/* Fading tail */}
+      <View style={{
+        position: 'absolute',
+        right: 3,
+        top: 0.5,
+        width: 40,
+        height: 2,
+        borderRadius: 1,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        ...(Platform.OS === 'web' ? {
+          background: 'linear-gradient(to left, rgba(255,255,255,0.3), transparent)',
+        } as any : {}),
+      }} />
+    </Animated.View>
+  );
+}
+
+function ShootingStarField() {
+  const w = SCREEN_W || 1200;
+  const h = SCREEN_H || 900;
+
+  const shooters = React.useMemo(() => [
+    { id: 0, delay: 5000, duration: 1200, startX: w * 0.7, startY: h * 0.1, angle: 2.5 },
+    { id: 1, delay: 15000, duration: 900, startX: w * 0.3, startY: h * 0.15, angle: 2.3 },
+    { id: 2, delay: 28000, duration: 1400, startX: w * 0.85, startY: h * 0.3, angle: 2.8 },
+    { id: 3, delay: 40000, duration: 1000, startX: w * 0.5, startY: h * 0.05, angle: 2.4 },
+  ], []);
+
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="none">
+      {shooters.map((s) => (
+        <ShootingStar key={s.id} {...s} />
+      ))}
+    </View>
+  );
+}
+
 function Ufo({ delay, duration, startX, startY, endX, endY }: {
   delay: number; duration: number; startX: number; startY: number; endX: number; endY: number;
 }) {
@@ -202,6 +288,7 @@ export default function LandingScreen() {
       }}
     >
       <Starfield />
+      <ShootingStarField />
       <UfoField />
       <GlowOrb />
 
@@ -246,7 +333,7 @@ export default function LandingScreen() {
           size="lg"
           fullWidth
         >
-          Request early access to the new Minds
+          Request early access
         </Button>
 
         <Button
