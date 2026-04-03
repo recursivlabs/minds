@@ -4,21 +4,22 @@ import { BASE_ORIGIN, ORG_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
 
 const KEYS = {
-  apiKey: 'recursiv:api_key',
-  user: 'recursiv:user',
-  orgId: 'recursiv:org_id',
-  version: 'recursiv:auth_version',
+  apiKey: 'minds:api_key',
+  user: 'minds:user',
+  orgId: 'minds:org_id',
+  version: 'minds:auth_version',
 };
 
-const AUTH_VERSION = '1';
+// Bump this when scopes change to force re-auth
+const AUTH_VERSION = '2';
 
 interface User {
   id: string;
   name: string;
   email: string;
-  username?: string;
+  username: string;
   image: string | null;
-  bio?: string;
+  bio: string;
 }
 
 interface AuthContextValue {
@@ -30,37 +31,50 @@ interface AuthContextValue {
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateUser: (updates: Partial<User>) => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-async function createApiKeyWithCookie(): Promise<string | null> {
+/**
+ * Create a per-user API key scoped to the Minds org.
+ * Uses session token from sign-up/sign-in (not cookies — cookies don't persist on mobile).
+ */
+async function createApiKeyWithSession(sessionToken: string): Promise<string | null> {
   try {
     const res = await fetch(`${BASE_ORIGIN}/api/v1/api-keys`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': BASE_ORIGIN },
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
       body: JSON.stringify({
-        name: 'Minds session',
+        name: 'minds-' + Date.now(),
+        organizationId: ORG_ID,
         scopes: [
           'posts:read', 'posts:write',
           'users:read',
           'communities:read', 'communities:write',
           'chat:read', 'chat:write',
           'agents:read', 'agents:write',
+          'organizations:read', 'organizations:write',
           'memory:read', 'memory:write',
           'tags:read', 'tags:write',
           'databases:read', 'databases:write',
           'storage:read', 'storage:write',
           'settings:read',
+          'notifications:read', 'notifications:write',
         ],
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error('[Auth] createApiKey failed:', res.status, errText.slice(0, 500));
+      return null;
+    }
     const data = await res.json();
     return data.data?.key || data.key || null;
-  } catch {
+  } catch (err) {
+    console.error('[Auth] createApiKey error:', err);
     return null;
   }
 }
@@ -71,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [orgId, setOrgId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
+  // Restore session on mount
   React.useEffect(() => {
     (async () => {
       try {
@@ -131,7 +146,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const body = await res.json();
-    const apiKey = await createApiKeyWithCookie();
+
+    // Extract session token (cookies don't persist on mobile/cross-origin)
+    const sessionToken = body?.session?.token || body?.token;
+    if (!sessionToken) throw new Error('No session token returned');
+
+    const apiKey = await createApiKeyWithSession(sessionToken);
     if (!apiKey) throw new Error('Failed to create session key');
 
     const sdk = createAuthedSdk(apiKey);
@@ -172,7 +192,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const body = await res.json();
-    const apiKey = await createApiKeyWithCookie();
+
+    // Extract session token
+    const sessionToken = body?.session?.token || body?.token;
+    if (!sessionToken) throw new Error('No session token returned');
+
+    const apiKey = await createApiKeyWithSession(sessionToken);
     if (!apiKey) throw new Error('Failed to create session key');
 
     const sdk = createAuthedSdk(apiKey);
@@ -204,15 +229,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgId(null);
   }, []);
 
-  const updateUser = React.useCallback((updates: Partial<User>) => {
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, ...updates };
-      storage.setItem(KEYS.user, JSON.stringify(updated)).catch(() => {});
-      return updated;
-    });
-  }, []);
-
   const value = React.useMemo(
     () => ({
       user,
@@ -223,9 +239,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signIn,
       signOut,
-      updateUser,
     }),
-    [user, authedSdk, orgId, isLoading, signUp, signIn, signOut, updateUser],
+    [user, authedSdk, orgId, isLoading, signUp, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
