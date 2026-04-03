@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Pressable, Platform } from 'react-native';
+import { View, Pressable, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -236,21 +236,23 @@ function TrendingApps() {
 // ─── Main Sidebar ────────────────────────────────────────────
 export function FeedSidebar() {
   return (
-    <View
+    <ScrollView
       style={{
         width: '100%' as any,
-        gap: spacing.lg,
         ...(Platform.OS === 'web'
           ? {
               position: 'sticky' as any,
               top: 0,
               maxHeight: '100vh' as any,
-              overflowY: 'auto' as any,
-              paddingTop: spacing.lg,
-              paddingBottom: spacing['4xl'],
             }
           : {}),
       }}
+      contentContainerStyle={{
+        gap: spacing.lg,
+        paddingTop: spacing.lg,
+        paddingBottom: spacing['4xl'],
+      }}
+      showsVerticalScrollIndicator={false}
     >
       <WalletSummary />
       <BoostedContent />
@@ -258,6 +260,6 @@ export function FeedSidebar() {
       <TrendingCommunities />
       <TrendingAgents />
       <TrendingApps />
-    </View>
+    </ScrollView>
   );
 }
