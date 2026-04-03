@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View, TextInput, ScrollView, Pressable, Switch, Image, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+// expo-image-picker imported lazily to avoid web crash
+const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Button, Input, Card } from '../../components';
 import { useAuth } from '../../lib/auth';
@@ -29,13 +30,25 @@ export default function CreateScreen() {
 
   const handlePickImage = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        setMediaUri(result.assets[0].uri);
+      const picker = getImagePicker();
+      if (picker) {
+        const result = await picker.launchImageLibraryAsync({
+          mediaTypes: picker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+        });
+        if (!result.canceled && result.assets[0]) {
+          setMediaUri(result.assets[0].uri);
+        }
+      } else if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) setMediaUri(URL.createObjectURL(file));
+        };
+        input.click();
       }
     } catch {}
   };
