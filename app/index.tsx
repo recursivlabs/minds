@@ -147,11 +147,12 @@ export default function LandingScreen() {
           color={colors.text}
           align="center"
           style={{
-            fontSize: 14,
+            fontSize: 18,
             letterSpacing: 8,
             fontWeight: '200',
             textTransform: 'lowercase',
             opacity: 0.5,
+            marginTop: spacing.md,
           }}
         >
           think freely
@@ -165,7 +166,7 @@ export default function LandingScreen() {
           size="lg"
           fullWidth
         >
-          Request early access
+          Request early access to the new Minds
         </Button>
 
         <Button
