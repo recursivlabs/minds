@@ -196,9 +196,8 @@ export function FeedSidebar() {
   return (
     <View
       style={{
-        width: 300,
+        width: '100%' as any,
         gap: spacing.lg,
-        paddingRight: spacing.xl,
         ...(Platform.OS === 'web'
           ? {
               position: 'sticky' as any,

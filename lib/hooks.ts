@@ -279,7 +279,7 @@ export function useTags(limit = 50) {
 }
 
 /**
- * Fetch a list of profiles/people.
+ * Fetch org members as profiles (scoped to Minds org).
  */
 export function useProfiles(limit = 20) {
   const { sdk } = useAuth();
@@ -292,8 +292,15 @@ export function useProfiles(limit = 20) {
     (async () => {
       try {
         const s = sdk || getSdk();
-        const res = await s.profiles.list({ limit } as any);
-        if (!cancelled) setProfiles(res.data || []);
+        if (ORG_ID) {
+          // Fetch org members to get org-scoped users
+          const res = await s.organizations.members(ORG_ID, { limit } as any);
+          const members = (res.data || []).map((m: any) => m.user || m);
+          if (!cancelled) setProfiles(members);
+        } else {
+          const res = await s.profiles.list({ limit } as any);
+          if (!cancelled) setProfiles(res.data || []);
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load profiles');
       } finally {

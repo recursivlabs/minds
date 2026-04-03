@@ -137,15 +137,16 @@ export default function FeedScreen() {
           style={{
             flex: 1,
             flexDirection: 'row',
-            justifyContent: 'center',
             paddingHorizontal: spacing.xl,
           }}
         >
-          <View style={{ flex: 1, maxWidth: 600 }}>
+          <View style={{ flex: 1 }}>
             {feedContent}
           </View>
           <View style={{ width: spacing.xl }} />
-          <FeedSidebar />
+          <View style={{ width: 340 }}>
+            <FeedSidebar />
+          </View>
         </View>
       ) : (
         feedContent
