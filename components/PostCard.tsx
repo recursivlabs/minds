@@ -197,10 +197,11 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
     <Pressable
       onPress={() => router.push(`/post/${post.id}`)}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
         borderBottomWidth: 0.5,
         borderBottomColor: colors.borderSubtle,
-        padding: spacing.xl,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
       })}
     >
       {/* Boost badge */}
@@ -225,7 +226,7 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <Pressable onPress={() => router.push(`/user/${authorUsername}`)}>
-              <Text variant="bodyMedium" numberOfLines={1}>
+              <Text variant="caption" numberOfLines={1} style={{ fontWeight: '400' }}>
                 {authorName}
               </Text>
             </Pressable>
@@ -268,14 +269,14 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
           hitSlop={8}
         >
-          <Ionicons name="chatbubble-outline" size={17} color={colors.textMuted} />
+          <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
           <Text variant="caption" color={colors.textMuted}>
             {replyCount}
           </Text>
         </Pressable>
 
         <Pressable hitSlop={8} style={{ padding: 2 }}>
-          <Ionicons name="repeat-outline" size={19} color={colors.textMuted} />
+          <Ionicons name="repeat-outline" size={18} color={colors.textMuted} />
         </Pressable>
 
         <Pressable
@@ -283,7 +284,7 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
         >
-          <Ionicons name="gift-outline" size={17} color={colors.textMuted} />
+          <Ionicons name="gift-outline" size={16} color={colors.textMuted} />
         </Pressable>
 
         <Pressable
@@ -291,7 +292,7 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
           hitSlop={8}
           style={{ padding: 2 }}
         >
-          <Ionicons name="ellipsis-horizontal" size={17} color={colors.textMuted} />
+          <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
         </Pressable>
       </View>
 

@@ -4,24 +4,28 @@
  */
 
 export const colors = {
-  // Backgrounds — deep, near-black
-  bg: '#08080a',
-  surface: '#111113',
-  surfaceRaised: '#1a1a1e',
-  surfaceHover: '#222226',
+  // Backgrounds — deeper, more contrast
+  bg: '#06060a',
+  surface: 'rgba(255,255,255,0.03)',
+  surfaceRaised: 'rgba(255,255,255,0.05)',
+  surfaceHover: 'rgba(255,255,255,0.07)',
 
-  // Borders
-  border: '#2a2a2e',
-  borderSubtle: '#1a1a1e',
+  // Glass effect
+  glass: 'rgba(255,255,255,0.04)',
+  glassBorder: 'rgba(255,255,255,0.06)',
+
+  // Borders — much subtler
+  border: 'rgba(255,255,255,0.08)',
+  borderSubtle: 'rgba(255,255,255,0.04)',
   borderFocus: '#d4a844',
 
-  // Text
+  // Text — same
   text: '#f5f5f5',
   textSecondary: '#a0a0a8',
   textMuted: '#606068',
-  textInverse: '#08080a',
+  textInverse: '#06060a',
 
-  // Accent — Minds gold
+  // Accent — Minds gold (keep)
   accent: '#d4a844',
   accentHover: '#e6bc54',
   accentMuted: 'rgba(212, 168, 68, 0.12)',
@@ -73,49 +77,49 @@ export const typography = {
   hero: {
     fontSize: 36,
     lineHeight: 42,
-    fontWeight: '700' as const,
+    fontWeight: '200' as const,
     letterSpacing: -0.8,
   },
   h1: {
     fontSize: 28,
     lineHeight: 34,
-    fontWeight: '700' as const,
+    fontWeight: '600' as const,
     letterSpacing: -0.5,
   },
   h2: {
     fontSize: 22,
     lineHeight: 28,
-    fontWeight: '600' as const,
+    fontWeight: '500' as const,
     letterSpacing: -0.3,
   },
   h3: {
     fontSize: 18,
     lineHeight: 24,
-    fontWeight: '600' as const,
+    fontWeight: '500' as const,
     letterSpacing: -0.2,
   },
   body: {
     fontSize: 15,
     lineHeight: 22,
-    fontWeight: '400' as const,
+    fontWeight: '300' as const,
     letterSpacing: 0,
   },
   bodyMedium: {
     fontSize: 15,
     lineHeight: 22,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     letterSpacing: 0,
   },
   caption: {
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '400' as const,
+    fontWeight: '300' as const,
     letterSpacing: 0,
   },
   label: {
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     letterSpacing: 0.2,
   },
   mono: {

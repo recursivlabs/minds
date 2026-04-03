@@ -53,6 +53,8 @@ export function Avatar({ uri, name, size = 'md' }: Props) {
           height: dim,
           borderRadius: radius.full,
           backgroundColor: colors.surfaceHover,
+          borderWidth: 0.5,
+          borderColor: colors.glassBorder,
         }}
       />
     );
@@ -67,6 +69,8 @@ export function Avatar({ uri, name, size = 'md' }: Props) {
         backgroundColor: hashColor(name),
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 0.5,
+        borderColor: colors.glassBorder,
       }}
     >
       <Text

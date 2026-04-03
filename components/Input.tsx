@@ -30,15 +30,15 @@ export function Input({ label, error, style, ...props }: Props) {
         }}
         style={[
           {
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: error ? colors.error : focused ? colors.borderFocus : colors.border,
+            backgroundColor: colors.glass,
+            borderWidth: 0.5,
+            borderColor: error ? colors.error : focused ? colors.borderFocus : colors.glassBorder,
             borderRadius: radius.md,
-            paddingHorizontal: spacing.lg,
-            paddingVertical: 13,
+            paddingHorizontal: spacing.md,
+            paddingVertical: 11,
             color: colors.text,
             ...typography.body,
-            ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            ...(Platform.OS === 'web' ? { outlineStyle: 'none', backdropFilter: 'blur(12px)' } as any : {}),
           },
           style,
         ]}

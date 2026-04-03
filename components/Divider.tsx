@@ -9,7 +9,7 @@ export function Divider({ marginVertical = spacing.lg }: Props) {
   return (
     <View
       style={{
-        height: 1,
+        height: 0.5,
         backgroundColor: colors.borderSubtle,
         marginVertical,
       }}

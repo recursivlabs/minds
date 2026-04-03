@@ -26,6 +26,7 @@ export function Header({ showBack, title }: Props) {
         backgroundColor: colors.bg,
         borderBottomWidth: 0.5,
         borderBottomColor: colors.borderSubtle,
+        // ultra-subtle separator already at 0.5px
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -44,7 +45,7 @@ export function Header({ showBack, title }: Props) {
           <Text
             variant="h2"
             color={colors.accent}
-            style={{ letterSpacing: -1, fontWeight: '700' }}
+            style={{ letterSpacing: 5, fontWeight: '300' }}
           >
             minds
           </Text>

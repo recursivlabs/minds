@@ -18,9 +18,9 @@ interface Props {
 }
 
 const sizeStyles: Record<Size, { paddingVertical: number; paddingHorizontal: number; fontSize: number }> = {
-  sm: { paddingVertical: 8, paddingHorizontal: 14, fontSize: 13 },
-  md: { paddingVertical: 12, paddingHorizontal: 20, fontSize: 15 },
-  lg: { paddingVertical: 14, paddingHorizontal: 24, fontSize: 15 },
+  sm: { paddingVertical: 7, paddingHorizontal: 14, fontSize: 13 },
+  md: { paddingVertical: 10, paddingHorizontal: 20, fontSize: 15 },
+  lg: { paddingVertical: 13, paddingHorizontal: 24, fontSize: 15 },
 };
 
 export function Button({
@@ -41,14 +41,14 @@ export function Button({
     variant === 'primary'
       ? accentColor || colors.accent
       : variant === 'secondary'
-        ? colors.surface
+        ? colors.glass
         : 'transparent';
 
   const textColor =
     variant === 'primary' ? colors.textInverse : colors.text;
 
   const borderColor =
-    variant === 'secondary' ? colors.border : 'transparent';
+    variant === 'secondary' ? colors.glassBorder : 'transparent';
 
   return (
     <Pressable
@@ -58,9 +58,9 @@ export function Button({
         {
           paddingVertical: s.paddingVertical,
           paddingHorizontal: s.paddingHorizontal,
-          borderRadius: radius.md,
+          borderRadius: radius.sm,
           backgroundColor: bgColor,
-          borderWidth: variant === 'secondary' ? 1 : 0,
+          borderWidth: variant === 'secondary' ? 0.5 : 0,
           borderColor,
           alignItems: 'center' as const,
           justifyContent: 'center' as const,

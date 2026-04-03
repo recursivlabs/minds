@@ -24,7 +24,7 @@ function WalletSummary() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <Ionicons name="diamond" size={20} color={colors.token} />
-            <Text variant="h3">Wallet</Text>
+            <Text variant="bodyMedium" style={{ fontSize: 14 }}>Wallet</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         </View>
@@ -47,7 +47,7 @@ function BoostedContent() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Ionicons name="rocket" size={16} color={colors.boost} />
-          <Text variant="h3">Boosted</Text>
+          <Text variant="bodyMedium" style={{ fontSize: 14 }}>Boosted</Text>
         </View>
         <Pressable onPress={() => router.push('/(tabs)/boost')}>
           <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>Boost yours</Text>
@@ -71,7 +71,7 @@ function TrendingPosts() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Ionicons name="trending-up" size={16} color={colors.accent} />
-          <Text variant="h3">Trending</Text>
+          <Text variant="bodyMedium" style={{ fontSize: 14 }}>Trending</Text>
         </View>
       </View>
       {trending.length === 0 ? (
@@ -119,7 +119,7 @@ function TrendingCommunities() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Ionicons name="people" size={16} color={colors.accent} />
-          <Text variant="h3">Communities</Text>
+          <Text variant="bodyMedium" style={{ fontSize: 14 }}>Communities</Text>
         </View>
         <Pressable onPress={() => router.push('/(tabs)/explore')}>
           <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>See all</Text>
@@ -169,7 +169,7 @@ function TrendingAgents() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Ionicons name="flash" size={16} color={colors.accent} />
-          <Text variant="h3">Agents</Text>
+          <Text variant="bodyMedium" style={{ fontSize: 14 }}>Agents</Text>
         </View>
         <Pressable onPress={() => router.push('/(tabs)/explore')}>
           <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>See all</Text>
@@ -217,7 +217,7 @@ function TrendingApps() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Ionicons name="cube" size={16} color={colors.accent} />
-          <Text variant="h3">Apps</Text>
+          <Text variant="bodyMedium" style={{ fontSize: 14 }}>Apps</Text>
         </View>
         <Pressable onPress={() => router.push('/(tabs)/explore')}>
           <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>See all</Text>

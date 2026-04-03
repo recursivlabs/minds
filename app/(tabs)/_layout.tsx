@@ -12,8 +12,8 @@ export default function TabLayout() {
           borderTopColor: colors.borderSubtle,
           borderTopWidth: 0.5,
           elevation: 0,
-          height: 56,
-          paddingBottom: 4,
+          height: 48,
+          paddingBottom: 2,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
@@ -28,8 +28,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Feed',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="newspaper-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="newspaper-outline" size={22} color={color} />
           ),
         }}
       />
@@ -37,8 +37,8 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="compass-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="compass-outline" size={22} color={color} />
           ),
         }}
       />
@@ -46,8 +46,8 @@ export default function TabLayout() {
         name="create"
         options={{
           title: 'Create',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="add-circle-outline" size={22} color={color} />
           ),
         }}
       />
@@ -55,8 +55,8 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="chatbubbles-outline" size={22} color={color} />
           ),
         }}
       />
@@ -64,8 +64,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-outline" size={22} color={color} />
           ),
         }}
       />
