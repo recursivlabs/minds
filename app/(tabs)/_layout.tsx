@@ -1,95 +1,18 @@
 import { Tabs, useRouter, usePathname } from 'expo-router';
-import { View, Pressable, Platform, useWindowDimensions } from 'react-native';
+import { View, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../constants/theme';
-import { Text } from '../../components/Text';
-
-const NAV_ITEMS = [
-  { name: 'index', label: 'Feed', icon: 'newspaper-outline' as const, activeIcon: 'newspaper' as const },
-  { name: 'explore', label: 'Explore', icon: 'compass-outline' as const, activeIcon: 'compass' as const },
-  { name: 'create', label: 'Create', icon: 'add-circle-outline' as const, activeIcon: 'add-circle' as const },
-  { name: 'chat', label: 'Chat', icon: 'chatbubbles-outline' as const, activeIcon: 'chatbubbles' as const },
-  { name: 'profile', label: 'Profile', icon: 'person-outline' as const, activeIcon: 'person' as const },
-];
-
-function SideRail() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const insets = useSafeAreaInsets();
-
-  const isActive = (name: string) => {
-    if (name === 'index') return pathname === '/' || pathname === '';
-    return pathname.includes(name);
-  };
-
-  return (
-    <View
-      style={{
-        width: 64,
-        backgroundColor: colors.bg,
-        borderRightWidth: 0.5,
-        borderRightColor: colors.borderSubtle,
-        paddingTop: insets.top + spacing.xl,
-        paddingBottom: insets.bottom + spacing.xl,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}
-    >
-      {/* Logo */}
-      <Pressable onPress={() => router.push('/(tabs)')}>
-        <Text
-          variant="h2"
-          color={colors.accent}
-          style={{ fontSize: 16, letterSpacing: 3, fontWeight: '300' }}
-        >
-          m
-        </Text>
-      </Pressable>
-
-      {/* Nav items */}
-      <View style={{ gap: spacing.xl, alignItems: 'center' }}>
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.name);
-          return (
-            <Pressable
-              key={item.name}
-              onPress={() => router.push(item.name === 'index' ? '/(tabs)' : `/(tabs)/${item.name}` as any)}
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                alignItems: 'center' as const,
-                justifyContent: 'center' as const,
-                backgroundColor: active ? colors.accentSubtle : 'transparent',
-                opacity: pressed ? 0.7 : 1,
-                cursor: 'pointer' as any,
-              })}
-            >
-              <Ionicons
-                name={active ? item.activeIcon : item.icon}
-                size={22}
-                color={active ? colors.accent : colors.textMuted}
-              />
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Bottom spacer */}
-      <View />
-    </View>
-  );
-}
+import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width > 768;
+  const sidebar = useSidebarState();
 
   if (isDesktop) {
     return (
       <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.bg }}>
-        <SideRail />
+        <SideNav collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
         <View style={{ flex: 1 }}>
           <Tabs
             screenOptions={{

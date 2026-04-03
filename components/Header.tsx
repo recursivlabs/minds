@@ -1,4 +1,4 @@
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -14,6 +14,8 @@ interface Props {
 export function Header({ showBack, title }: Props) {
   const router = useRouter();
   const { user } = useAuth();
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width > 768;
 
   return (
     <View
@@ -21,12 +23,11 @@ export function Header({ showBack, title }: Props) {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: spacing.md,
+        paddingVertical: spacing.sm + 2,
         paddingHorizontal: spacing.xl,
         backgroundColor: colors.bg,
         borderBottomWidth: 0.5,
         borderBottomColor: colors.borderSubtle,
-        // ultra-subtle separator already at 0.5px
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -36,12 +37,12 @@ export function Header({ showBack, title }: Props) {
             hitSlop={12}
             style={{ marginRight: spacing.xs }}
           >
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
           </Pressable>
         )}
         {title ? (
-          <Text variant="h3">{title}</Text>
-        ) : (
+          <Text variant="h3" style={{ fontWeight: '400' }}>{title}</Text>
+        ) : !isDesktop ? (
           <Text
             variant="h2"
             color={colors.accent}
@@ -49,16 +50,18 @@ export function Header({ showBack, title }: Props) {
           >
             minds
           </Text>
-        )}
+        ) : null}
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
         <Pressable hitSlop={8}>
-          <Ionicons name="notifications-outline" size={22} color={colors.textSecondary} />
+          <Ionicons name="notifications-outline" size={20} color={colors.textMuted} />
         </Pressable>
-        <Pressable onPress={() => router.push('/(tabs)/profile')}>
-          <Avatar uri={user?.image} name={user?.name} size="sm" />
-        </Pressable>
+        {!isDesktop && (
+          <Pressable onPress={() => router.push('/(tabs)/profile')}>
+            <Avatar uri={user?.image} name={user?.name} size="sm" />
+          </Pressable>
+        )}
       </View>
     </View>
   );

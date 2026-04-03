@@ -21,3 +21,4 @@ export { Header } from './Header';
 export { AgentCard } from './AgentCard';
 export { UserCard } from './UserCard';
 export { FeedSidebar } from './FeedSidebar';
+export { SideNav, useSidebarState } from './SideNav';
