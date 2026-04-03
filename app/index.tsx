@@ -125,37 +125,38 @@ export default function LandingScreen() {
       <Starfield />
       <GlowOrb />
 
-      {/* Wordmark */}
-      <Text
-        variant="hero"
-        color={colors.accent}
-        align="center"
-        style={{
-          fontSize: 96,
-          letterSpacing: 12,
-          fontWeight: '300',
-          textTransform: 'lowercase',
-          marginBottom: spacing.lg,
-        }}
-      >
-        minds
-      </Text>
+      {/* Hero block — centered as a group */}
+      <View style={{ alignItems: 'center', marginBottom: spacing['6xl'] }}>
+        <Text
+          variant="hero"
+          color={colors.accent}
+          align="center"
+          style={{
+            fontSize: 96,
+            letterSpacing: 12,
+            fontWeight: '300',
+            textTransform: 'lowercase',
+            marginBottom: spacing['3xl'],
+          }}
+        >
+          minds
+        </Text>
 
-      <Text
-        variant="body"
-        color={colors.text}
-        align="center"
-        style={{
-          fontSize: 16,
-          letterSpacing: 6,
-          fontWeight: '200',
-          textTransform: 'uppercase',
-          marginBottom: spacing['5xl'],
-          opacity: 0.7,
-        }}
-      >
-        think freely
-      </Text>
+        <Text
+          variant="body"
+          color={colors.text}
+          align="center"
+          style={{
+            fontSize: 14,
+            letterSpacing: 8,
+            fontWeight: '200',
+            textTransform: 'lowercase',
+            opacity: 0.5,
+          }}
+        >
+          think freely
+        </Text>
+      </View>
 
       {/* Buttons */}
       <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
@@ -164,7 +165,7 @@ export default function LandingScreen() {
           size="lg"
           fullWidth
         >
-          Sign up
+          Request early access
         </Button>
 
         <Button
@@ -173,7 +174,7 @@ export default function LandingScreen() {
           size="lg"
           fullWidth
         >
-          Sign in
+          Log in
         </Button>
       </View>
     </View>
