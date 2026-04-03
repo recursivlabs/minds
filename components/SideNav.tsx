@@ -11,18 +11,20 @@ const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 220;
 const COLLAPSE_KEY = 'minds:sidebar:collapsed';
 
-const NAV_ITEMS = [
-  { name: 'index', label: 'Feed', icon: 'newspaper-outline' as const, activeIcon: 'newspaper' as const },
-  { name: 'explore', label: 'Explore', icon: 'compass-outline' as const, activeIcon: 'compass' as const },
-  { name: 'create', label: 'Create', icon: 'add-circle-outline' as const, activeIcon: 'add-circle' as const },
-  { name: 'chat', label: 'Chat', icon: 'chatbubbles-outline' as const, activeIcon: 'chatbubbles' as const },
-  { name: 'wallet', label: 'Wallet', icon: 'diamond-outline' as const, activeIcon: 'diamond' as const },
-  { name: 'boost', label: 'Boost', icon: 'rocket-outline' as const, activeIcon: 'rocket' as const },
+type NavItem = { name: string; label: string; icon: string; activeIcon: string };
+
+const NAV_ITEMS: NavItem[] = [
+  { name: 'index', label: 'Feed', icon: 'newspaper-outline', activeIcon: 'newspaper' },
+  { name: 'explore', label: 'Explore', icon: 'compass-outline', activeIcon: 'compass' },
+  { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
+  { name: 'chat', label: 'Chat', icon: 'chatbubbles-outline', activeIcon: 'chatbubbles' },
+  { name: 'wallet', label: 'Wallet', icon: 'diamond-outline', activeIcon: 'diamond' },
+  { name: 'boost', label: 'Boost', icon: 'rocket-outline', activeIcon: 'rocket' },
 ];
 
-const BOTTOM_ITEMS = [
-  { name: 'admin', label: 'Admin', icon: 'shield-outline' as const, activeIcon: 'shield' as const },
-  { name: 'profile', label: 'Profile', icon: 'person-outline' as const, activeIcon: 'person' as const },
+const BOTTOM_ITEMS: NavItem[] = [
+  { name: 'admin', label: 'Admin', icon: 'shield-outline', activeIcon: 'shield' },
+  { name: 'profile', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
 ];
 
 export function useSidebarState() {
@@ -65,7 +67,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
 
   const width = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
 
-  const renderNavItem = (item: typeof NAV_ITEMS[0]) => {
+  const renderNavItem = (item: NavItem) => {
     const active = isActive(item.name);
     return (
       <Pressable
@@ -86,7 +88,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         })}
       >
         <Ionicons
-          name={active ? item.activeIcon : item.icon}
+          name={(active ? item.activeIcon : item.icon) as any}
           size={20}
           color={active ? colors.accent : colors.textMuted}
         />

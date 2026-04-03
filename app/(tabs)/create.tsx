@@ -183,39 +183,41 @@ function PostFlow({ onBack, onSuccess }: { onBack: () => void; onSuccess: () => 
   };
 
   const handlePost = async () => {
-    if (!content.trim() || !sdk) return;
+    if ((!content.trim() && !mediaUri) || !sdk) return;
     setPosting(true);
     try {
       const allTags = isNsfw ? [...tags, 'nsfw'] : tags;
 
-      let mediaUrl: string | undefined;
+      let mediaUrls: string[] | undefined;
       if (mediaUri) {
         try {
-          const uploadRes = await sdk.storage.getUploadUrl({
-            bucket: 'posts',
-            filename: `post-${Date.now()}.jpg`,
-            contentType: 'image/jpeg',
+          const uploadRes = await (sdk as any).uploads.getMediaUploadUrl({
+            content_type: 'image/jpeg',
+            content_length: 0,
           });
-          if (uploadRes.data?.url) {
+          const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+          if (uploadUrl) {
             const response = await fetch(mediaUri);
             const blob = await response.blob();
-            await fetch(uploadRes.data.url, {
+            await fetch(uploadUrl, {
               method: 'PUT',
               body: blob,
               headers: { 'Content-Type': 'image/jpeg' },
             });
-            mediaUrl = uploadRes.data.downloadUrl || uploadRes.data.url.split('?')[0];
+            const publicUrl = uploadRes.data?.public_url || uploadUrl.split('?')[0];
+            mediaUrls = [publicUrl];
           }
-        } catch {}
+        } catch (e) {
+          console.warn('Media upload failed:', e);
+        }
       }
 
       await sdk.posts.create({
-        content: content.trim(),
-        title: showTitle && title.trim() ? title.trim() : undefined,
-        tags: allTags,
-        communityId: selectedCommunity || undefined,
+        content: content.trim() || ' ',
+        community_id: selectedCommunity || undefined,
         organization_id: ORG_ID || undefined,
-      });
+        media_urls: mediaUrls,
+      } as any);
 
       onSuccess();
     } catch (err: any) {
@@ -720,7 +722,7 @@ function AppFlow({ onBack }: { onBack: () => void }) {
       const res = await sdk.agents.chat(MINDS_AI_AGENT_ID, {
         message: userMsg.content,
       } as any);
-      const reply = res.data?.message || res.data?.content || (typeof res.data === 'string' ? res.data : 'I received your message.');
+      const reply = (res.data as any)?.message || (res.data as any)?.content || (typeof res.data === 'string' ? res.data : 'I received your message.');
       setMessages((prev) => [
         ...prev,
         {
