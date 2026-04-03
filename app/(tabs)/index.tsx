@@ -30,8 +30,6 @@ export default function FeedScreen() {
     if (!sdk) return;
     const res = await sdk.posts.create({
       content: data.content,
-      title: data.title,
-      tags: data.tags,
       organization_id: ORG_ID || undefined,
     });
     if (res.data) {

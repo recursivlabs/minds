@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { Text, Avatar, Button, Divider, PostCard, Skeleton, Card } from '../../.
 import { TipModal } from '../../../components/TipModal';
 import { useAuth } from '../../../lib/auth';
 import { useProfile, usePosts } from '../../../lib/hooks';
+import { ORG_ID } from '../../../lib/recursiv';
 import { colors, spacing, radius } from '../../../constants/theme';
 
 export default function UserProfileScreen() {
@@ -15,18 +16,36 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
   const { profile, loading, error, isFollowing, setIsFollowing } = useProfile(username);
-  const { posts } = usePosts('latest', 50);
   const [followLoading, setFollowLoading] = React.useState(false);
   const [showTip, setShowTip] = React.useState(false);
+  const [userPosts, setUserPosts] = React.useState<any[]>([]);
+  const [postsLoading, setPostsLoading] = React.useState(true);
 
   const isOwnProfile = user?.id === profile?.id;
-  const userPosts = posts.filter(
-    (p: any) => {
-      const authorId = p.author?.id || p.userId || p.user_id;
-      const authorUsername = p.author?.username;
-      return authorId === profile?.id || authorUsername === username;
-    }
-  );
+
+  // Fetch this user's posts directly
+  React.useEffect(() => {
+    if (!profile?.id || !sdk) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await sdk.posts.list({
+          limit: 50,
+          organization_id: ORG_ID || undefined,
+        });
+        const filtered = (res.data || []).filter(
+          (p: any) => {
+            const authorId = p.author?.id || p.userId || p.user_id;
+            const authorUsername = p.author?.username;
+            return authorId === profile.id || authorUsername === username;
+          }
+        );
+        if (!cancelled) setUserPosts(filtered);
+      } catch {}
+      finally { if (!cancelled) setPostsLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.id, sdk, username]);
 
   const followerCount = profile?.followerCount || profile?.follower_count || 0;
   const followingCount = profile?.followingCount || profile?.following_count || 0;
@@ -50,8 +69,13 @@ export default function UserProfileScreen() {
     }
   };
 
-  const handleTip = async (amount: number, message: string) => {
-    console.log('Tip:', { userId: profile?.id, amount, message });
+  const handleTip = async (_amount: number, _message: string) => {
+    const msg = 'Tipping coming soon — this feature will use MINDS tokens';
+    if (Platform.OS === 'web') {
+      alert(msg);
+    } else {
+      Alert.alert('Coming Soon', msg);
+    }
   };
 
   if (loading) {

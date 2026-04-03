@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,15 +60,50 @@ export default function WalletScreen() {
         {/* Balance */}
         <WalletCard balance={0} />
 
+        {/* Token system notice */}
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderRadius: radius.lg,
+            padding: spacing.lg,
+            borderWidth: 1,
+            borderColor: colors.accent + '30',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+          }}
+        >
+          <Ionicons name="time-outline" size={20} color={colors.accent} />
+          <Text variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
+            Token system coming soon. Earn and send MINDS tokens for content and engagement.
+          </Text>
+        </View>
+
         {/* Actions */}
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <View style={{ flex: 1 }}>
-            <Button onPress={() => {}} variant="secondary" fullWidth>
+            <Button
+              onPress={() => {
+                const msg = 'Earning tokens coming soon! Create content and engage to earn MINDS tokens.';
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Coming Soon', msg);
+              }}
+              variant="secondary"
+              fullWidth
+            >
               Earn
             </Button>
           </View>
           <View style={{ flex: 1 }}>
-            <Button onPress={() => {}} variant="secondary" fullWidth>
+            <Button
+              onPress={() => {
+                const msg = 'Sending tokens coming soon! You will be able to tip creators with MINDS tokens.';
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Coming Soon', msg);
+              }}
+              variant="secondary"
+              fullWidth
+            >
               Send
             </Button>
           </View>

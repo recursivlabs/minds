@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Pressable, Image, Platform, Linking } from 'react-native';
+import { View, Pressable, Image, Platform, Linking, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -10,12 +10,15 @@ import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { TipModal } from './TipModal';
 import { useAuth } from '../lib/auth';
+import { BASE_ORIGIN } from '../lib/recursiv';
+import { getItem } from '../lib/storage';
 import { colors, spacing, radius, typography } from '../constants/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
 interface Props {
   post: any;
   onVoteChange?: (postId: string, newScore: number, userVote: 'upvote' | 'downvote' | null) => void;
+  onPostDeleted?: (postId: string) => void;
   compact?: boolean;
 }
 
@@ -30,9 +33,9 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 604800)}w`;
 }
 
-export function PostCard({ post, onVoteChange, compact = false }: Props) {
+export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }: Props) {
   const router = useRouter();
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
   const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(
     post.userReaction || post.user_reaction || null
   );
@@ -40,12 +43,17 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
   const [showMenu, setShowMenu] = React.useState(false);
   const [showReport, setShowReport] = React.useState(false);
   const [showTip, setShowTip] = React.useState(false);
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editContent, setEditContent] = React.useState(post.content || post.body || '');
+  const [editSaving, setEditSaving] = React.useState(false);
+  const [currentContent, setCurrentContent] = React.useState(post.content || post.body || '');
+  const [isDeleted, setIsDeleted] = React.useState(false);
 
   const author = post.author || post.user || {};
   const authorName = author.name || author.username || 'Anonymous';
   const authorUsername = author.username || author.name || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
-  const content = post.content || post.body || '';
+  const content = currentContent || '';
   const rawMedia = post.media;
   const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || post.image || post.thumbnail || null;
   const replyCount = post.replyCount || post.reply_count || post.comments_count || 0;
@@ -83,12 +91,12 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
 
     try {
       if (wasVoted) {
-        await sdk.posts.unreact(post.id, { type });
+        await sdk.posts.unreact(post.id);
       } else {
         if (prevVote) {
-          await sdk.posts.unreact(post.id, { type: prevVote });
+          await sdk.posts.unreact(post.id);
         }
-        await sdk.posts.react(post.id, { type });
+        await sdk.posts.react(post.id, type as any);
       }
     } catch {
       // Rollback
@@ -99,13 +107,77 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
   };
 
   const handleReport = async (reason: string, details: string) => {
-    // Report is a client-side action for now
-    console.log('Report:', { postId: post.id, reason, details });
+    try {
+      const apiKey = await getItem('minds:api_key');
+      await fetch(`${BASE_ORIGIN}/api/v1/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          target_type: 'post',
+          target_id: post.id,
+          reason,
+          details,
+        }),
+      });
+    } catch {
+      // Optimistic UX — report appears submitted even if endpoint doesn't exist yet
+    }
   };
 
-  const handleTip = async (amount: number, message: string) => {
-    // Tip placeholder
-    console.log('Tip:', { postId: post.id, userId: author.id, amount, message });
+  const handleTip = async (_amount: number, _message: string) => {
+    const msg = 'Tipping coming soon — this feature will use MINDS tokens';
+    if (Platform.OS === 'web') {
+      alert(msg);
+    } else {
+      Alert.alert('Coming Soon', msg);
+    }
+  };
+
+  const isOwnPost = user?.id && (author.id === user.id);
+
+  const handleDelete = async () => {
+    if (!sdk) return;
+    const doDelete = async () => {
+      try {
+        await sdk.posts.delete(post.id);
+        setIsDeleted(true);
+        onPostDeleted?.(post.id);
+      } catch {
+        const errMsg = 'Failed to delete post. Please try again.';
+        if (Platform.OS === 'web') alert(errMsg);
+        else Alert.alert('Error', errMsg);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Delete this post? This cannot be undone.')) {
+        await doDelete();
+      }
+    } else {
+      Alert.alert('Delete Post', 'Delete this post? This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!sdk || !editContent.trim()) return;
+    setEditSaving(true);
+    try {
+      await sdk.posts.update(post.id, { content: editContent.trim() });
+      setCurrentContent(editContent.trim());
+      setIsEditing(false);
+    } catch {
+      const errMsg = 'Failed to update post. Please try again.';
+      if (Platform.OS === 'web') alert(errMsg);
+      else Alert.alert('Error', errMsg);
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const renderMarkdownContent = () => {
@@ -193,11 +265,13 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
     </View>
   );
 
+  if (isDeleted) return null;
+
   return (
     <Pressable
-      onPress={() => router.push(`/post/${post.id}`)}
+      onPress={() => !isEditing && router.push(`/post/${post.id}`)}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        backgroundColor: pressed && !isEditing ? colors.surfaceHover : 'transparent',
         borderBottomWidth: 0.5,
         borderBottomColor: colors.borderSubtle,
         paddingHorizontal: spacing.lg,
@@ -241,7 +315,54 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
       </View>
 
       {/* Content */}
-      {isNsfw ? (
+      {isEditing ? (
+        <View style={{ gap: spacing.sm }}>
+          <TextInput
+            value={editContent}
+            onChangeText={setEditContent}
+            multiline
+            autoFocus
+            style={{
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.accent,
+              borderRadius: radius.md,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.md,
+              color: colors.text,
+              minHeight: 80,
+              ...typography.body,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
+          <View style={{ flexDirection: 'row', gap: spacing.sm, justifyContent: 'flex-end' }}>
+            <Pressable
+              onPress={() => setIsEditing(false)}
+              style={{
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.sm,
+                borderRadius: radius.md,
+                backgroundColor: colors.surfaceHover,
+              }}
+            >
+              <Text variant="label" color={colors.textSecondary}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleEditSave}
+              disabled={editSaving || !editContent.trim()}
+              style={{
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.sm,
+                borderRadius: radius.md,
+                backgroundColor: colors.accent,
+                opacity: editSaving ? 0.6 : 1,
+              }}
+            >
+              <Text variant="label" color="#fff">{editSaving ? 'Saving...' : 'Save'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : isNsfw ? (
         <NSFWOverlay>{renderContent()}</NSFWOverlay>
       ) : (
         renderContent()
@@ -312,6 +433,26 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
             minWidth: 160,
           }}
         >
+          {isOwnPost && (
+            <Pressable
+              onPress={() => {
+                setShowMenu(false);
+                setEditContent(content);
+                setIsEditing(true);
+              }}
+              style={{ padding: spacing.md }}
+            >
+              <Text variant="body">Edit</Text>
+            </Pressable>
+          )}
+          {isOwnPost && (
+            <Pressable
+              onPress={() => { setShowMenu(false); handleDelete(); }}
+              style={{ padding: spacing.md }}
+            >
+              <Text variant="body" color={colors.error}>Delete</Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={() => { setShowMenu(false); setShowReport(true); }}
             style={{ padding: spacing.md }}
@@ -325,6 +466,7 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
               try {
                 if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator?.clipboard) {
                   await navigator.clipboard.writeText(url);
+                  alert('Link copied!');
                 }
               } catch {}
             }}

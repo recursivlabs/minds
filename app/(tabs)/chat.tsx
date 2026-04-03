@@ -27,13 +27,22 @@ export default function ChatScreen() {
   const handleNewDM = async () => {
     if (!sdk || !dmUsername.trim()) return;
     try {
-      const res = await sdk.chat.dm({ username: dmUsername.trim() });
+      // Look up user by username first, then create DM with user_id
+      const profileRes = await sdk.profiles.getByUsername(dmUsername.trim());
+      const userId = profileRes.data?.id;
+      if (!userId) {
+        alert('User not found');
+        return;
+      }
+      const res = await sdk.chat.dm({ user_id: userId });
       if (res.data?.id) {
         setActiveConvoId(res.data.id);
         setShowNewChat(false);
         setDmUsername('');
       }
-    } catch {}
+    } catch {
+      alert('Could not start conversation. Check the username and try again.');
+    }
   };
 
   return (
@@ -208,11 +217,15 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [sending, setSending] = React.useState(false);
   const flatListRef = React.useRef<FlatList>(null);
 
+  // Mark as read when viewing the latest message
   React.useEffect(() => {
-    if (sdk) {
-      sdk.chat.markAsRead(conversationId).catch(() => {});
+    if (sdk && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.id && !lastMsg.id.startsWith('temp-')) {
+        sdk.chat.markAsRead(conversationId, { message_id: lastMsg.id }).catch(() => {});
+      }
     }
-  }, [conversationId, sdk]);
+  }, [conversationId, sdk, messages]);
 
   const handleSend = async () => {
     if (!text.trim() || !sdk) return;
@@ -230,7 +243,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     setMessages(prev => [...prev, tempMsg]);
 
     try {
-      await sdk.chat.send(conversationId, { content: messageText });
+      await sdk.chat.send({ conversation_id: conversationId, content: messageText });
       refresh();
     } catch {
       // Remove optimistic message on failure

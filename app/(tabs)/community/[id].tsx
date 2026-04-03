@@ -30,7 +30,7 @@ export default function CommunityDetailScreen() {
         const res = await sdk.communities.get(id);
         if (!cancelled) {
           setCommunity(res.data);
-          setIsMember(res.data?.isMember || res.data?.is_member || false);
+          setIsMember((res.data as any)?.isMember || (res.data as any)?.is_member || false);
         }
       } catch {}
       finally { if (!cancelled) setLoading(false); }
@@ -78,9 +78,7 @@ export default function CommunityDetailScreen() {
     if (!sdk || !id) return;
     const res = await sdk.posts.create({
       content: data.content,
-      title: data.title,
-      tags: data.tags,
-      communityId: id,
+      community_id: id,
       organization_id: ORG_ID || undefined,
     });
     if (res.data) {

@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Card, Button, Input, Avatar, Divider } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
+import { BASE_ORIGIN, ORG_ID } from '../../lib/recursiv';
+import { getItem } from '../../lib/storage';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
 type AdminTab = 'dashboard' | 'boosts' | 'reports' | 'users' | 'settings';
@@ -44,7 +46,41 @@ function KPICard({ label, value, accent = false }: { label: string; value: strin
 
 // ─── Dashboard Tab ───────────────────────────────────────────
 function DashboardTab() {
+  const { sdk } = useAuth();
   const [period, setPeriod] = React.useState<TimePeriod>('7days');
+  const [stats, setStats] = React.useState<any>({
+    totalUsers: 0,
+    totalAgents: 0,
+    totalApps: 0,
+    revenue: '$0',
+    activeUsers: 0,
+    newSignups: 0,
+  });
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const apiKey = await getItem('minds:api_key');
+        const res = await fetch(`${BASE_ORIGIN}/api/v1/orgs/${ORG_ID}/admin/stats`, {
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const d = data.data || data;
+          setStats({
+            totalUsers: d.total_users || d.totalUsers || 0,
+            totalAgents: d.total_agents || d.totalAgents || 0,
+            totalApps: d.total_apps || d.totalApps || 0,
+            revenue: d.revenue || '$0',
+            activeUsers: d.active_users || d.activeUsers || 0,
+            newSignups: d.new_signups || d.newSignups || 0,
+          });
+        }
+      } catch {
+        // Admin stats endpoint may not exist yet — show 0s gracefully
+      }
+    })();
+  }, [sdk]);
 
   const periodLabel: Record<TimePeriod, string> = {
     today: 'Today',
@@ -56,12 +92,12 @@ function DashboardTab() {
     <View style={{ gap: spacing.xl }}>
       {/* KPI grid */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-        <KPICard label="Total Users" value={0} accent />
-        <KPICard label="Total Agents" value={0} accent />
+        <KPICard label="Total Users" value={stats.totalUsers} accent />
+        <KPICard label="Total Agents" value={stats.totalAgents} accent />
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-        <KPICard label="Total Apps" value={0} />
-        <KPICard label="Revenue" value="$0" />
+        <KPICard label="Total Apps" value={stats.totalApps} />
+        <KPICard label="Revenue" value={stats.revenue} />
       </View>
 
       {/* Activity section */}
@@ -96,19 +132,19 @@ function DashboardTab() {
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text variant="body" color={colors.textSecondary}>Active Users</Text>
-              <Text variant="h3" color={colors.accent}>0</Text>
+              <Text variant="h3" color={colors.accent}>{stats.activeUsers}</Text>
             </View>
           </Card>
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text variant="body" color={colors.textSecondary}>New Signups</Text>
-              <Text variant="h3" color={colors.accent}>0</Text>
+              <Text variant="h3" color={colors.accent}>{stats.newSignups}</Text>
             </View>
           </Card>
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text variant="body" color={colors.textSecondary}>Revenue</Text>
-              <Text variant="h3" color={colors.accent}>$0</Text>
+              <Text variant="h3" color={colors.accent}>{stats.revenue}</Text>
             </View>
           </Card>
         </View>
@@ -169,11 +205,45 @@ function ReportsTab() {
 
 // ─── Users Tab ───────────────────────────────────────────────
 function UsersTab() {
+  const { sdk } = useAuth();
   const [search, setSearch] = React.useState('');
   const [expandedUser, setExpandedUser] = React.useState<string | null>(null);
+  const [users, setUsers] = React.useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = React.useState(true);
 
-  // Placeholder users list — will be replaced with SDK calls
-  const users: any[] = [];
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const apiKey = await getItem('minds:api_key');
+        // Try admin members endpoint first
+        const res = await fetch(`${BASE_ORIGIN}/api/v1/orgs/${ORG_ID}/admin/members`, {
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUsers((data.data || []).map((m: any) => m.user || m));
+        } else if (sdk) {
+          // Fall back to org members via SDK
+          if (ORG_ID) {
+            const membersRes = await sdk.organizations.members(ORG_ID, { limit: 100 } as any);
+            setUsers((membersRes.data || []).map((m: any) => m.user || m));
+          }
+        }
+      } catch {
+        // Admin endpoint may not exist — keep empty gracefully
+      } finally {
+        setUsersLoading(false);
+      }
+    })();
+  }, [sdk]);
+
+  const filteredUsers = search.trim()
+    ? users.filter((u: any) =>
+        (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (u.username || '').toLowerCase().includes(search.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(search.toLowerCase())
+      )
+    : users;
 
   return (
     <View style={{ gap: spacing.lg }}>
@@ -208,18 +278,27 @@ function UsersTab() {
         />
       </View>
 
-      {users.length === 0 ? (
+      {usersLoading ? (
+        <View style={{ padding: spacing.xl, gap: spacing.md }}>
+          {[1, 2, 3].map(i => (
+            <View key={i} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceHover }} />
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                <View style={{ width: 140, height: 14, backgroundColor: colors.surfaceHover, borderRadius: radius.sm }} />
+                <View style={{ width: 100, height: 12, backgroundColor: colors.surfaceHover, borderRadius: radius.sm }} />
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : filteredUsers.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: spacing['4xl'] }}>
           <Ionicons name="people-outline" size={48} color={colors.textMuted} />
           <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
-            {search ? 'No users found' : 'User list will load here'}
-          </Text>
-          <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-            Connect the admin users endpoint to populate this list
+            {search ? 'No users found' : 'No users loaded'}
           </Text>
         </View>
       ) : (
-        users.map((u: any) => (
+        filteredUsers.map((u: any) => (
           <Pressable
             key={u.id}
             onPress={() => setExpandedUser(expandedUser === u.id ? null : u.id)}

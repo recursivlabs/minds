@@ -1,24 +1,32 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Platform } from 'react-native';
+import { View, ScrollView, Pressable, Platform, TextInput, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Card, Button, Divider, PostCard, Skeleton } from '../../components';
+import { AgentCard } from '../../components/AgentCard';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
-import { useMyProfile, usePosts } from '../../lib/hooks';
-import { colors, spacing, radius } from '../../constants/theme';
+import { useMyProfile, usePosts, useCommunities, useAgents } from '../../lib/hooks';
+import { ORG_ID } from '../../lib/recursiv';
+import { colors, spacing, radius, typography } from '../../constants/theme';
 
 type ProfileTab = 'posts' | 'communities' | 'agents';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, signOut } = useAuth();
-  const { profile, loading: profileLoading } = useMyProfile();
-  const { posts, loading: postsLoading } = usePosts('latest', 20);
+  const { sdk, user, signOut } = useAuth();
+  const { profile, loading: profileLoading, refresh: refreshProfile } = useMyProfile();
+  const { posts, loading: postsLoading } = usePosts('latest', 50);
+  const { communities, loading: commLoading } = useCommunities(50);
+  const { agents, loading: agentsLoading } = useAgents(50);
   const [activeTab, setActiveTab] = React.useState<ProfileTab>('posts');
   const [showSettings, setShowSettings] = React.useState(false);
+  const [showEditProfile, setShowEditProfile] = React.useState(false);
+  const [editName, setEditName] = React.useState('');
+  const [editBio, setEditBio] = React.useState('');
+  const [editSaving, setEditSaving] = React.useState(false);
 
   const displayProfile = profile || user;
   const myPosts = posts.filter(
@@ -106,7 +114,11 @@ export default function ProfileScreen() {
           {/* Action buttons */}
           <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
             <Button
-              onPress={() => {}}
+              onPress={() => {
+                setEditName(displayProfile?.name || '');
+                setEditBio(displayProfile?.bio || profile?.bio || '');
+                setShowEditProfile(true);
+              }}
               variant="secondary"
               size={isWeb ? 'sm' : 'md'}
             >
@@ -201,31 +213,186 @@ export default function ProfileScreen() {
         )}
 
         {activeTab === 'communities' && (
-          <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-            <Ionicons name="people-outline" size={40} color={colors.textMuted} />
-            <Text variant="body" color={colors.textMuted} align="center">
-              You haven't joined any communities yet
-            </Text>
-            <Button onPress={() => router.push('/(tabs)/explore')} size="sm">
-              Explore communities
-            </Button>
-          </View>
+          commLoading ? (
+            <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} height={60} />
+              ))}
+            </View>
+          ) : communities.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+              <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+              <Text variant="body" color={colors.textMuted} align="center">
+                You haven't joined any communities yet
+              </Text>
+              <Button onPress={() => router.push('/(tabs)/discover')} size="sm">
+                Explore communities
+              </Button>
+            </View>
+          ) : (
+            communities.map((c: any) => (
+              <Pressable
+                key={c.id}
+                onPress={() => router.push(`/(tabs)/community/${c.id}`)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.md,
+                  paddingHorizontal: spacing.xl,
+                  paddingVertical: spacing.lg,
+                  backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: colors.borderSubtle,
+                })}
+              >
+                <Avatar uri={c.image || c.avatar} name={c.name} size="md" />
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodyMedium">{c.name}</Text>
+                  <Text variant="caption" color={colors.textMuted} numberOfLines={1}>
+                    {c.memberCount || c.member_count || 0} members
+                  </Text>
+                </View>
+              </Pressable>
+            ))
+          )
         )}
 
         {activeTab === 'agents' && (
-          <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-            <Ionicons name="sparkles-outline" size={40} color={colors.textMuted} />
-            <Text variant="body" color={colors.textMuted} align="center">
-              Create an AI agent to automate tasks
-            </Text>
-            <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })} size="sm">
-              Learn more
-            </Button>
-          </View>
+          agentsLoading ? (
+            <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} height={100} />
+              ))}
+            </View>
+          ) : agents.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+              <Ionicons name="sparkles-outline" size={40} color={colors.textMuted} />
+              <Text variant="body" color={colors.textMuted} align="center">
+                Create an AI agent to automate tasks
+              </Text>
+              <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })} size="sm">
+                Learn more
+              </Button>
+            </View>
+          ) : (
+            <View style={{ padding: spacing.xl, gap: spacing.md }}>
+              {agents.map((agent: any) => (
+                <AgentCard
+                  key={agent.id}
+                  agent={agent}
+                  onChat={() => router.push({ pathname: '/(tabs)/chat', params: { agent: agent.id } })}
+                />
+              ))}
+            </View>
+          )
         )}
 
         <View style={{ height: spacing['4xl'] }} />
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={showEditProfile} transparent animationType="fade" onRequestClose={() => setShowEditProfile(false)}>
+        <Pressable
+          onPress={() => setShowEditProfile(false)}
+          style={{
+            flex: 1,
+            backgroundColor: colors.overlay,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: spacing.xl,
+          }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: radius.xl,
+              padding: spacing['2xl'],
+              width: '100%',
+              maxWidth: 400,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Text variant="h3" style={{ marginBottom: spacing.xl }}>Edit Profile</Text>
+
+            <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>Name</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Your name"
+              placeholderTextColor={colors.textMuted}
+              style={{
+                backgroundColor: colors.bg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: 10,
+                color: colors.text,
+                ...typography.body,
+                marginBottom: spacing.lg,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+              }}
+            />
+
+            <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>Bio</Text>
+            <TextInput
+              value={editBio}
+              onChangeText={setEditBio}
+              placeholder="Tell people about yourself"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              numberOfLines={3}
+              style={{
+                backgroundColor: colors.bg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: 10,
+                color: colors.text,
+                minHeight: 80,
+                textAlignVertical: 'top',
+                ...typography.body,
+                marginBottom: spacing.xl,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+              }}
+            />
+
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Button onPress={() => setShowEditProfile(false)} variant="secondary" fullWidth>
+                  Cancel
+                </Button>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  loading={editSaving}
+                  onPress={async () => {
+                    if (!sdk) return;
+                    setEditSaving(true);
+                    try {
+                      await sdk.profiles.update({ name: editName.trim(), bio: editBio.trim() });
+                      await refreshProfile();
+                      setShowEditProfile(false);
+                    } catch {
+                      const msg = 'Failed to update profile. Please try again.';
+                      if (Platform.OS === 'web') alert(msg);
+                      else Alert.alert('Error', msg);
+                    } finally {
+                      setEditSaving(false);
+                    }
+                  }}
+                  fullWidth
+                >
+                  Save
+                </Button>
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Settings overlay */}
       {showSettings && (
@@ -267,6 +434,12 @@ export default function ProfileScreen() {
             <Text variant="h3" style={{ marginBottom: spacing.xl }}>Settings</Text>
 
             <Pressable
+              onPress={() => {
+                setShowSettings(false);
+                setEditName(displayProfile?.name || '');
+                setEditBio(displayProfile?.bio || profile?.bio || '');
+                setShowEditProfile(true);
+              }}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',

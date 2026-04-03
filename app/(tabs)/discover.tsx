@@ -102,7 +102,21 @@ export default function DiscoverScreen() {
               <View style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.md }}>
                 <AgentCard
                   agent={item}
-                  onChat={() => console.log('Chat with agent:', item.id)}
+                  onChat={async () => {
+                    if (!sdk) return;
+                    try {
+                      // Create or get a DM with the agent, then navigate to chat
+                      const res = await sdk.chat.dm({ user_id: item.id });
+                      if (res.data?.id) {
+                        router.push({ pathname: '/(tabs)/chat', params: { conversation: res.data.id } });
+                      } else {
+                        router.push({ pathname: '/(tabs)/chat', params: { agent: item.id } });
+                      }
+                    } catch {
+                      // Fall back to just navigating to chat
+                      router.push({ pathname: '/(tabs)/chat', params: { agent: item.id } });
+                    }
+                  }}
                 />
               </View>
             )}

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Modal } from 'react-native';
+import { View, ScrollView, Pressable, Modal, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +22,12 @@ export default function BoostScreen() {
   );
 
   const handleCreateBoost = () => {
-    // Boost creation placeholder
+    const msg = 'Boost system coming soon — spend MINDS tokens to amplify your content';
+    if (Platform.OS === 'web') {
+      alert(msg);
+    } else {
+      Alert.alert('Coming Soon', msg);
+    }
     setShowCreate(false);
     setSelectedPostId(null);
     setBoostAmount(1);

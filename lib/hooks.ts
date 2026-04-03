@@ -7,13 +7,14 @@ import { getSdk, ORG_ID } from './recursiv';
  * All calls scoped to the Minds org.
  */
 export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limit = 20) {
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
   const [posts, setPosts] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(true);
   const offsetRef = React.useRef(0);
+  const followingIdsRef = React.useRef<Set<string> | null>(null);
 
   const fetchPosts = React.useCallback(async (refresh = false) => {
     const s = sdk || getSdk();
@@ -23,6 +24,18 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         setRefreshing(true);
         offsetRef.current = 0;
       }
+
+      // For "following" tab, fetch the user's following list to filter by
+      if (sort === 'following' && user?.id && !followingIdsRef.current) {
+        try {
+          const followingRes = await s.profiles.following(user.id, { limit: 500 });
+          const ids = new Set((followingRes.data || []).map((p: any) => p.id));
+          followingIdsRef.current = ids;
+        } catch {
+          followingIdsRef.current = new Set();
+        }
+      }
+
       const res = await s.posts.list({ limit, offset: refresh ? 0 : offsetRef.current, organization_id: ORG_ID || undefined });
       let data = res.data || [];
 
@@ -33,6 +46,11 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
           new Date(b.createdAt || b.created_at || 0).getTime() -
           new Date(a.createdAt || a.created_at || 0).getTime()
         );
+      } else if (sort === 'following' && followingIdsRef.current) {
+        data = data.filter((p: any) => {
+          const authorId = p.author?.id || p.userId || p.user_id;
+          return followingIdsRef.current!.has(authorId);
+        });
       }
 
       if (refresh) {
@@ -48,12 +66,13 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
       setLoading(false);
       setRefreshing(false);
     }
-  }, [sdk, sort, limit]);
+  }, [sdk, sort, limit, user?.id]);
 
   React.useEffect(() => {
     setLoading(true);
     setPosts([]);
     offsetRef.current = 0;
+    followingIdsRef.current = null;
     fetchPosts(true);
   }, [sort]);
 
@@ -169,7 +188,7 @@ export function useProfile(username: string) {
           setProfile(res.data);
           try {
             const followRes = await s.profiles.isFollowing(res.data.id);
-            setIsFollowing(followRes.data?.following ?? false);
+            setIsFollowing(followRes.data?.is_following ?? false);
           } catch {}
         }
       } catch (err: any) {
@@ -331,7 +350,7 @@ export function useSearchPosts(query: string) {
     const timer = setTimeout(async () => {
       try {
         const s = sdk || getSdk();
-        const res = await s.posts.search({ query, limit: 20, organization_id: ORG_ID || undefined });
+        const res = await s.posts.search({ q: query, limit: 20, organization_id: ORG_ID || undefined });
         if (!cancelled) setResults(res.data || []);
       } catch {}
       finally { if (!cancelled) setLoading(false); }

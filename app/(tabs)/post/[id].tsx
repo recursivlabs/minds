@@ -29,7 +29,7 @@ export default function PostDetailScreen() {
         // Replies are typically child posts; fetch posts with parentId
         const res = await sdk.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
         const postReplies = (res.data || []).filter(
-          (p: any) => p.parentId === id || p.parent_id === id
+          (p: any) => p.parentId === id || p.parent_id === id || p.reply_to_id === id || p.replyToId === id
         );
         if (!cancelled) setReplies(postReplies);
       } catch {}
@@ -47,7 +47,7 @@ export default function PostDetailScreen() {
     try {
       const res = await sdk.posts.create({
         content: text,
-        parentId: id,
+        reply_to_id: id,
         organization_id: ORG_ID || undefined,
       });
       if (res.data) {

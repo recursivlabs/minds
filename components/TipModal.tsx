@@ -23,30 +23,15 @@ export function TipModal({ visible, onClose, recipientName, recipientAvatar, onS
   const [sending, setSending] = React.useState(false);
 
   const handleSend = async () => {
-    const numAmount = parseFloat(amount);
-    if (!numAmount || numAmount <= 0) return;
-    setSending(true);
-    try {
-      await onSend(numAmount, message);
-      const msg = `Sent ${numAmount} MINDS token${numAmount !== 1 ? 's' : ''} to ${recipientName}`;
-      if (Platform.OS === 'web') {
-        alert(msg);
-      } else {
-        Alert.alert('Tip Sent', msg);
-      }
-      setAmount('1');
-      setMessage('');
-      onClose();
-    } catch {
-      const errMsg = 'Failed to send tip. Please try again.';
-      if (Platform.OS === 'web') {
-        alert(errMsg);
-      } else {
-        Alert.alert('Error', errMsg);
-      }
-    } finally {
-      setSending(false);
+    const msg = 'Tipping coming soon — this feature will use MINDS tokens';
+    if (Platform.OS === 'web') {
+      alert(msg);
+    } else {
+      Alert.alert('Coming Soon', msg);
     }
+    setAmount('1');
+    setMessage('');
+    onClose();
   };
 
   return (
