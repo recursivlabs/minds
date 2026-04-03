@@ -99,13 +99,6 @@ export default function CreateScreen() {
         organization_id: ORG_ID || undefined,
       });
 
-      const msg = isBlogMode ? 'Blog published!' : 'Post created!';
-      if (Platform.OS === 'web') {
-        alert(msg);
-      } else {
-        Alert.alert('Success', msg);
-      }
-
       setTitle('');
       setContent('');
       setTags([]);
@@ -113,7 +106,7 @@ export default function CreateScreen() {
       setIsNsfw(false);
       setSelectedCommunity(null);
 
-      router.push('/(tabs)');
+      router.replace('/(tabs)');
     } catch (err: any) {
       const msg = err?.message || 'Failed to create post';
       if (Platform.OS === 'web') {

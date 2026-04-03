@@ -46,7 +46,8 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
   const authorUsername = author.username || author.name || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
   const content = post.content || post.body || '';
-  const media = post.media || post.image || post.thumbnail || null;
+  const rawMedia = post.media;
+  const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || post.image || post.thumbnail || null;
   const replyCount = post.replyCount || post.reply_count || post.comments_count || 0;
   const isBoosted = post.boosted || post.is_boosted || false;
   const isNsfw = (post.tags || []).some((t: any) =>
