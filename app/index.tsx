@@ -66,6 +66,85 @@ function Starfield() {
   );
 }
 
+function Ufo({ delay, duration, startX, startY, endX, endY }: {
+  delay: number; duration: number; startX: number; startY: number; endX: number; endY: number;
+}) {
+  const progress = React.useRef(new Animated.Value(0)).current;
+  const opacity = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 0.7, duration: 600, useNativeDriver: true }),
+          Animated.timing(progress, { toValue: 1, duration, useNativeDriver: true }),
+        ]),
+        Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.delay(2000),
+        Animated.timing(progress, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [startX, endX] });
+  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [startY, endY] });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        opacity,
+        transform: [{ translateX }, { translateY }],
+      }}
+    >
+      {/* UFO body — small elongated oval */}
+      <View style={{
+        width: 12,
+        height: 4,
+        borderRadius: 6,
+        backgroundColor: 'rgba(212,168,68,0.5)',
+        ...(Platform.OS === 'web' ? { boxShadow: '0 0 8px rgba(212,168,68,0.3)' } as any : {}),
+      }} />
+      {/* Tiny dome on top */}
+      <View style={{
+        position: 'absolute',
+        top: -2,
+        left: 4,
+        width: 4,
+        height: 3,
+        borderTopLeftRadius: 4,
+        borderTopRightRadius: 4,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+      }} />
+    </Animated.View>
+  );
+}
+
+function UfoField() {
+  const ufos = React.useMemo(() => {
+    const w = SCREEN_W || 1200;
+    const h = SCREEN_H || 900;
+    return [
+      { id: 0, delay: 3000, duration: 8000, startX: -20, startY: h * 0.3, endX: w + 20, endY: h * 0.25 },
+      { id: 1, delay: 12000, duration: 6000, startX: w + 20, startY: h * 0.7, endX: -20, endY: h * 0.6 },
+      { id: 2, delay: 20000, duration: 10000, startX: w * 0.2, startY: -10, endX: w * 0.8, endY: h + 10 },
+    ];
+  }, []);
+
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="none">
+      {ufos.map((u) => (
+        <Ufo key={u.id} {...u} />
+      ))}
+    </View>
+  );
+}
+
 function GlowOrb() {
   const scale = React.useRef(new Animated.Value(1)).current;
   const opacity = React.useRef(new Animated.Value(0.03)).current;
@@ -123,6 +202,7 @@ export default function LandingScreen() {
       }}
     >
       <Starfield />
+      <UfoField />
       <GlowOrb />
 
       {/* Hero block — centered as a group */}
