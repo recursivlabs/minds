@@ -15,7 +15,7 @@ export function Container({
   safeBottom = false,
   padded = true,
   centered = false,
-  maxWidth = 600,
+  maxWidth,
   style,
   children,
   ...props
