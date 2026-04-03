@@ -8,14 +8,13 @@ import { colors, spacing } from '../../constants/theme';
 export default function SignUpScreen() {
   const router = useRouter();
   const { signUp } = useAuth();
-  const [fullName, setFullName] = React.useState('');
-  const [email, setEmail] = React.useState('');
+  const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
   const handleSignUp = async () => {
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
+    if (!username.trim() || !password.trim()) {
       setError('All fields are required');
       return;
     }
@@ -26,7 +25,8 @@ export default function SignUpScreen() {
     setError('');
     setLoading(true);
     try {
-      await signUp(fullName.trim(), email.trim().toLowerCase(), password);
+      const email = username.includes('@') ? username.trim().toLowerCase() : `${username.trim().toLowerCase()}@minds.com`;
+      await signUp(username.trim(), email, password);
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(err?.message || 'Sign up failed. Please try again.');
@@ -40,38 +40,22 @@ export default function SignUpScreen() {
       <Text
         variant="h2"
         color={colors.accent}
-        style={{ marginBottom: spacing['3xl'], letterSpacing: -1, fontWeight: '700' }}
+        style={{ marginBottom: spacing['3xl'], letterSpacing: 4, fontWeight: '300' }}
       >
         minds
       </Text>
 
-      <Text variant="h1" style={{ marginBottom: spacing.xs }}>
-        Join Minds
-      </Text>
-      <Text variant="body" color={colors.textMuted} style={{ marginBottom: spacing['3xl'] }}>
-        Create your account and start sharing
-      </Text>
-
       <Input
-        label="Name"
-        placeholder="Your name"
-        value={fullName}
-        onChangeText={setFullName}
-        autoCapitalize="words"
-        autoComplete="name"
-      />
-      <Input
-        label="Email"
-        placeholder="you@example.com"
-        value={email}
-        onChangeText={setEmail}
+        label="Username"
+        placeholder="Choose a username"
+        value={username}
+        onChangeText={setUsername}
         autoCapitalize="none"
-        keyboardType="email-address"
-        autoComplete="email"
+        autoComplete="username"
       />
       <Input
         label="Password"
-        placeholder="Create a password (8+ characters)"
+        placeholder="8+ characters"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -87,7 +71,7 @@ export default function SignUpScreen() {
         size="lg"
         fullWidth
       >
-        Create account
+        Sign up
       </Button>
 
       <View style={{ height: spacing.xl }} />
