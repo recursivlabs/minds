@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { useAuth } from './auth';
-import { getSdk } from './recursiv';
+import { getSdk, ORG_ID } from './recursiv';
 
 /**
  * Fetch posts from the feed.
- * Supports sort: 'score' (for you), 'latest', or 'following'.
+ * All calls scoped to the Minds org.
  */
 export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limit = 20) {
   const { sdk } = useAuth();
@@ -23,7 +23,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         setRefreshing(true);
         offsetRef.current = 0;
       }
-      const res = await s.posts.list({ limit, offset: refresh ? 0 : offsetRef.current });
+      const res = await s.posts.list({ limit, offset: refresh ? 0 : offsetRef.current, organization_id: ORG_ID || undefined });
       let data = res.data || [];
 
       if (sort === 'score') {
@@ -95,7 +95,7 @@ export function usePost(postId: string) {
 }
 
 /**
- * Fetch communities.
+ * Fetch communities scoped to Minds org.
  */
 export function useCommunities(limit = 20) {
   const { sdk } = useAuth();
@@ -106,7 +106,7 @@ export function useCommunities(limit = 20) {
   const fetch = React.useCallback(async () => {
     try {
       const s = sdk || getSdk();
-      const res = await s.communities.list({ limit });
+      const res = await s.communities.list({ limit, organization_id: ORG_ID || undefined });
       setCommunities(res.data || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load communities');
@@ -121,7 +121,7 @@ export function useCommunities(limit = 20) {
 }
 
 /**
- * Fetch discoverable agents.
+ * Fetch discoverable agents scoped to Minds org.
  */
 export function useAgents(limit = 20) {
   const { sdk } = useAuth();
@@ -134,7 +134,7 @@ export function useAgents(limit = 20) {
     (async () => {
       try {
         const s = sdk || getSdk();
-        const res = await s.agents.listDiscoverable({ limit });
+        const res = await s.agents.listDiscoverable({ limit, organization_id: ORG_ID || undefined });
         if (!cancelled) setAgents(res.data || []);
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load agents');
@@ -279,7 +279,7 @@ export function useTags(limit = 50) {
 }
 
 /**
- * Search posts.
+ * Search posts scoped to Minds org.
  */
 export function useSearchPosts(query: string) {
   const { sdk } = useAuth();
@@ -296,7 +296,7 @@ export function useSearchPosts(query: string) {
     const timer = setTimeout(async () => {
       try {
         const s = sdk || getSdk();
-        const res = await s.posts.search({ query, limit: 20 });
+        const res = await s.posts.search({ query, limit: 20, organization_id: ORG_ID || undefined });
         if (!cancelled) setResults(res.data || []);
       } catch {}
       finally { if (!cancelled) setLoading(false); }

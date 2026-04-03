@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Button, Divider, PostCard, ComposePost, Skeleton, Card } from '../../../components';
 import { useAuth } from '../../../lib/auth';
+import { ORG_ID } from '../../../lib/recursiv';
 import { colors, spacing, radius } from '../../../constants/theme';
 
 export default function CommunityDetailScreen() {
@@ -43,7 +44,7 @@ export default function CommunityDetailScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await sdk.posts.list({ limit: 30 });
+        const res = await sdk.posts.list({ limit: 30, organization_id: ORG_ID || undefined });
         const communityPosts = (res.data || []).filter(
           (p: any) => p.communityId === id || p.community_id === id
         );
@@ -80,6 +81,7 @@ export default function CommunityDetailScreen() {
       title: data.title,
       tags: data.tags,
       communityId: id,
+      organization_id: ORG_ID || undefined,
     });
     if (res.data) {
       setPosts(prev => [

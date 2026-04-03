@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Button, Input, Card } from '../../components';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
+import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
 export default function CreateScreen() {
@@ -95,6 +96,7 @@ export default function CreateScreen() {
         title: title.trim() || undefined,
         tags: allTags,
         communityId: selectedCommunity || undefined,
+        organization_id: ORG_ID || undefined,
       });
 
       const msg = isBlogMode ? 'Blog published!' : 'Post created!';

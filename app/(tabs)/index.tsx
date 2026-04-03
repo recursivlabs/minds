@@ -3,6 +3,7 @@ import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header, FeedTabs, PostCard, ComposePost, Skeleton, Text } from '../../components';
+import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
 import { colors, spacing, radius } from '../../constants/theme';
@@ -33,6 +34,7 @@ export default function FeedScreen() {
       content: data.content,
       title: data.title,
       tags: data.tags,
+      organization_id: ORG_ID || undefined,
     });
     if (res.data) {
       setPosts(prev => [{ ...res.data, author: { name: user?.name, username: user?.username, image: user?.image } }, ...prev]);

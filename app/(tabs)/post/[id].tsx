@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, PostCard, Avatar, Skeleton, Button } from '../../../components';
 import { useAuth } from '../../../lib/auth';
 import { usePost } from '../../../lib/hooks';
+import { ORG_ID } from '../../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../../constants/theme';
 
 export default function PostDetailScreen() {
@@ -26,7 +27,7 @@ export default function PostDetailScreen() {
     (async () => {
       try {
         // Replies are typically child posts; fetch posts with parentId
-        const res = await sdk.posts.list({ limit: 50 });
+        const res = await sdk.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
         const postReplies = (res.data || []).filter(
           (p: any) => p.parentId === id || p.parent_id === id
         );
@@ -47,6 +48,7 @@ export default function PostDetailScreen() {
       const res = await sdk.posts.create({
         content: text,
         parentId: id,
+        organization_id: ORG_ID || undefined,
       });
       if (res.data) {
         setReplies(prev => [
