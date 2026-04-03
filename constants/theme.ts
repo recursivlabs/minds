@@ -1,49 +1,51 @@
 /**
  * Minds 2.0 Design Tokens
- * Dark theme with Minds blue accent.
+ * Dark, futuristic theme with gold accent.
  */
 
 export const colors = {
-  // Backgrounds
-  bg: '#09090b',
-  surface: '#18181b',
-  surfaceRaised: '#1e1e22',
-  surfaceHover: '#27272a',
+  // Backgrounds — deep, near-black
+  bg: '#08080a',
+  surface: '#111113',
+  surfaceRaised: '#1a1a1e',
+  surfaceHover: '#222226',
 
   // Borders
-  border: '#27272a',
-  borderSubtle: '#1e1e22',
-  borderFocus: '#a1a1aa',
+  border: '#2a2a2e',
+  borderSubtle: '#1a1a1e',
+  borderFocus: '#d4a844',
 
   // Text
-  text: '#fafafa',
-  textSecondary: '#a1a1aa',
-  textMuted: '#71717a',
-  textInverse: '#09090b',
+  text: '#f5f5f5',
+  textSecondary: '#a0a0a8',
+  textMuted: '#606068',
+  textInverse: '#08080a',
 
-  // Accent — Minds blue
-  accent: '#1b85d6',
-  accentHover: '#1a9fff',
+  // Accent — Minds gold
+  accent: '#d4a844',
+  accentHover: '#e6bc54',
+  accentMuted: 'rgba(212, 168, 68, 0.12)',
+  accentSubtle: 'rgba(212, 168, 68, 0.06)',
 
   // Semantic
   success: '#34d399',
-  successMuted: 'rgba(52, 211, 153, 0.12)',
+  successMuted: 'rgba(52, 211, 153, 0.10)',
   error: '#f87171',
-  errorMuted: 'rgba(248, 113, 113, 0.12)',
+  errorMuted: 'rgba(248, 113, 113, 0.10)',
   warning: '#fbbf24',
-  warningMuted: 'rgba(251, 191, 36, 0.12)',
+  warningMuted: 'rgba(251, 191, 36, 0.10)',
   info: '#60a5fa',
-  infoMuted: 'rgba(96, 165, 250, 0.12)',
+  infoMuted: 'rgba(96, 165, 250, 0.10)',
 
   // Overlay
-  overlay: 'rgba(0, 0, 0, 0.6)',
-  scrim: 'rgba(0, 0, 0, 0.4)',
+  overlay: 'rgba(0, 0, 0, 0.7)',
+  scrim: 'rgba(0, 0, 0, 0.5)',
 
-  // Special
-  boost: '#f5a623',
-  boostMuted: 'rgba(245, 166, 35, 0.12)',
-  token: '#ffd700',
-  tokenMuted: 'rgba(255, 215, 0, 0.12)',
+  // Special — boost and token share the gold family
+  boost: '#e6bc54',
+  boostMuted: 'rgba(230, 188, 84, 0.12)',
+  token: '#f0d060',
+  tokenMuted: 'rgba(240, 208, 96, 0.10)',
 };
 
 export const spacing = {

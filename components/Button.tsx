@@ -45,7 +45,7 @@ export function Button({
         : 'transparent';
 
   const textColor =
-    variant === 'primary' ? '#fff' : colors.text;
+    variant === 'primary' ? colors.textInverse : colors.text;
 
   const borderColor =
     variant === 'secondary' ? colors.border : 'transparent';

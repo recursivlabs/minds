@@ -6,26 +6,28 @@
 - **Subtitle**: Powered by AI. Owned by you.
 
 ## Colors
-- **Background**: `#09090b` (near-black)
-- **Surface**: `#18181b` (card backgrounds)
-- **Accent**: `#1b85d6` (Minds blue)
-- **Boost**: `#f5a623` (gold)
-- **Token**: `#ffd700` (gold)
+- **Background**: `#08080a` (deep black)
+- **Surface**: `#111113` (card backgrounds)
+- **Accent**: `#d4a844` (Minds gold)
+- **Accent Hover**: `#e6bc54` (lighter gold)
+- **Boost**: `#e6bc54` (gold)
+- **Token**: `#f0d060` (bright gold)
 
 ## Typography
-Dark theme, high contrast white text on black backgrounds.
+Dark theme, high contrast white text on deep black backgrounds.
 System font stack, no custom fonts required.
 
 ## Design Principles
-1. **Dark first** - the entire app is dark mode
-2. **Minimal chrome** - content is the focus, UI gets out of the way
-3. **Blue accents** - Minds blue for interactive elements
-4. **Gold for value** - boost and token features use gold
-5. **Instant feedback** - optimistic updates everywhere
+1. **Dark first** — deep, near-black backgrounds for a futuristic feel
+2. **Minimal chrome** — content is the focus, UI gets out of the way
+3. **Gold accents** — warm gold for all interactive elements, CTAs, active states
+4. **Gold for value** — boost, tokens, and tips all use the gold family
+5. **Instant feedback** — optimistic updates everywhere
+6. **Futuristic simplicity** — clean lines, generous spacing, no visual noise
 
 ## Key Components
 - **PostCard**: The core content unit with votes, replies, boost, tip
-- **VoteButtons**: Upvote/downvote arrows (blue up, red down)
+- **VoteButtons**: Upvote/downvote arrows (gold up, red down)
 - **BoostBadge**: Gold rocket badge on boosted posts
 - **NSFWOverlay**: Blur overlay with tap-to-reveal
 - **WalletCard**: Token balance display with diamond icon
