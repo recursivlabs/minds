@@ -19,3 +19,4 @@ export { TipModal } from './TipModal';
 export { WalletCard } from './WalletCard';
 export { Header } from './Header';
 export { AgentCard } from './AgentCard';
+export { UserCard } from './UserCard';

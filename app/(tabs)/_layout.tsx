@@ -72,6 +72,7 @@ export default function TabLayout() {
       {/* Hidden from tab bar but accessible via navigation */}
       <Tabs.Screen name="wallet" options={{ href: null }} />
       <Tabs.Screen name="boost" options={{ href: null }} />
+      <Tabs.Screen name="discover" options={{ href: null }} />
       <Tabs.Screen name="post/[id]" options={{ href: null }} />
       <Tabs.Screen name="user/[username]" options={{ href: null }} />
       <Tabs.Screen name="community/[id]" options={{ href: null }} />

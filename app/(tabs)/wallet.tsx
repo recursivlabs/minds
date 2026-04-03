@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Card, Button, WalletCard, Divider } from '../../components';
+import { Text, Card, Button, WalletCard, Divider, Container } from '../../components';
 import { colors, spacing, radius } from '../../constants/theme';
 
 const EARN_METHODS = [
@@ -34,7 +34,7 @@ export default function WalletScreen() {
   const router = useRouter();
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+    <Container safeTop padded={false}>
       {/* Header */}
       <View
         style={{
@@ -127,6 +127,6 @@ export default function WalletScreen() {
 
         <View style={{ height: spacing['4xl'] }} />
       </ScrollView>
-    </View>
+    </Container>
   );
 }

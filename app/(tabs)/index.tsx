@@ -2,12 +2,11 @@ import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Header, FeedTabs, PostCard, ComposePost, Skeleton, Text } from '../../components';
+import { Header, FeedTabs, PostCard, ComposePost, Skeleton, Text, Container } from '../../components';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
-import { colors, spacing, radius } from '../../constants/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, spacing } from '../../constants/theme';
 
 type FeedTab = 'foryou' | 'latest' | 'following';
 
@@ -20,7 +19,6 @@ function feedTabToSort(tab: FeedTab): 'score' | 'latest' | 'following' {
 }
 
 export default function FeedScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sdk, user } = useAuth();
   const [activeTab, setActiveTab] = React.useState<FeedTab>('foryou');
@@ -57,7 +55,7 @@ export default function FeedScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+    <Container safeTop padded={false}>
       <Header />
       <FeedTabs active={activeTab} onChange={setActiveTab} />
 
@@ -140,6 +138,6 @@ export default function FeedScreen() {
       >
         <Ionicons name="add" size={28} color="#fff" />
       </Pressable>
-    </View>
+    </Container>
   );
 }

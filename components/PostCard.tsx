@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Pressable, Image } from 'react-native';
+import { View, Pressable, Image, Platform, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -10,7 +10,8 @@ import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { TipModal } from './TipModal';
 import { useAuth } from '../lib/auth';
-import { colors, spacing, radius } from '../constants/theme';
+import { colors, spacing, radius, typography } from '../constants/theme';
+import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
 interface Props {
   post: any;
@@ -106,17 +107,76 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
     console.log('Tip:', { postId: post.id, userId: author.id, amount, message });
   };
 
+  const renderMarkdownContent = () => {
+    if (!content) return null;
+
+    if (Platform.OS === 'web') {
+      const html = renderMarkdownToHtml(compact ? content.slice(0, 300) : content);
+      // Use createElement to avoid TSX type issues with <div> in React Native
+      const WebDiv = 'div' as any;
+      return (
+        <WebDiv
+          dangerouslySetInnerHTML={{ __html: html }}
+          style={{
+            color: colors.text,
+            fontSize: typography.body.fontSize,
+            lineHeight: `${typography.body.lineHeight}px`,
+            marginBottom: media ? spacing.md : 0,
+            wordBreak: 'break-word',
+          }}
+        />
+      );
+    }
+
+    // Native: parse segments
+    const segments = parseMarkdownSegments(compact ? content.slice(0, 300) : content);
+    return (
+      <Text variant="body" style={{ marginBottom: media ? spacing.md : 0 }}>
+        {segments.map((seg, i) => {
+          switch (seg.type) {
+            case 'bold':
+              return <Text key={i} variant="bodyMedium" style={{ fontWeight: '700' }}>{seg.text}</Text>;
+            case 'italic':
+              return <Text key={i} variant="body" style={{ fontStyle: 'italic' }}>{seg.text}</Text>;
+            case 'code':
+              return (
+                <Text
+                  key={i}
+                  variant="mono"
+                  color={colors.textSecondary}
+                  style={{ backgroundColor: colors.surfaceRaised }}
+                >
+                  {seg.text}
+                </Text>
+              );
+            case 'link':
+              return (
+                <Text
+                  key={i}
+                  variant="body"
+                  color={colors.accent}
+                  onPress={() => Linking.openURL(seg.url)}
+                  style={{ textDecorationLine: 'underline' }}
+                >
+                  {seg.text}
+                </Text>
+              );
+            case 'break':
+              return <Text key={i}>{'\n'}</Text>;
+            default:
+              return <Text key={i} variant="body">{seg.text}</Text>;
+          }
+        })}
+        {compact && content.length > 300 ? (
+          <Text variant="body" color={colors.textMuted}>...</Text>
+        ) : null}
+      </Text>
+    );
+  };
+
   const renderContent = () => (
     <View>
-      {content ? (
-        <Text
-          variant="body"
-          style={{ marginBottom: media ? spacing.md : 0 }}
-          numberOfLines={compact ? 4 : undefined}
-        >
-          {content}
-        </Text>
-      ) : null}
+      {renderMarkdownContent()}
       {media ? (
         <Image
           source={{ uri: typeof media === 'string' ? media : media.url }}
@@ -257,13 +317,15 @@ export function PostCard({ post, onVoteChange, compact = false }: Props) {
             <Text variant="body" color={colors.error}>Report</Text>
           </Pressable>
           <Pressable
-            onPress={() => setShowMenu(false)}
-            style={{ padding: spacing.md }}
-          >
-            <Text variant="body">Flag NSFW</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setShowMenu(false)}
+            onPress={async () => {
+              setShowMenu(false);
+              const url = `https://minds.on.recursiv.io/(tabs)/post/${post.id}`;
+              try {
+                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator?.clipboard) {
+                  await navigator.clipboard.writeText(url);
+                }
+              } catch {}
+            }}
             style={{ padding: spacing.md }}
           >
             <Text variant="body">Copy Link</Text>

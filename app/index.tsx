@@ -121,14 +121,28 @@ function Ufo({ delay, duration, startX, startY, endX, endY }: {
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [startY, endY] });
   return (
     <Animated.View style={{ position: 'absolute', left: 0, top: 0, opacity, transform: [{ translateX }, { translateY }] }}>
+      {/* Beam of light underneath */}
       <View style={{
-        width: 12, height: 4, borderRadius: 6, backgroundColor: 'rgba(212,168,68,0.5)',
-        ...(Platform.OS === 'web' ? { boxShadow: '0 0 8px rgba(212,168,68,0.3)' } as any : {}),
+        position: 'absolute', top: 8, left: 6, width: 0, height: 0,
+        borderLeftWidth: 8, borderRightWidth: 8, borderTopWidth: 14,
+        borderLeftColor: 'transparent', borderRightColor: 'transparent',
+        borderTopColor: 'rgba(212,168,68,0.08)',
       }} />
+      {/* Saucer body — wide flat oval */}
       <View style={{
-        position: 'absolute', top: -2, left: 4, width: 4, height: 3,
-        borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: 'rgba(255,255,255,0.3)',
+        width: 28, height: 6, borderRadius: 14, backgroundColor: 'rgba(180,180,190,0.5)',
+        ...(Platform.OS === 'web' ? { boxShadow: '0 0 12px rgba(212,168,68,0.25)' } as any : {}),
       }} />
+      {/* Dome on top — half circle */}
+      <View style={{
+        position: 'absolute', top: -5, left: 8, width: 12, height: 7,
+        borderTopLeftRadius: 8, borderTopRightRadius: 8,
+        backgroundColor: 'rgba(212,168,68,0.4)',
+      }} />
+      {/* Tiny lights on the saucer rim */}
+      <View style={{ position: 'absolute', top: 2, left: 4, width: 2, height: 2, borderRadius: 1, backgroundColor: 'rgba(212,168,68,0.7)' }} />
+      <View style={{ position: 'absolute', top: 2, left: 13, width: 2, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+      <View style={{ position: 'absolute', top: 2, left: 22, width: 2, height: 2, borderRadius: 1, backgroundColor: 'rgba(212,168,68,0.7)' }} />
     </Animated.View>
   );
 }

@@ -1,9 +1,10 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, FlatList } from 'react-native';
+import { View, ScrollView, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Card, Button, Divider, PostCard, Skeleton } from '../../components';
+import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useMyProfile, usePosts } from '../../lib/hooks';
 import { colors, spacing, radius } from '../../constants/theme';
@@ -27,8 +28,10 @@ export default function ProfileScreen() {
   const followerCount = profile?.followerCount || profile?.follower_count || 0;
   const followingCount = profile?.followingCount || profile?.following_count || 0;
 
+  const isWeb = Platform.OS === 'web';
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+    <Container safeTop padded={false}>
       {/* Header */}
       <View
         style={{
@@ -48,77 +51,88 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile card */}
-        <View style={{ alignItems: 'center', paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
-          <Avatar
-            uri={displayProfile?.image}
-            name={displayProfile?.name}
-            size="xl"
-          />
-          <Text variant="h2" style={{ marginTop: spacing.lg }}>
-            {displayProfile?.name || 'User'}
-          </Text>
-          <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-            @{displayProfile?.username || displayProfile?.email?.split('@')[0] || 'user'}
-          </Text>
+        {/* Profile info — left aligned */}
+        <View style={{ paddingTop: spacing['2xl'], paddingHorizontal: spacing.xl }}>
+          {/* Avatar + Name row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+            <Avatar
+              uri={displayProfile?.image}
+              name={displayProfile?.name}
+              size="xl"
+            />
+            <View style={{ flex: 1 }}>
+              <Text variant="h2">
+                {displayProfile?.name || 'User'}
+              </Text>
+              <Text variant="body" color={colors.textMuted} style={{ marginTop: 2 }}>
+                @{displayProfile?.username || displayProfile?.email?.split('@')[0] || 'user'}
+              </Text>
+            </View>
+          </View>
 
+          {/* Bio */}
           {(displayProfile?.bio || profile?.bio) && (
             <Text
               variant="body"
               color={colors.textSecondary}
-              align="center"
-              style={{ marginTop: spacing.md, maxWidth: 300 }}
+              style={{ marginTop: spacing.lg }}
             >
               {displayProfile?.bio || profile?.bio}
             </Text>
           )}
 
-          {/* Stats */}
+          {/* Stats row */}
           <View
             style={{
               flexDirection: 'row',
-              gap: spacing['3xl'],
+              gap: spacing['2xl'],
               marginTop: spacing.xl,
             }}
           >
-            <View style={{ alignItems: 'center' }}>
-              <Text variant="h3">{myPosts.length}</Text>
-              <Text variant="caption" color={colors.textMuted}>Posts</Text>
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text variant="h3">{followerCount}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Text variant="bodyMedium">{followerCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Followers</Text>
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text variant="h3">{followingCount}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Text variant="bodyMedium">{followingCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Following</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Text variant="bodyMedium">{myPosts.length}</Text>
+              <Text variant="caption" color={colors.textMuted}>Posts</Text>
             </View>
           </View>
 
           {/* Action buttons */}
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, width: '100%' }}>
-            <View style={{ flex: 1 }}>
-              <Button onPress={() => router.push('/(tabs)/wallet')} variant="secondary" fullWidth>
-                Wallet
-              </Button>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button onPress={() => router.push('/(tabs)/boost')} variant="secondary" fullWidth>
-                Boost
-              </Button>
-            </View>
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
+            <Button
+              onPress={() => {}}
+              variant="secondary"
+              size={isWeb ? 'sm' : 'md'}
+            >
+              Edit Profile
+            </Button>
+            <Button
+              onPress={() => setShowSettings(true)}
+              variant="secondary"
+              size={isWeb ? 'sm' : 'md'}
+            >
+              Settings
+            </Button>
           </View>
         </View>
 
-        <Divider marginVertical={spacing.xl} />
+        {/* Divider */}
+        <View style={{ marginTop: spacing.xl }}>
+          <Divider />
+        </View>
 
-        {/* Tabs */}
+        {/* Content tabs */}
         <View
           style={{
             flexDirection: 'row',
-            paddingHorizontal: spacing.xl,
-            gap: spacing.xs,
-            marginBottom: spacing.lg,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.borderSubtle,
           }}
         >
           {(['posts', 'communities', 'agents'] as ProfileTab[]).map(tab => (
@@ -126,10 +140,11 @@ export default function ProfileScreen() {
               key={tab}
               onPress={() => setActiveTab(tab)}
               style={{
-                paddingHorizontal: spacing.lg,
-                paddingVertical: spacing.sm,
-                borderRadius: radius.full,
-                backgroundColor: activeTab === tab ? colors.surfaceHover : 'transparent',
+                flex: 1,
+                paddingVertical: spacing.md,
+                alignItems: 'center',
+                borderBottomWidth: 2,
+                borderBottomColor: activeTab === tab ? colors.accent : 'transparent',
               }}
             >
               <Text
@@ -211,6 +226,9 @@ export default function ProfileScreen() {
               borderTopRightRadius: radius.xl,
               padding: spacing['2xl'],
               paddingBottom: insets.bottom + spacing['2xl'],
+              maxWidth: 600,
+              alignSelf: 'center',
+              width: '100%',
             }}
           >
             <View
@@ -295,6 +313,6 @@ export default function ProfileScreen() {
           </Pressable>
         </Pressable>
       )}
-    </View>
+    </Container>
   );
 }

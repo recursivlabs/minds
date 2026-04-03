@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 // expo-image-picker imported lazily to avoid web crash
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Button, Input, Card } from '../../components';
+import { Text, Button, Input, Card, Container } from '../../components';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
@@ -129,7 +129,7 @@ export default function CreateScreen() {
   const selectedCommunityObj = communities.find((c: any) => c.id === selectedCommunity);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+    <Container safeTop padded={false}>
       {/* Header */}
       <View
         style={{
@@ -421,6 +421,6 @@ export default function CreateScreen() {
           {content.length} chars
         </Text>
       </View>
-    </View>
+    </Container>
   );
 }

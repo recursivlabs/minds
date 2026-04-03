@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Card, Button, Divider, Skeleton, PostCard } from '../../components';
+import { Text, Card, Button, Divider, Skeleton, PostCard, Container } from '../../components';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
 import { colors, spacing, radius } from '../../constants/theme';
@@ -29,7 +29,7 @@ export default function BoostScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+    <Container safeTop padded={false}>
       {/* Header */}
       <View
         style={{
@@ -246,6 +246,6 @@ export default function BoostScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </Container>
   );
 }

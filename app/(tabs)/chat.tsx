@@ -2,7 +2,7 @@ import * as React from 'react';
 import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
+import { Text, Avatar, Skeleton, ChatBubble, Button, Container } from '../../components';
 import { useAuth } from '../../lib/auth';
 import { useConversations, useMessages } from '../../lib/hooks';
 import { colors, spacing, radius, typography } from '../../constants/theme';
@@ -37,7 +37,7 @@ export default function ChatScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+    <Container safeTop padded={false}>
       {/* Header */}
       <View
         style={{
@@ -194,7 +194,7 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+    </Container>
   );
 }
 

@@ -279,6 +279,34 @@ export function useTags(limit = 50) {
 }
 
 /**
+ * Fetch a list of profiles/people.
+ */
+export function useProfiles(limit = 20) {
+  const { sdk } = useAuth();
+  const [profiles, setProfiles] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = sdk || getSdk();
+        const res = await s.profiles.list({ limit } as any);
+        if (!cancelled) setProfiles(res.data || []);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Failed to load profiles');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, limit]);
+
+  return { profiles, loading, error };
+}
+
+/**
  * Search posts scoped to Minds org.
  */
 export function useSearchPosts(query: string) {

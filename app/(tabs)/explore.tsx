@@ -1,25 +1,55 @@
 import * as React from 'react';
-import { View, ScrollView, FlatList, TextInput, Platform } from 'react-native';
+import { View, ScrollView, FlatList, TextInput, Platform, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header, Text, CommunityCard, AgentCard, PostCard, Skeleton, Card } from '../../components';
-import { useCommunities, useAgents, useSearchPosts, useTags } from '../../lib/hooks';
+import { Header, Text, CommunityCard, AgentCard, PostCard, Skeleton, Card, Button, UserCard } from '../../components';
+import { Container } from '../../components/Container';
+import { useCommunities, useAgents, useSearchPosts, useProfiles } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
+function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.xl,
+        marginBottom: spacing.lg,
+      }}
+    >
+      <Text variant="h3">{title}</Text>
+      {onSeeAll && (
+        <Pressable onPress={onSeeAll} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text variant="label" color={colors.accent}>See all</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 export default function ExploreScreen() {
-  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { sdk } = useAuth();
   const [query, setQuery] = React.useState('');
   const { communities, loading: commLoading } = useCommunities(10);
   const { agents, loading: agentsLoading } = useAgents(6);
-  const { tags, loading: tagsLoading } = useTags(20);
+  const { profiles, loading: profilesLoading } = useProfiles(10);
   const { results: searchResults, loading: searchLoading } = useSearchPosts(query);
 
   const isSearching = query.trim().length > 0;
 
+  const handleFollow = async (userId: string) => {
+    if (!sdk) return;
+    try {
+      await sdk.profiles.follow(userId);
+    } catch {}
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+    <Container safeTop padded={false}>
       <Header />
 
       {/* Search bar */}
@@ -90,12 +120,10 @@ export default function ExploreScreen() {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Trending Communities */}
           <View style={{ paddingTop: spacing.lg }}>
-            <Text
-              variant="h3"
-              style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.lg }}
-            >
-              Trending Communities
-            </Text>
+            <SectionHeader
+              title="Trending Communities"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })}
+            />
 
             {commLoading ? (
               <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xl, gap: spacing.md }}>
@@ -126,19 +154,17 @@ export default function ExploreScreen() {
             )}
           </View>
 
-          {/* Discover Agents */}
+          {/* Trending Agents */}
           <View style={{ paddingTop: spacing['3xl'] }}>
-            <Text
-              variant="h3"
-              style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.lg }}
-            >
-              Discover Agents
-            </Text>
+            <SectionHeader
+              title="Trending Agents"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })}
+            />
 
             {agentsLoading ? (
-              <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
+              <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xl, gap: spacing.md }}>
                 {[1, 2].map(i => (
-                  <Skeleton key={i} height={100} borderRadius={14} />
+                  <Skeleton key={i} width={200} height={140} borderRadius={14} />
                 ))}
               </View>
             ) : agents.length === 0 ? (
@@ -153,76 +179,96 @@ export default function ExploreScreen() {
                 </Card>
               </View>
             ) : (
-              <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
-                {agents.map((agent: any) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    onChat={() => {
-                      // Navigate to agent chat
-                      console.log('Chat with agent:', agent.id);
-                    }}
-                  />
-                ))}
-              </View>
+              <FlatList
+                horizontal
+                data={agents}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={{ width: 240, marginRight: spacing.md }}>
+                    <AgentCard
+                      agent={item}
+                      onChat={() => {
+                        console.log('Chat with agent:', item.id);
+                      }}
+                    />
+                  </View>
+                )}
+                contentContainerStyle={{ paddingHorizontal: spacing.xl }}
+                showsHorizontalScrollIndicator={false}
+              />
             )}
           </View>
 
-          {/* Popular Tags */}
-          <View style={{ paddingTop: spacing['3xl'], paddingBottom: spacing['4xl'] }}>
-            <Text
-              variant="h3"
-              style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.lg }}
-            >
-              Popular Tags
-            </Text>
+          {/* Apps */}
+          <View style={{ paddingTop: spacing['3xl'] }}>
+            <SectionHeader
+              title="Apps"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'apps' } })}
+            />
+            <View style={{ paddingHorizontal: spacing.xl }}>
+              <Card variant="raised">
+                <View style={{ alignItems: 'center', padding: spacing.xl }}>
+                  <Ionicons name="apps-outline" size={40} color={colors.textMuted} />
+                  <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+                    No apps yet — build one!
+                  </Text>
+                  <Text
+                    variant="caption"
+                    color={colors.textMuted}
+                    align="center"
+                    style={{ marginTop: spacing.xs }}
+                  >
+                    Build apps on the Minds platform
+                  </Text>
+                  <View style={{ marginTop: spacing.lg }}>
+                    <Button onPress={() => {}} size="sm">
+                      Build Your First App
+                    </Button>
+                  </View>
+                </View>
+              </Card>
+            </View>
+          </View>
 
-            {tagsLoading ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.xl }}>
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Skeleton key={i} width={80} height={32} borderRadius={999} />
+          {/* Discover People */}
+          <View style={{ paddingTop: spacing['3xl'], paddingBottom: spacing['4xl'] }}>
+            <SectionHeader
+              title="Discover People"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'people' } })}
+            />
+
+            {profilesLoading ? (
+              <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xl, gap: spacing.md }}>
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} width={160} height={160} borderRadius={14} />
                 ))}
               </View>
-            ) : tags.length === 0 ? (
+            ) : profiles.length === 0 ? (
               <View style={{ paddingHorizontal: spacing.xl }}>
-                <Text variant="body" color={colors.textMuted}>
-                  No tags yet
-                </Text>
+                <Card variant="raised">
+                  <View style={{ alignItems: 'center', padding: spacing.lg }}>
+                    <Ionicons name="person-outline" size={32} color={colors.textMuted} />
+                    <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
+                      No users to discover yet
+                    </Text>
+                  </View>
+                </Card>
               </View>
             ) : (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  gap: spacing.sm,
-                  paddingHorizontal: spacing.xl,
-                }}
-              >
-                {tags.map((tag: any) => {
-                  const name = typeof tag === 'string' ? tag : tag.name || tag.tag;
-                  return (
-                    <View
-                      key={name}
-                      style={{
-                        backgroundColor: colors.surfaceHover,
-                        paddingHorizontal: spacing.lg,
-                        paddingVertical: spacing.sm,
-                        borderRadius: radius.full,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }}
-                    >
-                      <Text variant="bodyMedium" color={colors.accent} style={{ fontSize: 13 }}>
-                        #{name}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
+              <FlatList
+                horizontal
+                data={profiles}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <UserCard user={item} onFollow={handleFollow} compact />
+                )}
+                contentContainerStyle={{ paddingHorizontal: spacing.xl }}
+                showsHorizontalScrollIndicator={false}
+              />
             )}
           </View>
         </ScrollView>
       )}
-    </View>
+    </Container>
   );
 }
