@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Minds",
+    "slug": "minds",
+    "version": "2.0.0",
+    "scheme": "minds",
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

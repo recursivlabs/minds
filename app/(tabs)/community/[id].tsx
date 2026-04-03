@@ -1,0 +1,271 @@
+import * as React from 'react';
+import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, Avatar, Button, Divider, PostCard, ComposePost, Skeleton, Card } from '../../../components';
+import { useAuth } from '../../../lib/auth';
+import { colors, spacing, radius } from '../../../constants/theme';
+
+export default function CommunityDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { sdk, user } = useAuth();
+
+  const [community, setCommunity] = React.useState<any>(null);
+  const [posts, setPosts] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [postsLoading, setPostsLoading] = React.useState(true);
+  const [isMember, setIsMember] = React.useState(false);
+  const [joinLoading, setJoinLoading] = React.useState(false);
+
+  // Fetch community
+  React.useEffect(() => {
+    if (!id || !sdk) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await sdk.communities.get(id);
+        if (!cancelled) {
+          setCommunity(res.data);
+          setIsMember(res.data?.isMember || res.data?.is_member || false);
+        }
+      } catch {}
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [id, sdk]);
+
+  // Fetch community posts
+  React.useEffect(() => {
+    if (!id || !sdk) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await sdk.posts.list({ limit: 30 });
+        const communityPosts = (res.data || []).filter(
+          (p: any) => p.communityId === id || p.community_id === id
+        );
+        if (!cancelled) setPosts(communityPosts);
+      } catch {}
+      finally { if (!cancelled) setPostsLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [id, sdk]);
+
+  const handleJoinLeave = async () => {
+    if (!sdk || !id) return;
+    setJoinLoading(true);
+    const wasMember = isMember;
+    setIsMember(!wasMember);
+
+    try {
+      if (wasMember) {
+        await sdk.communities.leave(id);
+      } else {
+        await sdk.communities.join(id);
+      }
+    } catch {
+      setIsMember(wasMember);
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  const handlePost = async (data: { content: string; title?: string; tags: string[] }) => {
+    if (!sdk || !id) return;
+    const res = await sdk.posts.create({
+      content: data.content,
+      title: data.title,
+      tags: data.tags,
+      communityId: id,
+    });
+    if (res.data) {
+      setPosts(prev => [
+        { ...res.data, author: { name: user?.name, username: user?.username, image: user?.image } },
+        ...prev,
+      ]);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            paddingHorizontal: spacing.xl,
+            paddingVertical: spacing.md,
+          }}
+        >
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </Pressable>
+        </View>
+        <View style={{ padding: spacing.xl, gap: spacing.lg, alignItems: 'center' }}>
+          <Skeleton width={56} height={56} borderRadius={28} />
+          <Skeleton width={180} height={20} />
+          <Skeleton width={240} height={14} />
+        </View>
+      </View>
+    );
+  }
+
+  if (!community) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            paddingHorizontal: spacing.xl,
+            paddingVertical: spacing.md,
+          }}
+        >
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </Pressable>
+          <Text variant="h3">Community</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="people-outline" size={48} color={colors.textMuted} />
+          <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+            Community not found
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const memberCount = community.memberCount || community.member_count || 0;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.md,
+          paddingHorizontal: spacing.xl,
+          paddingVertical: spacing.md,
+          borderBottomWidth: 0.5,
+          borderBottomColor: colors.borderSubtle,
+        }}
+      >
+        <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </Pressable>
+        <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>
+          {community.name}
+        </Text>
+      </View>
+
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={
+          <View>
+            {/* Community header */}
+            <View style={{ alignItems: 'center', padding: spacing.xl }}>
+              <Avatar
+                uri={community.image || community.avatar}
+                name={community.name}
+                size="xl"
+              />
+              <Text variant="h2" style={{ marginTop: spacing.lg }}>
+                {community.name}
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.xs,
+                  marginTop: spacing.sm,
+                }}
+              >
+                <Ionicons name="people" size={16} color={colors.textMuted} />
+                <Text variant="body" color={colors.textMuted}>
+                  {memberCount} member{memberCount !== 1 ? 's' : ''}
+                </Text>
+              </View>
+
+              {community.description && (
+                <Text
+                  variant="body"
+                  color={colors.textSecondary}
+                  align="center"
+                  style={{ marginTop: spacing.md, maxWidth: 340 }}
+                >
+                  {community.description}
+                </Text>
+              )}
+
+              <View style={{ marginTop: spacing.xl, width: 160 }}>
+                <Button
+                  onPress={handleJoinLeave}
+                  loading={joinLoading}
+                  variant={isMember ? 'secondary' : 'primary'}
+                  fullWidth
+                >
+                  {isMember ? 'Leave' : 'Join'}
+                </Button>
+              </View>
+            </View>
+
+            <Divider marginVertical={0} />
+
+            {/* Composer */}
+            {isMember && (
+              <ComposePost
+                onPost={handlePost}
+                placeholder={`Post to ${community.name}...`}
+                showTitle={false}
+                communityId={id}
+              />
+            )}
+
+            <View
+              style={{
+                paddingHorizontal: spacing.xl,
+                paddingVertical: spacing.lg,
+                borderBottomWidth: 0.5,
+                borderBottomColor: colors.borderSubtle,
+              }}
+            >
+              <Text variant="bodyMedium" color={colors.textSecondary}>
+                Community Feed
+              </Text>
+            </View>
+          </View>
+        }
+        renderItem={({ item }) => <PostCard post={item} />}
+        ListEmptyComponent={
+          !postsLoading ? (
+            <View style={{ padding: spacing['4xl'], alignItems: 'center' }}>
+              <Ionicons name="chatbubbles-outline" size={40} color={colors.textMuted} />
+              <Text
+                variant="body"
+                color={colors.textMuted}
+                align="center"
+                style={{ marginTop: spacing.md }}
+              >
+                No posts yet. {isMember ? 'Be the first to post!' : 'Join to start posting.'}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          )
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+}
