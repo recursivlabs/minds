@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Platform, Animated, Dimensions, Pressable } from 'react-native';
+import { View, Platform, Animated, Dimensions, Pressable, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
@@ -173,14 +173,15 @@ function DarkGlow() {
 
 // ─── LIGHT MODE ELEMENTS ─────────────────────────────────────
 
-function Cloud({ x, y, width, speed, opacity: baseOpacity }: {
-  x: number; y: number; width: number; speed: number; opacity: number;
+function Cloud({ delay, y, width, speed, opacity: baseOpacity }: {
+  delay: number; y: number; width: number; speed: number; opacity: number;
 }) {
-  const translateX = React.useRef(new Animated.Value(x)).current;
+  const translateX = React.useRef(new Animated.Value(-width - 50)).current;
   React.useEffect(() => {
     const anim = Animated.loop(Animated.sequence([
-      Animated.timing(translateX, { toValue: W + width, duration: speed, useNativeDriver: true }),
-      Animated.timing(translateX, { toValue: -width, duration: 0, useNativeDriver: true }),
+      Animated.delay(delay),
+      Animated.timing(translateX, { toValue: W + 50, duration: speed, useNativeDriver: true }),
+      Animated.timing(translateX, { toValue: -width - 50, duration: 0, useNativeDriver: true }),
     ]));
     anim.start();
     return () => anim.stop();
@@ -213,12 +214,10 @@ function Cloud({ x, y, width, speed, opacity: baseOpacity }: {
 
 function CloudField() {
   const clouds = React.useMemo(() => [
-    { id: 0, x: W * 0.1, y: H * 0.12, width: 160, speed: 60000, opacity: 0.7 },
-    { id: 1, x: W * 0.5, y: H * 0.25, width: 120, speed: 80000, opacity: 0.5 },
-    { id: 2, x: W * 0.8, y: H * 0.08, width: 200, speed: 50000, opacity: 0.6 },
-    { id: 3, x: W * 0.3, y: H * 0.35, width: 100, speed: 90000, opacity: 0.4 },
-    { id: 4, x: -100, y: H * 0.18, width: 140, speed: 70000, opacity: 0.55 },
-    { id: 5, x: W * 0.6, y: H * 0.42, width: 90, speed: 100000, opacity: 0.35 },
+    { id: 0, delay: 0, y: H * 0.10, width: 180, speed: 70000, opacity: 0.6 },
+    { id: 1, delay: 15000, y: H * 0.28, width: 130, speed: 90000, opacity: 0.45 },
+    { id: 2, delay: 35000, y: H * 0.15, width: 150, speed: 80000, opacity: 0.5 },
+    { id: 3, delay: 55000, y: H * 0.38, width: 100, speed: 100000, opacity: 0.35 },
   ], []);
   return (
     <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="none">
@@ -327,13 +326,21 @@ const lightColors = {
 
 // ─── MAIN SCREEN ─────────────────────────────────────────────
 
+type ScreenMode = 'home' | 'earlyAccess' | 'login' | 'submitted';
+
 export default function LandingScreen() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, signIn } = useAuth();
   const [isDark, setIsDark] = React.useState(true);
-  const bgAnim = React.useRef(new Animated.Value(1)).current;
   const darkOpacity = React.useRef(new Animated.Value(1)).current;
   const lightOpacity = React.useRef(new Animated.Value(0)).current;
+
+  const [screen, setScreen] = React.useState<ScreenMode>('home');
+  const [email, setEmail] = React.useState('');
+  const [loginId, setLoginId] = React.useState('');
+  const [loginPw, setLoginPw] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
 
   if (isAuthenticated && !isLoading) {
     router.replace('/(tabs)');
@@ -349,22 +356,247 @@ export default function LandingScreen() {
     ]).start();
   };
 
+  const handleEarlyAccess = () => {
+    if (!email.trim() || !email.includes('@')) return;
+    // TODO: store email in database via SDK
+    setScreen('submitted');
+  };
+
+  const handleLogin = async () => {
+    if (!loginId.trim() || !loginPw.trim()) {
+      setError('All fields are required');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      const loginEmail = loginId.includes('@') ? loginId.trim().toLowerCase() : `${loginId.trim().toLowerCase()}@minds.com`;
+      await signIn(loginEmail, loginPw);
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      setError(err?.message || 'Sign in failed. Check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const c = isDark ? {
-    bg: colors.bg,
     wordmark: colors.accent,
     tagline: colors.text,
     taglineOpacity: 0.5,
     buttonBg: colors.accent,
     buttonText: colors.textInverse,
     ghostText: colors.text,
+    inputBg: 'rgba(255,255,255,0.06)',
+    inputBorder: 'rgba(255,255,255,0.12)',
+    inputBorderFocus: colors.accent,
+    inputText: '#fafafa',
+    inputPlaceholder: 'rgba(255,255,255,0.3)',
+    successText: colors.text,
+    subtleText: 'rgba(255,255,255,0.4)',
   } : {
-    bg: lightColors.bg,
     wordmark: lightColors.accent,
     tagline: lightColors.text,
     taglineOpacity: 0.5,
     buttonBg: lightColors.buttonBg,
     buttonText: lightColors.buttonText,
     ghostText: lightColors.ghostText,
+    inputBg: 'rgba(255,255,255,0.5)',
+    inputBorder: 'rgba(255,255,255,0.6)',
+    inputBorderFocus: lightColors.accent,
+    inputText: '#1a1a2e',
+    inputPlaceholder: 'rgba(26,26,46,0.35)',
+    successText: lightColors.text,
+    subtleText: 'rgba(26,26,46,0.5)',
+  };
+
+  const renderForm = () => {
+    if (screen === 'submitted') {
+      return (
+        <View style={{ width: '100%', maxWidth: 320, alignItems: 'center', gap: spacing.lg }}>
+          <Ionicons name="checkmark-circle" size={48} color={isDark ? colors.success : '#2d8a5e'} />
+          <Text variant="h3" color={c.successText} align="center">
+            You're on the list
+          </Text>
+          <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.7 }}>
+            We'll notify you at {email} when your access is ready.
+          </Text>
+          <Pressable
+            onPress={() => { setScreen('home'); setEmail(''); }}
+            style={{ marginTop: spacing.md }}
+          >
+            <Text variant="body" color={c.subtleText} style={{ opacity: 0.5 }}>
+              Back
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (screen === 'earlyAccess') {
+      return (
+        <View style={{ width: '100%', maxWidth: 320, gap: spacing.lg }}>
+          <Text variant="h3" color={c.tagline} align="center">
+            Request early access
+          </Text>
+          <View style={{
+            flexDirection: 'row', gap: spacing.sm,
+            width: '100%',
+          }}>
+            <View style={{ flex: 1 }}>
+              <TextInput
+                placeholder="Your email"
+                placeholderTextColor={c.inputPlaceholder}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                onSubmitEditing={handleEarlyAccess}
+                style={{
+                  backgroundColor: c.inputBg,
+                  borderWidth: 1,
+                  borderColor: c.inputBorder,
+                  borderRadius: 10,
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  color: c.inputText,
+                  fontSize: 15,
+                  ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+                }}
+              />
+            </View>
+            <Pressable
+              onPress={handleEarlyAccess}
+              style={({ pressed }) => ({
+                paddingHorizontal: 20,
+                paddingVertical: 13,
+                borderRadius: 10,
+                backgroundColor: c.buttonBg,
+                justifyContent: 'center' as const,
+                opacity: pressed ? 0.85 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name="arrow-forward" size={18} color={c.buttonText} />
+            </Pressable>
+          </View>
+          <Pressable onPress={() => { setScreen('home'); setError(''); }}>
+            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.5 }}>
+              Back
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (screen === 'login') {
+      return (
+        <View style={{ width: '100%', maxWidth: 320, gap: spacing.md }}>
+          <Text variant="h3" color={c.tagline} align="center" style={{ marginBottom: spacing.sm }}>
+            Log in
+          </Text>
+          <TextInput
+            placeholder="Email or username"
+            placeholderTextColor={c.inputPlaceholder}
+            value={loginId}
+            onChangeText={(t) => { setLoginId(t); setError(''); }}
+            autoCapitalize="none"
+            style={{
+              backgroundColor: c.inputBg,
+              borderWidth: 1,
+              borderColor: error ? colors.error : c.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 16,
+              paddingVertical: 13,
+              color: c.inputText,
+              fontSize: 15,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
+          <TextInput
+            placeholder="Password"
+            placeholderTextColor={c.inputPlaceholder}
+            value={loginPw}
+            onChangeText={(t) => { setLoginPw(t); setError(''); }}
+            secureTextEntry
+            onSubmitEditing={handleLogin}
+            style={{
+              backgroundColor: c.inputBg,
+              borderWidth: 1,
+              borderColor: error ? colors.error : c.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 16,
+              paddingVertical: 13,
+              color: c.inputText,
+              fontSize: 15,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
+          {error ? (
+            <Text variant="caption" color={colors.error} align="center">{error}</Text>
+          ) : null}
+          <Pressable
+            onPress={handleLogin}
+            disabled={loading}
+            style={({ pressed }) => ({
+              paddingVertical: 14,
+              borderRadius: 10,
+              backgroundColor: c.buttonBg,
+              alignItems: 'center' as const,
+              opacity: loading ? 0.5 : pressed ? 0.85 : 1,
+              ...(Platform.OS === 'web' ? { cursor: loading ? 'default' : 'pointer' } as any : {}),
+            })}
+          >
+            <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
+              {loading ? 'Signing in...' : 'Log in'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => { setScreen('home'); setError(''); setLoginId(''); setLoginPw(''); }}>
+            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.5 }}>
+              Back
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    // Home — two buttons
+    return (
+      <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
+        <Pressable
+          onPress={() => setScreen('earlyAccess')}
+          style={({ pressed }) => ({
+            paddingVertical: 14,
+            paddingHorizontal: 24,
+            borderRadius: 10,
+            backgroundColor: c.buttonBg,
+            alignItems: 'center' as const,
+            opacity: pressed ? 0.85 : 1,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'opacity 0.15s ease' } as any : {}),
+          })}
+        >
+          <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
+            Request early access
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setScreen('login')}
+          style={({ pressed }) => ({
+            paddingVertical: 14,
+            paddingHorizontal: 24,
+            borderRadius: 10,
+            alignItems: 'center' as const,
+            opacity: pressed ? 0.6 : 1,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'opacity 0.15s ease' } as any : {}),
+          })}
+        >
+          <Text variant="bodyMedium" color={c.ghostText} style={{ fontSize: 15, opacity: 0.7 }}>
+            Log in
+          </Text>
+        </Pressable>
+      </View>
+    );
   };
 
   return (
@@ -385,7 +617,6 @@ export default function LandingScreen() {
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         opacity: lightOpacity,
       }}>
-        {/* Sky gradient */}
         <View style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
           ...(Platform.OS === 'web' ? {
@@ -459,41 +690,7 @@ export default function LandingScreen() {
           </Text>
         </View>
 
-        {/* Buttons */}
-        <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
-          <Pressable
-            onPress={() => router.push('/(auth)/sign-up')}
-            style={({ pressed }) => ({
-              paddingVertical: 14,
-              paddingHorizontal: 24,
-              borderRadius: 10,
-              backgroundColor: c.buttonBg,
-              alignItems: 'center' as const,
-              opacity: pressed ? 0.85 : 1,
-              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'opacity 0.15s ease' } as any : {}),
-            })}
-          >
-            <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
-              Request early access
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(auth)/sign-in')}
-            style={({ pressed }) => ({
-              paddingVertical: 14,
-              paddingHorizontal: 24,
-              borderRadius: 10,
-              alignItems: 'center' as const,
-              opacity: pressed ? 0.6 : 1,
-              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'opacity 0.15s ease' } as any : {}),
-            })}
-          >
-            <Text variant="bodyMedium" color={c.ghostText} style={{ fontSize: 15, opacity: 0.7 }}>
-              Log in
-            </Text>
-          </Pressable>
-        </View>
+        {renderForm()}
       </View>
     </View>
   );
