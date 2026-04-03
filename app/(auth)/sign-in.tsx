@@ -8,20 +8,21 @@ import { colors, spacing } from '../../constants/theme';
 export default function SignInScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
-  const [email, setEmail] = React.useState('');
+  const [identifier, setIdentifier] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
   const handleSignIn = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError('Email and password are required');
+    if (!identifier.trim() || !password.trim()) {
+      setError('All fields are required');
       return;
     }
     setError('');
     setLoading(true);
     try {
-      await signIn(email.trim().toLowerCase(), password);
+      const email = identifier.includes('@') ? identifier.trim().toLowerCase() : `${identifier.trim().toLowerCase()}@minds.com`;
+      await signIn(email, password);
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(err?.message || 'Sign in failed. Check your credentials.');
@@ -35,25 +36,17 @@ export default function SignInScreen() {
       <Text
         variant="h2"
         color={colors.accent}
-        style={{ marginBottom: spacing['3xl'], letterSpacing: -1, fontWeight: '700' }}
+        style={{ marginBottom: spacing['3xl'], letterSpacing: 4, fontWeight: '300' }}
       >
         minds
       </Text>
 
-      <Text variant="h1" style={{ marginBottom: spacing.xs }}>
-        Welcome back
-      </Text>
-      <Text variant="body" color={colors.textMuted} style={{ marginBottom: spacing['3xl'] }}>
-        Sign in to your Minds account
-      </Text>
-
       <Input
-        label="Email"
-        placeholder="you@example.com"
-        value={email}
-        onChangeText={setEmail}
+        label="Email or username"
+        placeholder="you@example.com or username"
+        value={identifier}
+        onChangeText={setIdentifier}
         autoCapitalize="none"
-        keyboardType="email-address"
         autoComplete="email"
       />
       <Input

@@ -1,80 +1,106 @@
 import * as React from 'react';
-import { View, Platform } from 'react-native';
+import { View, Platform, Animated, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../lib/auth';
 import { Text, Button } from '../components';
 import { colors, spacing } from '../constants/theme';
 
-function StarfieldBackground() {
-  if (Platform.OS !== 'web') return null;
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+function Star({ delay, duration, size, x, y, color }: {
+  delay: number; duration: number; size: number; x: number; y: number; color: string;
+}) {
+  const opacity = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes drift {
-        from { transform: translateY(0px) translateX(0px); }
-        to { transform: translateY(-2000px) translateX(-500px); }
-      }
-      @keyframes pulse-glow {
-        0%, 100% { opacity: 0.03; transform: scale(1); }
-        50% { opacity: 0.07; transform: scale(1.2); }
-      }
-      .starfield {
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        overflow: hidden;
-        z-index: 0;
-        pointer-events: none;
-      }
-      .starfield-layer {
-        position: absolute;
-        top: 0; left: 0;
-        width: 200%; height: 200%;
-        background-image:
-          radial-gradient(1px 1px at 10% 20%, rgba(212,168,68,0.4) 0%, transparent 100%),
-          radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
-          radial-gradient(1px 1px at 50% 10%, rgba(212,168,68,0.3) 0%, transparent 100%),
-          radial-gradient(1.5px 1.5px at 70% 80%, rgba(255,255,255,0.4) 0%, transparent 100%),
-          radial-gradient(1px 1px at 90% 40%, rgba(212,168,68,0.2) 0%, transparent 100%),
-          radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.25) 0%, transparent 100%),
-          radial-gradient(1px 1px at 45% 45%, rgba(212,168,68,0.35) 0%, transparent 100%),
-          radial-gradient(1.5px 1.5px at 80% 15%, rgba(255,255,255,0.3) 0%, transparent 100%),
-          radial-gradient(1px 1px at 25% 35%, rgba(212,168,68,0.2) 0%, transparent 100%),
-          radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.2) 0%, transparent 100%),
-          radial-gradient(1px 1px at 5% 55%, rgba(212,168,68,0.3) 0%, transparent 100%),
-          radial-gradient(1px 1px at 85% 50%, rgba(255,255,255,0.35) 0%, transparent 100%),
-          radial-gradient(1px 1px at 35% 90%, rgba(212,168,68,0.25) 0%, transparent 100%),
-          radial-gradient(1.5px 1.5px at 65% 25%, rgba(255,255,255,0.3) 0%, transparent 100%),
-          radial-gradient(1px 1px at 95% 75%, rgba(212,168,68,0.2) 0%, transparent 100%);
-        animation: drift 120s linear infinite;
-      }
-      .starfield-layer-2 {
-        position: absolute;
-        top: 0; left: 0;
-        width: 200%; height: 200%;
-        background-image:
-          radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.2) 0%, transparent 100%),
-          radial-gradient(1px 1px at 40% 70%, rgba(212,168,68,0.15) 0%, transparent 100%),
-          radial-gradient(1px 1px at 60% 20%, rgba(255,255,255,0.25) 0%, transparent 100%),
-          radial-gradient(1px 1px at 80% 60%, rgba(212,168,68,0.2) 0%, transparent 100%),
-          radial-gradient(1px 1px at 10% 50%, rgba(255,255,255,0.15) 0%, transparent 100%),
-          radial-gradient(1px 1px at 55% 85%, rgba(212,168,68,0.2) 0%, transparent 100%),
-          radial-gradient(1px 1px at 75% 35%, rgba(255,255,255,0.2) 0%, transparent 100%),
-          radial-gradient(1px 1px at 35% 15%, rgba(212,168,68,0.15) 0%, transparent 100%);
-        animation: drift 80s linear infinite;
-        animation-delay: -20s;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(opacity, { toValue: 1, duration: duration * 0.4, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.1, duration: duration * 0.6, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
   }, []);
 
   return (
-    <div className="starfield">
-      <div className="starfield-layer" />
-      <div className="starfield-layer-2" />
-    </div>
-  ) as any;
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+      }}
+    />
+  );
+}
+
+function Starfield() {
+  const stars = React.useMemo(() => {
+    const result = [];
+    for (let i = 0; i < 60; i++) {
+      result.push({
+        id: i,
+        x: Math.random() * (SCREEN_W || 1200),
+        y: Math.random() * (SCREEN_H || 900),
+        size: Math.random() * 2 + 0.5,
+        delay: Math.random() * 4000,
+        duration: 3000 + Math.random() * 5000,
+        color: Math.random() > 0.5 ? 'rgba(212,168,68,0.6)' : 'rgba(255,255,255,0.4)',
+      });
+    }
+    return result;
+  }, []);
+
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="none">
+      {stars.map((s) => (
+        <Star key={s.id} {...s} />
+      ))}
+    </View>
+  );
+}
+
+function GlowOrb() {
+  const scale = React.useRef(new Animated.Value(1)).current;
+  const opacity = React.useRef(new Animated.Value(0.03)).current;
+
+  React.useEffect(() => {
+    const anim = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(scale, { toValue: 1.3, duration: 4000, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1, duration: 4000, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 0.06, duration: 4000, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.03, duration: 4000, useNativeDriver: true }),
+        ]),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        width: 500,
+        height: 500,
+        borderRadius: 250,
+        backgroundColor: colors.accent,
+        opacity,
+        transform: [{ scale }],
+        ...(Platform.OS === 'web' ? { filter: 'blur(120px)' } as any : {}),
+      }}
+    />
+  );
 }
 
 export default function LandingScreen() {
@@ -96,25 +122,8 @@ export default function LandingScreen() {
         paddingHorizontal: spacing['2xl'],
       }}
     >
-      <StarfieldBackground />
-
-      {/* Glow behind wordmark */}
-      {Platform.OS === 'web' ? (
-        <View
-          style={{
-            position: 'absolute',
-            width: 600,
-            height: 600,
-            borderRadius: 9999,
-            backgroundColor: colors.accent,
-            opacity: 0.03,
-            ...(Platform.OS === 'web' ? {
-              filter: 'blur(150px)',
-              animation: 'pulse-glow 8s ease-in-out infinite',
-            } as any : {}),
-          }}
-        />
-      ) : null}
+      <Starfield />
+      <GlowOrb />
 
       {/* Wordmark */}
       <Text
@@ -126,20 +135,30 @@ export default function LandingScreen() {
           letterSpacing: 12,
           fontWeight: '300',
           textTransform: 'lowercase',
-          marginBottom: spacing['5xl'],
-          ...(Platform.OS === 'web' ? { zIndex: 1 } : {}),
+          marginBottom: spacing.lg,
         }}
       >
         minds
       </Text>
 
+      <Text
+        variant="body"
+        color={colors.text}
+        align="center"
+        style={{
+          fontSize: 16,
+          letterSpacing: 6,
+          fontWeight: '200',
+          textTransform: 'uppercase',
+          marginBottom: spacing['5xl'],
+          opacity: 0.7,
+        }}
+      >
+        think freely
+      </Text>
+
       {/* Buttons */}
-      <View style={{
-        width: '100%',
-        maxWidth: 280,
-        gap: spacing.md,
-        ...(Platform.OS === 'web' ? { zIndex: 1 } : {}),
-      }}>
+      <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
         <Button
           onPress={() => router.push('/(auth)/sign-up')}
           size="lg"
