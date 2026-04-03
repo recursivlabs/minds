@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Header, FeedTabs, PostCard, ComposePost, Skeleton, Text, Container } from '../../components';
+import { Header, FeedTabs, PostCard, ComposePost, Skeleton, Text, Container, FeedSidebar } from '../../components';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
@@ -54,11 +54,11 @@ export default function FeedScreen() {
     </View>
   );
 
-  return (
-    <Container safeTop padded={false}>
-      <Header />
-      <FeedTabs active={activeTab} onChange={setActiveTab} />
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth > 768;
 
+  const feedContent = (
+    <>
       {loading && posts.length === 0 ? (
         renderPostSkeleton()
       ) : (
@@ -114,6 +114,32 @@ export default function FeedScreen() {
           }
           showsVerticalScrollIndicator={false}
         />
+      )}
+    </>
+  );
+
+  return (
+    <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>
+      <Header />
+      <FeedTabs active={activeTab} onChange={setActiveTab} />
+
+      {isDesktopWeb ? (
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            justifyContent: 'center',
+            paddingHorizontal: spacing.xl,
+          }}
+        >
+          <View style={{ flex: 1, maxWidth: 600 }}>
+            {feedContent}
+          </View>
+          <View style={{ width: spacing.xl }} />
+          <FeedSidebar />
+        </View>
+      ) : (
+        feedContent
       )}
 
       {/* Floating compose button */}

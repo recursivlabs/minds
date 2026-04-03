@@ -120,6 +120,20 @@ export default function ProfileScreen() {
               Settings
             </Button>
           </View>
+
+          {/* Admin link — visible to admins */}
+          <Pressable
+            onPress={() => router.push('/(tabs)/admin')}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+              marginTop: spacing.lg,
+            }}
+          >
+            <Ionicons name="shield-outline" size={16} color={colors.accent} />
+            <Text variant="label" color={colors.accent}>Admin</Text>
+          </Pressable>
         </View>
 
         {/* Divider */}
