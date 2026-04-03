@@ -106,11 +106,14 @@ export default function ExploreScreen() {
           }
           ListEmptyComponent={
             !searchLoading ? (
-              <View style={{ padding: spacing['4xl'], alignItems: 'center' }}>
+              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
                 <Ionicons name="search-outline" size={40} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+                <Text variant="body" color={colors.textMuted} align="center">
                   No results found
                 </Text>
+                <Button onPress={() => setQuery('')} size="sm" variant="secondary">
+                  Clear search
+                </Button>
               </View>
             ) : null
           }
@@ -134,11 +137,14 @@ export default function ExploreScreen() {
             ) : communities.length === 0 ? (
               <View style={{ paddingHorizontal: spacing.xl }}>
                 <Card variant="raised">
-                  <View style={{ alignItems: 'center', padding: spacing.lg }}>
+                  <View style={{ alignItems: 'center', padding: spacing.lg, gap: spacing.md }}>
                     <Ionicons name="people-outline" size={32} color={colors.textMuted} />
-                    <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
-                      No communities yet. Create one!
+                    <Text variant="body" color={colors.textMuted}>
+                      No communities yet
                     </Text>
+                    <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })} size="sm">
+                      Create a community
+                    </Button>
                   </View>
                 </Card>
               </View>
@@ -170,11 +176,14 @@ export default function ExploreScreen() {
             ) : agents.length === 0 ? (
               <View style={{ paddingHorizontal: spacing.xl }}>
                 <Card variant="raised">
-                  <View style={{ alignItems: 'center', padding: spacing.lg }}>
+                  <View style={{ alignItems: 'center', padding: spacing.lg, gap: spacing.md }}>
                     <Ionicons name="sparkles-outline" size={32} color={colors.textMuted} />
-                    <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
-                      No agents available yet
+                    <Text variant="body" color={colors.textMuted}>
+                      No agents yet
                     </Text>
+                    <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })} size="sm">
+                      Explore the platform
+                    </Button>
                   </View>
                 </Card>
               </View>
@@ -246,11 +255,14 @@ export default function ExploreScreen() {
             ) : profiles.length === 0 ? (
               <View style={{ paddingHorizontal: spacing.xl }}>
                 <Card variant="raised">
-                  <View style={{ alignItems: 'center', padding: spacing.lg }}>
+                  <View style={{ alignItems: 'center', padding: spacing.lg, gap: spacing.md }}>
                     <Ionicons name="person-outline" size={32} color={colors.textMuted} />
-                    <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
-                      No users to discover yet
+                    <Text variant="body" color={colors.textMuted}>
+                      Be the first! Invite your friends
                     </Text>
+                    <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'people' } })} size="sm" variant="secondary">
+                      Invite friends
+                    </Button>
                   </View>
                 </Card>
               </View>

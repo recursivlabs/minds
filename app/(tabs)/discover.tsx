@@ -65,11 +65,20 @@ export default function DiscoverScreen() {
               </View>
             )}
             ListEmptyComponent={
-              <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
+              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
                 <Ionicons name="people-outline" size={40} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+                <Text variant="body" color={colors.textMuted} align="center">
                   {searchQuery ? 'No communities match your search' : 'No communities yet'}
                 </Text>
+                {searchQuery ? (
+                  <Button onPress={() => setSearchQuery('')} size="sm" variant="secondary">
+                    Clear search
+                  </Button>
+                ) : (
+                  <Button onPress={() => {}} size="sm">
+                    Create a community
+                  </Button>
+                )}
               </View>
             }
             showsVerticalScrollIndicator={false}
@@ -98,11 +107,20 @@ export default function DiscoverScreen() {
               </View>
             )}
             ListEmptyComponent={
-              <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
+              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
                 <Ionicons name="sparkles-outline" size={40} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+                <Text variant="body" color={colors.textMuted} align="center">
                   {searchQuery ? 'No agents match your search' : 'No agents available yet'}
                 </Text>
+                {searchQuery ? (
+                  <Button onPress={() => setSearchQuery('')} size="sm" variant="secondary">
+                    Clear search
+                  </Button>
+                ) : (
+                  <Button onPress={() => {}} size="sm">
+                    Create an agent
+                  </Button>
+                )}
               </View>
             }
             showsVerticalScrollIndicator={false}
@@ -157,11 +175,20 @@ export default function DiscoverScreen() {
               </View>
             )}
             ListEmptyComponent={
-              <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
+              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
                 <Ionicons name="person-outline" size={40} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+                <Text variant="body" color={colors.textMuted} align="center">
                   {searchQuery ? 'No people match your search' : 'No people to discover yet'}
                 </Text>
+                {searchQuery ? (
+                  <Button onPress={() => setSearchQuery('')} size="sm" variant="secondary">
+                    Clear search
+                  </Button>
+                ) : (
+                  <Button onPress={() => {}} size="sm" variant="secondary">
+                    Invite friends
+                  </Button>
+                )}
               </View>
             }
             showsVerticalScrollIndicator={false}

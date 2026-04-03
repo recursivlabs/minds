@@ -184,11 +184,14 @@ export default function ProfileScreen() {
               ))}
             </View>
           ) : myPosts.length === 0 ? (
-            <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
               <Ionicons name="document-text-outline" size={40} color={colors.textMuted} />
-              <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
-                No posts yet
+              <Text variant="body" color={colors.textMuted} align="center">
+                You haven't posted yet
               </Text>
+              <Button onPress={() => router.push('/(tabs)/create')} size="sm">
+                Create a post
+              </Button>
             </View>
           ) : (
             myPosts.map((post: any) => (
@@ -198,20 +201,26 @@ export default function ProfileScreen() {
         )}
 
         {activeTab === 'communities' && (
-          <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
+          <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
             <Ionicons name="people-outline" size={40} color={colors.textMuted} />
-            <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
-              Join communities from the Explore tab
+            <Text variant="body" color={colors.textMuted} align="center">
+              You haven't joined any communities yet
             </Text>
+            <Button onPress={() => router.push('/(tabs)/explore')} size="sm">
+              Explore communities
+            </Button>
           </View>
         )}
 
         {activeTab === 'agents' && (
-          <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
+          <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
             <Ionicons name="sparkles-outline" size={40} color={colors.textMuted} />
-            <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
-              Discover agents from the Explore tab
+            <Text variant="body" color={colors.textMuted} align="center">
+              Create an AI agent to automate tasks
             </Text>
+            <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })} size="sm">
+              Learn more
+            </Button>
           </View>
         )}
 

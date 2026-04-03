@@ -2,7 +2,7 @@ import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Header, FeedTabs, PostCard, ComposePost, Skeleton, Text, Container, FeedSidebar } from '../../components';
+import { Header, FeedTabs, PostCard, ComposePost, Skeleton, Text, Container, FeedSidebar, Button } from '../../components';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
@@ -99,16 +99,25 @@ export default function FeedScreen() {
           }
           ListEmptyComponent={
             !loading ? (
-              <View style={{ padding: spacing['4xl'], alignItems: 'center' }}>
-                <Ionicons name="newspaper-outline" size={48} color={colors.textMuted} />
-                <Text
-                  variant="body"
+              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+                <Ionicons
+                  name={activeTab === 'following' ? 'people-outline' : 'newspaper-outline'}
+                  size={40}
                   color={colors.textMuted}
-                  align="center"
-                  style={{ marginTop: spacing.lg }}
-                >
-                  No posts yet. Be the first to share something!
+                />
+                <Text variant="body" color={colors.textMuted} align="center">
+                  {activeTab === 'following'
+                    ? 'Follow people to see their posts here'
+                    : 'No posts yet'}
                 </Text>
+                <Button
+                  onPress={() =>
+                    router.push(activeTab === 'following' ? '/(tabs)/explore' : '/(tabs)/create')
+                  }
+                  size="sm"
+                >
+                  {activeTab === 'following' ? 'Discover people' : 'Create your first post'}
+                </Button>
               </View>
             ) : null
           }

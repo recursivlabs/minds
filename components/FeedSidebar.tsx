@@ -58,7 +58,13 @@ function TrendingNow() {
     return (
       <Card>
         <Text variant="h3" style={{ marginBottom: spacing.md }}>Trending Now</Text>
-        <Text variant="caption" color={colors.textMuted}>No trending posts yet</Text>
+        <View style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
+          <Ionicons name="trending-up-outline" size={24} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>No trending posts yet</Text>
+          <Pressable onPress={() => router.push('/(tabs)/create')}>
+            <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>Create a post</Text>
+          </Pressable>
+        </View>
       </Card>
     );
   }
@@ -104,7 +110,13 @@ function SuggestedPeople() {
     return (
       <Card>
         <Text variant="h3" style={{ marginBottom: spacing.md }}>Suggested People</Text>
-        <Text variant="caption" color={colors.textMuted}>No suggestions yet</Text>
+        <View style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
+          <Ionicons name="person-add-outline" size={24} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>No suggestions yet</Text>
+          <Pressable onPress={() => router.push('/(tabs)/explore')}>
+            <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>Invite friends to Minds</Text>
+          </Pressable>
+        </View>
       </Card>
     );
   }
@@ -159,14 +171,18 @@ function SuggestedPeople() {
 
 // ─── Active Boosts ───────────────────────────────────────────
 function ActiveBoosts() {
+  const router = useRouter();
   return (
     <Card>
       <Text variant="h3" style={{ marginBottom: spacing.md }}>Active Boosts</Text>
-      <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
+      <View style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
         <Ionicons name="rocket-outline" size={24} color={colors.textMuted} />
-        <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
+        <Text variant="caption" color={colors.textMuted}>
           No active boosts
         </Text>
+        <Pressable onPress={() => router.push('/(tabs)/boost')}>
+          <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>Boost your content</Text>
+        </Pressable>
       </View>
     </Card>
   );

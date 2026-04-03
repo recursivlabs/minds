@@ -112,19 +112,17 @@ export default function BoostScreen() {
             Active Boosts
           </Text>
           <Card variant="raised">
-            <View style={{ alignItems: 'center', padding: spacing.xl }}>
+            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.md }}>
               <Ionicons name="rocket-outline" size={40} color={colors.textMuted} />
-              <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+              <Text variant="body" color={colors.textMuted}>
                 No active boosts
               </Text>
-              <Text
-                variant="caption"
-                color={colors.textMuted}
-                align="center"
-                style={{ marginTop: spacing.xs }}
-              >
-                Create a boost to amplify your best content
+              <Text variant="caption" color={colors.textMuted} align="center">
+                Boost your content to reach more people
               </Text>
+              <Button onPress={() => setShowCreate(true)} size="sm" accentColor={colors.boost}>
+                Create your first boost
+              </Button>
             </View>
           </Card>
         </View>

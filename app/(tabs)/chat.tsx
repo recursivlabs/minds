@@ -107,19 +107,21 @@ export default function ChatScreen() {
           ))}
         </View>
       ) : conversations.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['4xl'] }}>
-          <Ionicons name="chatbubbles-outline" size={56} color={colors.textMuted} />
-          <Text variant="h3" color={colors.textMuted} style={{ marginTop: spacing.xl }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+          <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
+          <Text variant="h3" color={colors.textMuted}>
             No conversations yet
           </Text>
           <Text
             variant="body"
             color={colors.textMuted}
             align="center"
-            style={{ marginTop: spacing.sm }}
           >
-            Start a conversation by tapping the compose icon above
+            Find someone to chat with or start a new conversation
           </Text>
+          <Button onPress={() => setShowNewChat(true)} size="sm">
+            Start a conversation
+          </Button>
         </View>
       ) : (
         <FlatList

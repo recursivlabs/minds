@@ -194,8 +194,11 @@ export default function UserProfileScreen() {
         </View>
 
         {userPosts.length === 0 ? (
-          <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
-            <Text variant="body" color={colors.textMuted}>No posts yet</Text>
+          <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+            <Ionicons name="document-text-outline" size={40} color={colors.textMuted} />
+            <Text variant="body" color={colors.textMuted} align="center">
+              This user hasn't posted yet
+            </Text>
           </View>
         ) : (
           userPosts.map((post: any) => (

@@ -163,9 +163,13 @@ export default function PostDetailScreen() {
         renderItem={({ item }) => <PostCard post={item} compact />}
         ListEmptyComponent={
           !repliesLoading ? (
-            <View style={{ padding: spacing['4xl'], alignItems: 'center' }}>
-              <Text variant="body" color={colors.textMuted}>
-                No replies yet. Be the first!
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+              <Ionicons name="chatbubble-outline" size={40} color={colors.textMuted} />
+              <Text variant="body" color={colors.textMuted} align="center">
+                No replies yet
+              </Text>
+              <Text variant="caption" color={colors.accent}>
+                Be the first to reply
               </Text>
             </View>
           ) : (

@@ -80,14 +80,17 @@ export default function WalletScreen() {
             Recent Transactions
           </Text>
           <Card variant="raised">
-            <View style={{ alignItems: 'center', padding: spacing.xl }}>
+            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.md }}>
               <Ionicons name="receipt-outline" size={36} color={colors.textMuted} />
-              <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+              <Text variant="body" color={colors.textMuted}>
                 No transactions yet
               </Text>
-              <Text variant="caption" color={colors.textMuted} align="center" style={{ marginTop: spacing.xs }}>
-                Your token transactions will appear here
+              <Text variant="caption" color={colors.textMuted} align="center">
+                Start posting to earn tokens
               </Text>
+              <Button onPress={() => router.push('/(tabs)/create')} size="sm">
+                Start posting to earn
+              </Button>
             </View>
           </Card>
         </View>

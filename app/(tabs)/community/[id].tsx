@@ -249,16 +249,20 @@ export default function CommunityDetailScreen() {
         renderItem={({ item }) => <PostCard post={item} />}
         ListEmptyComponent={
           !postsLoading ? (
-            <View style={{ padding: spacing['4xl'], alignItems: 'center' }}>
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
               <Ionicons name="chatbubbles-outline" size={40} color={colors.textMuted} />
-              <Text
-                variant="body"
-                color={colors.textMuted}
-                align="center"
-                style={{ marginTop: spacing.md }}
-              >
-                No posts yet. {isMember ? 'Be the first to post!' : 'Join to start posting.'}
+              <Text variant="body" color={colors.textMuted} align="center">
+                No posts in this community yet
               </Text>
+              {!isMember ? (
+                <Button onPress={handleJoinLeave} loading={joinLoading} size="sm">
+                  Join to start posting
+                </Button>
+              ) : (
+                <Text variant="caption" color={colors.accent} align="center">
+                  Be the first to post!
+                </Text>
+              )}
             </View>
           ) : (
             <View style={{ padding: spacing.xl, alignItems: 'center' }}>
