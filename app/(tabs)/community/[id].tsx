@@ -132,7 +132,7 @@ export default function CommunityDetailScreen() {
           <Text variant="h3">Community</Text>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="people-outline" size={48} color={colors.textMuted} />
+          <Ionicons name="people-outline" size={32} color={colors.textMuted} />
           <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
             Community not found
           </Text>
@@ -154,7 +154,7 @@ export default function CommunityDetailScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -171,47 +171,49 @@ export default function CommunityDetailScreen() {
         ListHeaderComponent={
           <View>
             {/* Community header */}
-            <View style={{ alignItems: 'center', padding: spacing.xl }}>
-              <Avatar
-                uri={community.image || community.avatar}
-                name={community.name}
-                size="xl"
-              />
-              <Text variant="h2" style={{ marginTop: spacing.lg }}>
-                {community.name}
-              </Text>
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.xs,
-                  marginTop: spacing.sm,
-                }}
-              >
-                <Ionicons name="people" size={16} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted}>
-                  {memberCount} member{memberCount !== 1 ? 's' : ''}
-                </Text>
+            <View style={{ padding: spacing.xl }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+                <Avatar
+                  uri={community.image || community.avatar}
+                  name={community.name}
+                  size="xl"
+                />
+                <View style={{ flex: 1 }}>
+                  <Text variant="h2">
+                    {community.name}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.xs,
+                      marginTop: spacing.xs,
+                    }}
+                  >
+                    <Ionicons name="people" size={14} color={colors.textMuted} />
+                    <Text variant="caption" color={colors.textMuted}>
+                      {memberCount} member{memberCount !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               {community.description && (
                 <Text
                   variant="body"
                   color={colors.textSecondary}
-                  align="center"
-                  style={{ marginTop: spacing.md, maxWidth: 340 }}
+                  style={{ marginTop: spacing.lg }}
                 >
                   {community.description}
                 </Text>
               )}
 
-              <View style={{ marginTop: spacing.xl, width: 160 }}>
+              <View style={{ marginTop: spacing.xl }}>
                 <Button
                   onPress={handleJoinLeave}
                   loading={joinLoading}
                   variant={isMember ? 'secondary' : 'primary'}
-                  fullWidth
+                  size="sm"
                 >
                   {isMember ? 'Leave' : 'Join'}
                 </Button>
@@ -235,7 +237,7 @@ export default function CommunityDetailScreen() {
                 paddingHorizontal: spacing.xl,
                 paddingVertical: spacing.lg,
                 borderBottomWidth: 0.5,
-                borderBottomColor: colors.borderSubtle,
+                borderBottomColor: 'rgba(255,255,255,0.06)',
               }}
             >
               <Text variant="bodyMedium" color={colors.textSecondary}>
@@ -248,7 +250,7 @@ export default function CommunityDetailScreen() {
         ListEmptyComponent={
           !postsLoading ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name="chatbubbles-outline" size={40} color={colors.textMuted} />
+              <Ionicons name="chatbubbles-outline" size={32} color={colors.textMuted} />
               <Text variant="body" color={colors.textMuted} align="center">
                 No posts in this community yet
               </Text>

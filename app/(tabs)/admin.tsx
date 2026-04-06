@@ -6,6 +6,7 @@ import {
   Switch,
   Platform,
   TextInput,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -292,7 +293,7 @@ function UsersTab() {
         </View>
       ) : filteredUsers.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: spacing['4xl'] }}>
-          <Ionicons name="people-outline" size={48} color={colors.textMuted} />
+          <Ionicons name="people-outline" size={32} color={colors.textMuted} />
           <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
             {search ? 'No users found' : 'No users loaded'}
           </Text>
@@ -336,7 +337,7 @@ function UsersTab() {
               </View>
 
               {expandedUser === u.id && (
-                <View style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.borderSubtle }}>
+                <View style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
                   <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.md }}>
                     Posts: 0  |  Last active: --
                   </Text>
@@ -344,9 +345,9 @@ function UsersTab() {
                     Strike history: None
                   </Text>
                   <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-                    <Button onPress={() => {}} variant="secondary" size="sm">Give Strike</Button>
-                    <Button onPress={() => {}} variant="secondary" size="sm">Suspend</Button>
-                    <Button onPress={() => {}} size="sm" accentColor={colors.error}>Ban</Button>
+                    <Button onPress={() => { const m = 'Strike system coming soon'; Platform.OS === 'web' ? alert(m) : Alert.alert('Coming Soon', m); }} variant="secondary" size="sm">Give Strike</Button>
+                    <Button onPress={() => { const m = 'Suspension system coming soon'; Platform.OS === 'web' ? alert(m) : Alert.alert('Coming Soon', m); }} variant="secondary" size="sm">Suspend</Button>
+                    <Button onPress={() => { const m = 'Ban system coming soon'; Platform.OS === 'web' ? alert(m) : Alert.alert('Coming Soon', m); }} size="sm" accentColor={colors.error}>Ban</Button>
                   </View>
                 </View>
               )}
@@ -419,7 +420,7 @@ function SettingsTab() {
         {toggleRow('Require invite codes', requireInvite, setRequireInvite)}
       </Card>
 
-      <Button onPress={() => {}} variant="primary">Save Settings</Button>
+      <Button onPress={() => { const m = 'Settings saved (coming soon — settings persistence not yet wired)'; Platform.OS === 'web' ? alert(m) : Alert.alert('Saved', m); }} variant="primary">Save Settings</Button>
     </View>
   );
 }
@@ -437,7 +438,7 @@ export default function AdminScreen() {
   if (!isAdmin) {
     return (
       <Container safeTop centered>
-        <Ionicons name="lock-closed-outline" size={48} color={colors.textMuted} />
+        <Ionicons name="lock-closed-outline" size={32} color={colors.textMuted} />
         <Text variant="h3" color={colors.textMuted} style={{ marginTop: spacing.lg }}>
           Access Denied
         </Text>
@@ -469,7 +470,7 @@ export default function AdminScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -496,7 +497,7 @@ export default function AdminScreen() {
         showsHorizontalScrollIndicator={false}
         style={{
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
           flexGrow: 0,
         }}
         contentContainerStyle={{

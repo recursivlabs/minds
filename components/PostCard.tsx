@@ -273,7 +273,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
       style={({ pressed }) => ({
         backgroundColor: pressed && !isEditing ? colors.surfaceHover : 'transparent',
         borderBottomWidth: 0.5,
-        borderBottomColor: colors.borderSubtle,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
       })}

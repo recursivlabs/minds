@@ -97,10 +97,10 @@ export default function FeedScreen() {
           }
           ListEmptyComponent={
             !loading ? (
-              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.md }}>
                 <Ionicons
                   name={activeTab === 'following' ? 'people-outline' : 'newspaper-outline'}
-                  size={40}
+                  size={32}
                   color={colors.textMuted}
                 />
                 <Text variant="body" color={colors.textMuted} align="center">

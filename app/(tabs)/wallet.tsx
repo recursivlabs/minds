@@ -44,13 +44,10 @@ export default function WalletScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text variant="h2" style={{ flex: 1 }}>Wallet</Text>
+        <Text variant="bodyMedium" style={{ flex: 1, fontSize: 14 }}>Wallet</Text>
       </View>
 
       <ScrollView
@@ -63,10 +60,10 @@ export default function WalletScreen() {
         {/* Token system notice */}
         <View
           style={{
-            backgroundColor: colors.surface,
-            borderRadius: radius.lg,
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            borderRadius: radius.md,
             padding: spacing.lg,
-            borderWidth: 1,
+            borderWidth: 0.5,
             borderColor: colors.accent + '30',
             flexDirection: 'row',
             alignItems: 'center',
@@ -111,12 +108,12 @@ export default function WalletScreen() {
 
         {/* Recent transactions */}
         <View>
-          <Text variant="h3" style={{ marginBottom: spacing.lg }}>
+          <Text variant="bodyMedium" color={colors.textSecondary} style={{ marginBottom: spacing.lg, fontSize: 14 }}>
             Recent Transactions
           </Text>
           <Card variant="raised">
             <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.md }}>
-              <Ionicons name="receipt-outline" size={36} color={colors.textMuted} />
+              <Ionicons name="receipt-outline" size={32} color={colors.textMuted} />
               <Text variant="body" color={colors.textMuted}>
                 No transactions yet
               </Text>
@@ -134,7 +131,7 @@ export default function WalletScreen() {
 
         {/* How to earn */}
         <View>
-          <Text variant="h3" style={{ marginBottom: spacing.lg }}>
+          <Text variant="bodyMedium" color={colors.textSecondary} style={{ marginBottom: spacing.lg, fontSize: 14 }}>
             How to Earn Tokens
           </Text>
           <View style={{ gap: spacing.md }}>

@@ -27,7 +27,7 @@ export function UserCard({ user, onFollow, compact = false }: Props) {
           borderRadius: radius.lg,
           padding: spacing.lg,
           borderWidth: 1,
-          borderColor: colors.borderSubtle,
+          borderColor: 'rgba(255,255,255,0.06)',
           width: 160,
           marginRight: spacing.md,
           alignItems: 'center',

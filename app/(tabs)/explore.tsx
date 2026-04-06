@@ -18,7 +18,7 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
         marginBottom: spacing.md,
       }}
     >
-      <Text variant="h3">{title}</Text>
+      <Text variant="bodyMedium" color={colors.textSecondary} style={{ fontSize: 14 }}>{title}</Text>
       {onSeeAll && (
         <Pressable onPress={onSeeAll} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text variant="label" color={colors.accent}>See all</Text>
@@ -88,7 +88,7 @@ function TrendingCommunityCard({ community, onPress }: { community: any; onPress
 }
 
 // Compact agent card for grid
-function TrendingAgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
+function TrendingAgentCard({ agent, onPress, onChat }: { agent: any; onPress: () => void; onChat: () => void }) {
   const bio = agent.bio || agent.description || '';
 
   return (
@@ -100,6 +100,25 @@ function TrendingAgentCard({ agent, onPress }: { agent: any; onPress: () => void
           {bio ? (
             <Text variant="caption" color={colors.textMuted} numberOfLines={1} align="center">{bio}</Text>
           ) : null}
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onChat();
+            }}
+            style={{
+              backgroundColor: colors.accentMuted,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs,
+              borderRadius: radius.full,
+              marginTop: 2,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.xs,
+            }}
+          >
+            <Ionicons name="chatbubble" size={12} color={colors.accent} />
+            <Text variant="caption" color={colors.accent}>Chat</Text>
+          </Pressable>
         </View>
       </Card>
     </Pressable>
@@ -200,6 +219,20 @@ export default function ExploreScreen() {
     } catch {}
   };
 
+  const handleChatWithAgent = async (agentId: string) => {
+    if (!sdk) return;
+    try {
+      const res = await sdk.chat.dm({ user_id: agentId });
+      if (res.data?.id) {
+        router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
+      } else {
+        router.push({ pathname: '/(tabs)/chat', params: { agent: agentId } } as any);
+      }
+    } catch {
+      router.push({ pathname: '/(tabs)/chat', params: { agent: agentId } } as any);
+    }
+  };
+
   const itemCount = isDesktop ? 6 : 4;
 
   return (
@@ -269,7 +302,7 @@ export default function ExploreScreen() {
           ListEmptyComponent={
             !searchLoading ? (
               <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="search-outline" size={40} color={colors.textMuted} />
+                <Ionicons name="search-outline" size={32} color={colors.textMuted} />
                 <Text variant="body" color={colors.textMuted} align="center">
                   No results found
                 </Text>
@@ -315,7 +348,7 @@ export default function ExploreScreen() {
           </View>
 
           {/* Trending Communities */}
-          <View style={{ paddingTop: spacing['3xl'] }}>
+          <View style={{ paddingTop: spacing['2xl'] }}>
             <SectionHeader
               title="Trending Communities"
               onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })}
@@ -328,7 +361,7 @@ export default function ExploreScreen() {
                   <Ionicons name="people-outline" size={32} color={colors.textMuted} />
                   <Text variant="body" color={colors.textMuted}>No communities yet</Text>
                   <Button
-                    onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })}
+                    onPress={() => router.push({ pathname: '/(tabs)/create' } as any)}
                     size="sm"
                   >
                     Create a community
@@ -349,7 +382,7 @@ export default function ExploreScreen() {
           </View>
 
           {/* Trending Agents */}
-          <View style={{ paddingTop: spacing['3xl'] }}>
+          <View style={{ paddingTop: spacing['2xl'] }}>
             <SectionHeader
               title="Trending Agents"
               onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })}
@@ -369,7 +402,8 @@ export default function ExploreScreen() {
                   <TrendingAgentCard
                     key={agent.id}
                     agent={agent}
-                    onPress={() => router.push(`/agent/${agent.id}`)}
+                    onPress={() => handleChatWithAgent(agent.id)}
+                    onChat={() => handleChatWithAgent(agent.id)}
                   />
                 ))}
               </Grid>
@@ -377,7 +411,7 @@ export default function ExploreScreen() {
           </View>
 
           {/* Trending People */}
-          <View style={{ paddingTop: spacing['3xl'] }}>
+          <View style={{ paddingTop: spacing['2xl'] }}>
             <SectionHeader
               title="Trending People"
               onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'people' } })}
@@ -397,7 +431,7 @@ export default function ExploreScreen() {
                   <TrendingPersonCard
                     key={user.id}
                     user={user}
-                    onPress={() => router.push(`/profile/${user.username || user.id}`)}
+                    onPress={() => router.push(`/user/${user.username || user.id}`)}
                     onFollow={() => handleFollow(user.id)}
                   />
                 ))}
@@ -406,14 +440,14 @@ export default function ExploreScreen() {
           </View>
 
           {/* Apps */}
-          <View style={{ paddingTop: spacing['3xl'] }}>
+          <View style={{ paddingTop: spacing['2xl'] }}>
             <SectionHeader
               title="Apps"
               onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'apps' } })}
             />
             <Card variant="raised">
               <View style={{ alignItems: 'center', padding: spacing.xl }}>
-                <Ionicons name="apps-outline" size={40} color={colors.textMuted} />
+                <Ionicons name="apps-outline" size={32} color={colors.textMuted} />
                 <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
                   No apps yet — build one!
                 </Text>
@@ -426,7 +460,7 @@ export default function ExploreScreen() {
                   Build apps on the Minds platform
                 </Text>
                 <View style={{ marginTop: spacing.lg }}>
-                  <Button onPress={() => {}} size="sm">
+                  <Button onPress={() => router.push({ pathname: '/(tabs)/create' } as any)} size="sm">
                     Build Your First App
                   </Button>
                 </View>

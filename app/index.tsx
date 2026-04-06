@@ -356,7 +356,18 @@ export default function LandingScreen() {
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
-  if (isAuthenticated && !isLoading) {
+  // Show nothing while restoring session (prevents landing page flash)
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#06060a', alignItems: 'center', justifyContent: 'center' }}>
+        <Text variant="h2" color="#d4a844" style={{ letterSpacing: 4, fontWeight: '300' }}>
+          minds
+        </Text>
+      </View>
+    );
+  }
+
+  if (isAuthenticated) {
     router.replace('/(tabs)');
     return null;
   }

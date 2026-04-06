@@ -66,7 +66,7 @@ export default function DiscoverScreen() {
             )}
             ListEmptyComponent={
               <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+                <Ionicons name="people-outline" size={32} color={colors.textMuted} />
                 <Text variant="body" color={colors.textMuted} align="center">
                   {searchQuery ? 'No communities match your search' : 'No communities yet'}
                 </Text>
@@ -75,7 +75,7 @@ export default function DiscoverScreen() {
                     Clear search
                   </Button>
                 ) : (
-                  <Button onPress={() => {}} size="sm">
+                  <Button onPress={() => router.push({ pathname: '/(tabs)/create' } as any)} size="sm">
                     Create a community
                   </Button>
                 )}
@@ -122,7 +122,7 @@ export default function DiscoverScreen() {
             )}
             ListEmptyComponent={
               <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="sparkles-outline" size={40} color={colors.textMuted} />
+                <Ionicons name="sparkles-outline" size={32} color={colors.textMuted} />
                 <Text variant="body" color={colors.textMuted} align="center">
                   {searchQuery ? 'No agents match your search' : 'No agents available yet'}
                 </Text>
@@ -131,7 +131,7 @@ export default function DiscoverScreen() {
                     Clear search
                   </Button>
                 ) : (
-                  <Button onPress={() => {}} size="sm">
+                  <Button onPress={() => router.push({ pathname: '/(tabs)/create' } as any)} size="sm">
                     Create an agent
                   </Button>
                 )}
@@ -145,7 +145,7 @@ export default function DiscoverScreen() {
       case 'apps':
         return (
           <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
-            <Ionicons name="apps-outline" size={56} color={colors.textMuted} />
+            <Ionicons name="apps-outline" size={32} color={colors.textMuted} />
             <Text variant="h3" color={colors.textMuted} style={{ marginTop: spacing.xl }}>
               No apps yet
             </Text>
@@ -158,7 +158,7 @@ export default function DiscoverScreen() {
               Build apps on the Minds platform and they will show up here.
             </Text>
             <View style={{ marginTop: spacing.xl }}>
-              <Button onPress={() => {}} size="md">
+              <Button onPress={() => router.push({ pathname: '/(tabs)/create' } as any)} size="md">
                 Build Your First App
               </Button>
             </View>
@@ -190,7 +190,7 @@ export default function DiscoverScreen() {
             )}
             ListEmptyComponent={
               <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="person-outline" size={40} color={colors.textMuted} />
+                <Ionicons name="person-outline" size={32} color={colors.textMuted} />
                 <Text variant="body" color={colors.textMuted} align="center">
                   {searchQuery ? 'No people match your search' : 'No people to discover yet'}
                 </Text>
@@ -199,7 +199,10 @@ export default function DiscoverScreen() {
                     Clear search
                   </Button>
                 ) : (
-                  <Button onPress={() => {}} size="sm" variant="secondary">
+                  <Button onPress={() => {
+                    const msg = 'Invite system coming soon — share your Minds link with friends';
+                    if (Platform.OS === 'web') alert(msg);
+                  }} size="sm" variant="secondary">
                     Invite friends
                   </Button>
                 )}
@@ -223,7 +226,7 @@ export default function DiscoverScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -275,7 +278,7 @@ export default function DiscoverScreen() {
           paddingHorizontal: spacing.lg,
           gap: spacing.xs,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
           paddingBottom: spacing.sm,
         }}
       >

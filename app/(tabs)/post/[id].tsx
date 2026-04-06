@@ -108,7 +108,7 @@ export default function PostDetailScreen() {
           <Text variant="h3">Post</Text>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['4xl'] }}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
+          <Ionicons name="alert-circle-outline" size={32} color={colors.textMuted} />
           <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
             {error || 'Post not found'}
           </Text>
@@ -131,7 +131,7 @@ export default function PostDetailScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -151,7 +151,7 @@ export default function PostDetailScreen() {
                 paddingHorizontal: spacing.xl,
                 paddingVertical: spacing.lg,
                 borderBottomWidth: 0.5,
-                borderBottomColor: colors.borderSubtle,
+                borderBottomColor: 'rgba(255,255,255,0.06)',
               }}
             >
               <Text variant="bodyMedium" color={colors.textSecondary}>
@@ -164,7 +164,7 @@ export default function PostDetailScreen() {
         ListEmptyComponent={
           !repliesLoading ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name="chatbubble-outline" size={40} color={colors.textMuted} />
+              <Ionicons name="chatbubble-outline" size={32} color={colors.textMuted} />
               <Text variant="body" color={colors.textMuted} align="center">
                 No replies yet
               </Text>
@@ -192,7 +192,7 @@ export default function PostDetailScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
-          borderTopColor: colors.borderSubtle,
+          borderTopColor: 'rgba(255,255,255,0.06)',
           paddingBottom: insets.bottom || spacing.md,
         }}
       >

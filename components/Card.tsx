@@ -1,5 +1,5 @@
 import { View, ViewProps, Platform } from 'react-native';
-import { colors, spacing, radius, shadows } from '../constants/theme';
+import { colors, spacing, radius } from '../constants/theme';
 
 interface Props extends ViewProps {
   variant?: 'default' | 'raised' | 'ghost';
@@ -9,10 +9,10 @@ interface Props extends ViewProps {
 export function Card({ variant = 'default', padding = 'lg', style, ...props }: Props) {
   const bg =
     variant === 'raised'
-      ? colors.surfaceRaised
+      ? 'rgba(255,255,255,0.03)'
       : variant === 'ghost'
         ? 'transparent'
-        : colors.glass;
+        : 'rgba(255,255,255,0.03)';
 
   return (
     <View
@@ -22,9 +22,8 @@ export function Card({ variant = 'default', padding = 'lg', style, ...props }: P
           borderRadius: radius.md,
           padding: spacing[padding],
           ...(variant !== 'ghost'
-            ? { borderWidth: 0.5, borderColor: colors.glassBorder }
+            ? { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)' }
             : {}),
-          ...(variant === 'raised' ? shadows.sm : {}),
           ...(Platform.OS === 'web' && variant !== 'ghost'
             ? { backdropFilter: 'blur(20px)' } as any
             : {}),

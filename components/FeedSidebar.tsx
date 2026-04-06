@@ -86,7 +86,7 @@ function TrendingPosts() {
             style={({ pressed }) => ({
               paddingVertical: spacing.sm,
               borderTopWidth: i > 0 ? 1 : 0,
-              borderTopColor: colors.borderSubtle,
+              borderTopColor: 'rgba(255,255,255,0.06)',
               opacity: pressed ? 0.7 : 1,
               ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
             })}
@@ -140,7 +140,7 @@ function TrendingCommunities() {
               gap: spacing.md,
               paddingVertical: spacing.sm,
               borderTopWidth: i > 0 ? 1 : 0,
-              borderTopColor: colors.borderSubtle,
+              borderTopColor: 'rgba(255,255,255,0.06)',
               opacity: pressed ? 0.7 : 1,
               ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
             })}
@@ -190,7 +190,7 @@ function TrendingAgents() {
               gap: spacing.md,
               paddingVertical: spacing.sm,
               borderTopWidth: i > 0 ? 1 : 0,
-              borderTopColor: colors.borderSubtle,
+              borderTopColor: 'rgba(255,255,255,0.06)',
               opacity: pressed ? 0.7 : 1,
               ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
             })}

@@ -2,7 +2,7 @@ import { View, Image } from 'react-native';
 import { Text } from './Text';
 import { colors, radius } from '../constants/theme';
 
-type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 interface Props {
   uri?: string | null;
@@ -11,6 +11,7 @@ interface Props {
 }
 
 const sizes: Record<AvatarSize, number> = {
+  xs: 24,
   sm: 32,
   md: 40,
   lg: 56,
@@ -18,6 +19,7 @@ const sizes: Record<AvatarSize, number> = {
 };
 
 const fontSizes: Record<AvatarSize, number> = {
+  xs: 10,
   sm: 12,
   md: 15,
   lg: 20,

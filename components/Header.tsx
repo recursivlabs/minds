@@ -17,6 +17,44 @@ export function Header({ showBack, title }: Props) {
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width > 768;
 
+  if (isDesktop) {
+    // Minimal desktop header — just page context, no logo/bell/avatar (all in sidebar)
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.xl,
+          backgroundColor: colors.bg,
+          borderBottomWidth: 0.5,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
+          minHeight: 40,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          {showBack && (
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              style={{ marginRight: spacing.xs }}
+            >
+              <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+            </Pressable>
+          )}
+          {title ? (
+            <Text variant="bodyMedium" color={colors.textSecondary} style={{ fontSize: 14 }}>
+              {title}
+            </Text>
+          ) : null}
+        </View>
+        <View />
+      </View>
+    );
+  }
+
+  // Mobile header — wordmark + notification bell
   return (
     <View
       style={{
@@ -27,7 +65,7 @@ export function Header({ showBack, title }: Props) {
         paddingHorizontal: spacing.xl,
         backgroundColor: colors.bg,
         borderBottomWidth: 0.5,
-        borderBottomColor: colors.borderSubtle,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -41,8 +79,8 @@ export function Header({ showBack, title }: Props) {
           </Pressable>
         )}
         {title ? (
-          <Text variant="h3" style={{ fontWeight: '400' }}>{title}</Text>
-        ) : !isDesktop ? (
+          <Text variant="bodyMedium" style={{ fontWeight: '400' }}>{title}</Text>
+        ) : (
           <Text
             variant="h2"
             color={colors.accent}
@@ -50,18 +88,30 @@ export function Header({ showBack, title }: Props) {
           >
             minds
           </Text>
-        ) : null}
+        )}
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-        <Pressable hitSlop={8}>
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            if (Platform.OS === 'web') alert('Notifications coming soon');
+          }}
+          style={{ position: 'relative' }}
+        >
           <Ionicons name="notifications-outline" size={20} color={colors.textMuted} />
+          <View
+            style={{
+              position: 'absolute',
+              top: -2,
+              right: -4,
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: colors.accent,
+            }}
+          />
         </Pressable>
-        {!isDesktop && (
-          <Pressable onPress={() => router.push('/(tabs)/profile')}>
-            <Avatar uri={user?.image} name={user?.name} size="sm" />
-          </Pressable>
-        )}
       </View>
     </View>
   );

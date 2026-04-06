@@ -100,7 +100,7 @@ export function ComposePost({ onPost, placeholder = "What's on your mind?", show
       style={{
         backgroundColor: colors.surface,
         borderBottomWidth: 0.5,
-        borderBottomColor: colors.borderSubtle,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
         padding: spacing.xl,
       }}
     >

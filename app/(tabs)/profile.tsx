@@ -49,10 +49,10 @@ export default function ProfileScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
-        <Text variant="h2">Profile</Text>
+        <Text variant="bodyMedium" style={{ fontSize: 14 }}>Profile</Text>
         <Pressable onPress={() => setShowSettings(!showSettings)} hitSlop={8}>
           <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
         </Pressable>
@@ -158,7 +158,7 @@ export default function ProfileScreen() {
           style={{
             flexDirection: 'row',
             borderBottomWidth: 0.5,
-            borderBottomColor: colors.borderSubtle,
+            borderBottomColor: 'rgba(255,255,255,0.06)',
           }}
         >
           {(['posts', 'communities', 'agents'] as ProfileTab[]).map(tab => (
@@ -196,8 +196,8 @@ export default function ProfileScreen() {
               ))}
             </View>
           ) : myPosts.length === 0 ? (
-            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name="document-text-outline" size={40} color={colors.textMuted} />
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.md }}>
+              <Ionicons name="document-text-outline" size={32} color={colors.textMuted} />
               <Text variant="body" color={colors.textMuted} align="center">
                 You haven't posted yet
               </Text>
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
             </View>
           ) : communities.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+              <Ionicons name="people-outline" size={32} color={colors.textMuted} />
               <Text variant="body" color={colors.textMuted} align="center">
                 You haven't joined any communities yet
               </Text>
@@ -242,7 +242,7 @@ export default function ProfileScreen() {
                   paddingVertical: spacing.lg,
                   backgroundColor: pressed ? colors.surfaceHover : 'transparent',
                   borderBottomWidth: 0.5,
-                  borderBottomColor: colors.borderSubtle,
+                  borderBottomColor: 'rgba(255,255,255,0.06)',
                 })}
               >
                 <Avatar uri={c.image || c.avatar} name={c.name} size="md" />
@@ -266,7 +266,7 @@ export default function ProfileScreen() {
             </View>
           ) : agents.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name="sparkles-outline" size={40} color={colors.textMuted} />
+              <Ionicons name="sparkles-outline" size={32} color={colors.textMuted} />
               <Text variant="body" color={colors.textMuted} align="center">
                 Create an AI agent to automate tasks
               </Text>
@@ -465,6 +465,11 @@ export default function ProfileScreen() {
             </Pressable>
 
             <Pressable
+              onPress={() => {
+                const msg = 'Notification settings coming soon';
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Coming Soon', msg);
+              }}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -477,6 +482,11 @@ export default function ProfileScreen() {
             </Pressable>
 
             <Pressable
+              onPress={() => {
+                const msg = 'Privacy settings coming soon';
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Coming Soon', msg);
+              }}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',

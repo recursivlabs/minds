@@ -121,7 +121,7 @@ export default function UserProfileScreen() {
           <Text variant="h3">User</Text>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="person-outline" size={48} color={colors.textMuted} />
+          <Ionicons name="person-outline" size={32} color={colors.textMuted} />
           <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
             {error || 'User not found'}
           </Text>
@@ -141,7 +141,7 @@ export default function UserProfileScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -151,61 +151,61 @@ export default function UserProfileScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile info */}
-        <View style={{ alignItems: 'center', paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
-          <Avatar uri={profile.image || profile.avatar} name={profile.name} size="xl" />
-          <Text variant="h2" style={{ marginTop: spacing.lg }}>
-            {profile.name || username}
-          </Text>
-          <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-            @{profile.username || username}
-          </Text>
+        {/* Profile info — left aligned */}
+        <View style={{ paddingTop: spacing['2xl'], paddingHorizontal: spacing.xl }}>
+          {/* Avatar + Name row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+            <Avatar uri={profile.image || profile.avatar} name={profile.name} size="xl" />
+            <View style={{ flex: 1 }}>
+              <Text variant="h2">
+                {profile.name || username}
+              </Text>
+              <Text variant="body" color={colors.textMuted} style={{ marginTop: 2 }}>
+                @{profile.username || username}
+              </Text>
+            </View>
+          </View>
 
           {profile.bio && (
             <Text
               variant="body"
               color={colors.textSecondary}
-              align="center"
-              style={{ marginTop: spacing.md, maxWidth: 300 }}
+              style={{ marginTop: spacing.lg }}
             >
               {profile.bio}
             </Text>
           )}
 
-          {/* Stats */}
-          <View style={{ flexDirection: 'row', gap: spacing['3xl'], marginTop: spacing.xl }}>
-            <View style={{ alignItems: 'center' }}>
-              <Text variant="h3">{userPosts.length}</Text>
-              <Text variant="caption" color={colors.textMuted}>Posts</Text>
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text variant="h3">{followerCount}</Text>
+          {/* Stats row */}
+          <View style={{ flexDirection: 'row', gap: spacing['2xl'], marginTop: spacing.xl }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Text variant="bodyMedium">{followerCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Followers</Text>
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text variant="h3">{followingCount}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Text variant="bodyMedium">{followingCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Following</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Text variant="bodyMedium">{userPosts.length}</Text>
+              <Text variant="caption" color={colors.textMuted}>Posts</Text>
             </View>
           </View>
 
           {/* Actions */}
           {!isOwnProfile && (
-            <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, width: '100%' }}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  onPress={handleToggleFollow}
-                  loading={followLoading}
-                  variant={isFollowing ? 'secondary' : 'primary'}
-                  fullWidth
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </Button>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button onPress={() => setShowTip(true)} variant="secondary" fullWidth>
-                  Tip
-                </Button>
-              </View>
+            <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
+              <Button
+                onPress={handleToggleFollow}
+                loading={followLoading}
+                variant={isFollowing ? 'secondary' : 'primary'}
+                size="sm"
+              >
+                {isFollowing ? 'Following' : 'Follow'}
+              </Button>
+              <Button onPress={() => setShowTip(true)} variant="secondary" size="sm">
+                Tip
+              </Button>
             </View>
           )}
         </View>
@@ -219,7 +219,7 @@ export default function UserProfileScreen() {
 
         {userPosts.length === 0 ? (
           <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-            <Ionicons name="document-text-outline" size={40} color={colors.textMuted} />
+            <Ionicons name="document-text-outline" size={32} color={colors.textMuted} />
             <Text variant="body" color={colors.textMuted} align="center">
               This user hasn't posted yet
             </Text>

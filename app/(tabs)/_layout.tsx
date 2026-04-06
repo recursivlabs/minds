@@ -44,7 +44,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.bg,
-          borderTopColor: colors.borderSubtle,
+          borderTopColor: 'rgba(255,255,255,0.06)',
           borderTopWidth: 0.5,
           elevation: 0,
           height: 56,
@@ -88,11 +88,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="wallet"
         options={{
-          title: 'Chat',
+          title: 'Wallet',
           tabBarIcon: ({ color }) => (
-            <Ionicons name="chatbubbles-outline" size={22} color={color} />
+            <Ionicons name="diamond-outline" size={22} color={color} />
           ),
         }}
       />
@@ -105,7 +105,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="wallet" options={{ href: null }} />
+      <Tabs.Screen name="chat" options={{ href: null }} />
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />
       <Tabs.Screen name="admin" options={{ href: null }} />

@@ -44,7 +44,7 @@ export default function BoostScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -61,13 +61,13 @@ export default function BoostScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Info card */}
-        <Card variant="raised">
+        <Card>
           <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'center' }}>
             <View
               style={{
                 width: 48,
                 height: 48,
-                borderRadius: 14,
+                borderRadius: radius.md,
                 backgroundColor: colors.boostMuted,
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -76,8 +76,8 @@ export default function BoostScreen() {
               <Ionicons name="rocket" size={24} color={colors.boost} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text variant="h3">Boost Your Content</Text>
-              <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.xs }}>
+              <Text variant="bodyMedium">Boost Your Content</Text>
+              <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs }}>
                 Spend MINDS tokens to get your posts seen by more people.
               </Text>
             </View>
@@ -87,11 +87,11 @@ export default function BoostScreen() {
         {/* Conversion info */}
         <View
           style={{
-            backgroundColor: colors.surface,
-            borderRadius: radius.lg,
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            borderRadius: radius.md,
             padding: spacing.xl,
-            borderWidth: 1,
-            borderColor: colors.borderSubtle,
+            borderWidth: 0.5,
+            borderColor: 'rgba(255,255,255,0.06)',
             flexDirection: 'row',
             justifyContent: 'space-around',
           }}
@@ -113,12 +113,12 @@ export default function BoostScreen() {
 
         {/* Active boosts */}
         <View>
-          <Text variant="h3" style={{ marginBottom: spacing.lg }}>
+          <Text variant="bodyMedium" color={colors.textSecondary} style={{ marginBottom: spacing.lg, fontSize: 14 }}>
             Active Boosts
           </Text>
           <Card variant="raised">
             <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.md }}>
-              <Ionicons name="rocket-outline" size={40} color={colors.textMuted} />
+              <Ionicons name="rocket-outline" size={32} color={colors.textMuted} />
               <Text variant="body" color={colors.textMuted}>
                 No active boosts
               </Text>

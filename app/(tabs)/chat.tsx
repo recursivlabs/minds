@@ -56,10 +56,10 @@ export default function ChatScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
-        <Text variant="h2">Messages</Text>
+        <Text variant="bodyMedium" style={{ fontSize: 14 }}>Messages</Text>
         <Pressable onPress={() => setShowNewChat(!showNewChat)} hitSlop={8}>
           <Ionicons name="create-outline" size={22} color={colors.accent} />
         </Pressable>
@@ -73,7 +73,7 @@ export default function ChatScreen() {
             gap: spacing.sm,
             padding: spacing.xl,
             borderBottomWidth: 0.5,
-            borderBottomColor: colors.borderSubtle,
+            borderBottomColor: 'rgba(255,255,255,0.06)',
           }}
         >
           <View style={{ flex: 1 }}>
@@ -117,7 +117,7 @@ export default function ChatScreen() {
         </View>
       ) : conversations.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-          <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
+          <Ionicons name="chatbubbles-outline" size={32} color={colors.textMuted} />
           <Text variant="h3" color={colors.textMuted}>
             No conversations yet
           </Text>
@@ -267,7 +267,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         <Pressable onPress={onBack} hitSlop={12}>
@@ -317,7 +317,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
-          borderTopColor: colors.borderSubtle,
+          borderTopColor: 'rgba(255,255,255,0.06)',
           paddingBottom: insets.bottom || spacing.md,
         }}
       >

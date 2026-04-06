@@ -490,7 +490,7 @@ function PostFlow({ onBack, onSuccess }: { onBack: () => void; onSuccess: () => 
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
-          borderTopColor: colors.borderSubtle,
+          borderTopColor: 'rgba(255,255,255,0.06)',
           backgroundColor: colors.bg,
         }}
       >
@@ -762,7 +762,7 @@ function AppFlow({ onBack }: { onBack: () => void }) {
 
         {messages.length === 0 && (
           <View style={{ alignItems: 'center', paddingVertical: spacing['3xl'], gap: spacing.lg }}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
+            <Ionicons name="chatbubbles-outline" size={32} color={colors.textMuted} />
             <Text variant="body" color={colors.textMuted} align="center">
               Describe what you want to build and we will help you get started.
             </Text>
@@ -807,7 +807,7 @@ function AppFlow({ onBack }: { onBack: () => void }) {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
-          borderTopColor: colors.borderSubtle,
+          borderTopColor: 'rgba(255,255,255,0.06)',
           backgroundColor: colors.bg,
         }}
       >
@@ -1016,7 +1016,7 @@ export default function CreateScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         {mode !== 'landing' ? (
@@ -1096,7 +1096,7 @@ export default function CreateScreen() {
       {mode === 'boost' && (
         // Redirect to boost tab
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg }}>
-          <Ionicons name="rocket-outline" size={48} color={colors.accent} />
+          <Ionicons name="rocket-outline" size={32} color={colors.accent} />
           <Text variant="h3">Boost</Text>
           <Text variant="body" color={colors.textMuted} align="center">
             Amplify your content to reach more people.
