@@ -1088,7 +1088,7 @@ export default function CreateScreen() {
           onBack={() => setMode('landing')}
           onSuccess={(slug) => {
             showSuccess('Community created!');
-            setTimeout(() => router.push(`/community/${slug}`), 1600);
+            setTimeout(() => router.push(`/(tabs)/community/${slug}` as any), 1600);
           }}
         />
       )}

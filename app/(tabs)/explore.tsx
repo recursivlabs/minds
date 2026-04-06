@@ -288,7 +288,7 @@ export default function ExploreScreen() {
             <View style={{ marginBottom: spacing.md }}>
               <TrendingPostCard
                 post={item}
-                onPress={() => router.push(`/post/${item.id}`)}
+                onPress={() => router.push(`/(tabs)/post/${item.id}` as any)}
               />
             </View>
           )}
@@ -340,7 +340,7 @@ export default function ExploreScreen() {
                   <TrendingPostCard
                     key={post.id}
                     post={post}
-                    onPress={() => router.push(`/post/${post.id}`)}
+                    onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
                   />
                 ))}
               </Grid>
@@ -374,7 +374,7 @@ export default function ExploreScreen() {
                   <TrendingCommunityCard
                     key={c.id}
                     community={c}
-                    onPress={() => router.push(`/community/${c.slug || c.id}`)}
+                    onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
                   />
                 ))}
               </Grid>
@@ -431,7 +431,7 @@ export default function ExploreScreen() {
                   <TrendingPersonCard
                     key={user.id}
                     user={user}
-                    onPress={() => router.push(`/user/${user.username || user.id}`)}
+                    onPress={() => router.push(`/(tabs)/user/${user.username || user.id}` as any)}
                     onFollow={() => handleFollow(user.id)}
                   />
                 ))}

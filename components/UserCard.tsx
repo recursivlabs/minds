@@ -21,7 +21,7 @@ export function UserCard({ user, onFollow, compact = false }: Props) {
   if (compact) {
     return (
       <Pressable
-        onPress={() => router.push(`/user/${username}`)}
+        onPress={() => router.push(`/(tabs)/user/${username}` as any)}
         style={({ pressed }) => ({
           backgroundColor: pressed ? colors.surfaceHover : colors.surface,
           borderRadius: radius.lg,
@@ -65,7 +65,7 @@ export function UserCard({ user, onFollow, compact = false }: Props) {
 
   return (
     <Pressable
-      onPress={() => router.push(`/user/${username}`)}
+      onPress={() => router.push(`/(tabs)/user/${username}` as any)}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

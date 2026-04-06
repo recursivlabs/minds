@@ -20,7 +20,7 @@ export function CommunityCard({ community, variant = 'card' }: Props) {
   if (variant === 'row') {
     return (
       <Pressable
-        onPress={() => router.push(`/community/${community.id}`)}
+        onPress={() => router.push(`/(tabs)/community/${community.id}` as any)}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
@@ -44,7 +44,7 @@ export function CommunityCard({ community, variant = 'card' }: Props) {
 
   return (
     <Pressable
-      onPress={() => router.push(`/community/${community.id}`)}
+      onPress={() => router.push(`/(tabs)/community/${community.id}` as any)}
       style={({ pressed }) => ({
         backgroundColor: pressed ? colors.surfaceHover : colors.surface,
         borderRadius: radius.lg,

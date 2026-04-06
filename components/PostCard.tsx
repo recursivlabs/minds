@@ -269,7 +269,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
 
   return (
     <Pressable
-      onPress={() => !isEditing && router.push(`/post/${post.id}`)}
+      onPress={() => !isEditing && router.push(`/(tabs)/post/${post.id}` as any)}
       style={({ pressed }) => ({
         backgroundColor: pressed && !isEditing ? colors.surfaceHover : 'transparent',
         borderBottomWidth: 0.5,
@@ -294,12 +294,12 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
           marginBottom: spacing.md,
         }}
       >
-        <Pressable onPress={() => router.push(`/user/${authorUsername}`)}>
+        <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
           <Avatar uri={authorAvatar} name={authorName} size="sm" />
         </Pressable>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Pressable onPress={() => router.push(`/user/${authorUsername}`)}>
+            <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
               <Text variant="caption" numberOfLines={1} style={{ fontWeight: '400' }}>
                 {authorName}
               </Text>
@@ -386,7 +386,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         />
 
         <Pressable
-          onPress={() => router.push(`/post/${post.id}`)}
+          onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
           hitSlop={8}
         >
