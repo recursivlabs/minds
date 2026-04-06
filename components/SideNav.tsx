@@ -209,8 +209,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                   onPress={onToggle}
                   hitSlop={8}
                   style={({ pressed }) => ({
-                    opacity: pressed ? 0.5 : 0.4,
-                    padding: 4,
+                    opacity: pressed ? 0.5 : 0.7,
+                    padding: 6,
+                    borderRadius: 6,
+                    backgroundColor: pressed ? 'rgba(255,255,255,0.05)' : 'transparent',
                   })}
                 >
                   <Ionicons name="chevron-back" size={16} color={colors.textMuted} />

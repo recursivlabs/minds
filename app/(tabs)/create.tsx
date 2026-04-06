@@ -25,10 +25,10 @@ import { colors, spacing, radius, typography } from '../../constants/theme';
 const MINDS_AI_AGENT_ID = 'b20fc63e-7c12-4a31-8f3a-ef282b568dbf';
 
 const AGENT_MODELS = [
-  'gemini-3.1-pro-preview',
-  'claude-sonnet-4-20250514',
-  'gpt-4o',
-  'gemini-2.5-flash-preview-05-20',
+  'google/gemini-3.1-pro-preview',
+  'anthropic/claude-sonnet-4.6',
+  'openai/gpt-5.4',
+  'google/gemini-3-flash-preview',
 ];
 
 type CreationMode = 'landing' | 'post' | 'agent' | 'app' | 'community' | 'boost';
@@ -864,7 +864,8 @@ function CommunityFlow({ onBack, onSuccess }: { onBack: () => void; onSuccess: (
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-');
+    .replace(/\s+/g, '-')
+    + '-' + Math.random().toString(36).slice(2, 6);
 
   const handleCreate = async () => {
     if (!name.trim() || !sdk) return;

@@ -11,7 +11,7 @@ const KEYS = {
 };
 
 // Bump this when scopes change to force re-auth
-const AUTH_VERSION = '2';
+const AUTH_VERSION = '3';
 
 interface User {
   id: string;
@@ -52,7 +52,7 @@ async function createApiKeyWithSession(sessionToken: string): Promise<string | n
         organizationId: ORG_ID,
         scopes: [
           'posts:read', 'posts:write',
-          'users:read',
+          'users:read', 'users:write',
           'communities:read', 'communities:write',
           'chat:read', 'chat:write',
           'agents:read', 'agents:write',
