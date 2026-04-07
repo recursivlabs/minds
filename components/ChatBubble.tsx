@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { View } from 'react-native';
 import { Text } from './Text';
 import { colors, spacing, radius } from '../constants/theme';
@@ -7,7 +8,7 @@ interface Props {
   isOwn: boolean;
 }
 
-export function ChatBubble({ message, isOwn }: Props) {
+export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Props) {
   const content = message.content || message.text || message.body || '';
   const timestamp = message.createdAt || message.created_at || '';
 
@@ -52,4 +53,4 @@ export function ChatBubble({ message, isOwn }: Props) {
       ) : null}
     </View>
   );
-}
+});

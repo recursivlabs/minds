@@ -31,7 +31,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 604800)}w`;
 }
 
-export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }: Props) {
+export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPostDeleted, compact = false }: Props) {
   const router = useRouter();
   const { sdk, user } = useAuth();
   const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(
@@ -422,4 +422,4 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
       />
     </Pressable>
   );
-}
+});

@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ProjectProvider } from '../lib/project';
 import { AuthProvider } from '../lib/auth';
 import { ThemeProvider } from '../lib/theme';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,14 +32,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        <ThemeProvider>
-          <ProjectProvider>
-            <AuthProvider>
-              <StatusBar style="light" />
-              <Slot />
-            </AuthProvider>
-          </ProjectProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <ProjectProvider>
+              <AuthProvider>
+                <StatusBar style="light" />
+                <Slot />
+              </AuthProvider>
+            </ProjectProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </View>
     </SafeAreaProvider>
   );

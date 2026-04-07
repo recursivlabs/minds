@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { View, Image } from 'react-native';
 import { Text } from './Text';
 import { colors, radius } from '../constants/theme';
@@ -43,7 +44,7 @@ function hashColor(name?: string): string {
   return `hsl(${hue}, 50%, 40%)`;
 }
 
-export function Avatar({ uri, name, size = 'md' }: Props) {
+export const Avatar = React.memo(function Avatar({ uri, name, size = 'md' }: Props) {
   const dim = sizes[size];
 
   if (uri) {
@@ -84,4 +85,4 @@ export function Avatar({ uri, name, size = 'md' }: Props) {
       </Text>
     </View>
   );
-}
+});
