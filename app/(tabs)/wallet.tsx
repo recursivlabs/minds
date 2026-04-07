@@ -8,24 +8,24 @@ export default function WalletScreen() {
   return (
     <Container safeTop centered>
       <View style={{ alignItems: 'center', gap: spacing['2xl'], padding: spacing['3xl'] }}>
-        <Ionicons name="diamond" size={40} color={colors.token} />
+        <Ionicons name="diamond" size={40} color={colors.accent} />
 
-        <Text variant="hero" color={colors.token}>
-          0 MINDS
+        <Text variant="h2" color={colors.text} align="center">
+          MINDS Tokens
         </Text>
 
         <Text
           variant="body"
           color={colors.textSecondary}
           align="center"
-          style={{ maxWidth: 280, lineHeight: 24 }}
+          style={{ maxWidth: 300, lineHeight: 24 }}
         >
-          Token system launching soon.{'\n'}
-          Earn tokens by creating content and engaging with the community.
+          A new token economy is coming to Minds.{'\n'}
+          Earn, spend, and support the creators you believe in.
         </Text>
 
         <Text variant="caption" color={colors.textMuted}>
-          Learn more at minds.com
+          Stay tuned for updates
         </Text>
       </View>
     </Container>

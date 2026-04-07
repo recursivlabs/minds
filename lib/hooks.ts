@@ -183,8 +183,18 @@ export function useProfile(username: string) {
     (async () => {
       try {
         const s = sdk || getSdk();
-        const res = await s.profiles.getByUsername(username);
-        if (!cancelled) {
+        let res;
+        try {
+          res = await s.profiles.getByUsername(username);
+        } catch {
+          // Fallback: try as user ID
+          try {
+            res = await s.profiles.get(username);
+          } catch {
+            throw new Error('User not found');
+          }
+        }
+        if (!cancelled && res?.data) {
           setProfile(res.data);
           try {
             const followRes = await s.profiles.isFollowing(res.data.id);
@@ -192,7 +202,7 @@ export function useProfile(username: string) {
           } catch {}
         }
       } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Failed to load profile');
+        if (!cancelled) setError(err.message || 'User not found');
       } finally {
         if (!cancelled) setLoading(false);
       }

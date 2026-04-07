@@ -216,6 +216,25 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
 
     try {
       await sdk.chat.send({ conversation_id: conversationId, content: messageText });
+      // Check if this is an agent conversation and trigger agent response
+      try {
+        const convoRes = await sdk.chat.conversation(conversationId);
+        const members = (convoRes.data as any)?.members || [];
+        const otherMember = members.find((m: any) => m.user?.id !== user?.id || m.userId !== user?.id);
+        const agentId = otherMember?.user?.isAi ? (otherMember.user.id || otherMember.userId) : null;
+        if (agentId) {
+          const agentRes = await (sdk as any).agents.chat(agentId, { message: messageText });
+          const reply = (agentRes.data as any)?.content || (agentRes.data as any)?.message;
+          if (reply) {
+            setMessages(prev => [...prev, {
+              id: 'agent-' + Date.now(),
+              content: reply,
+              sender: { id: agentId, name: otherMember.user?.name || 'Agent' },
+              createdAt: new Date().toISOString(),
+            }]);
+          }
+        }
+      } catch {}
       refresh();
     } catch {
       setMessages(prev => prev.filter(m => m.id !== tempMsg.id));

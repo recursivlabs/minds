@@ -346,8 +346,10 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
             borderWidth: 1,
             borderColor: colors.border,
             padding: spacing.xs,
-            zIndex: 10,
+            zIndex: 9999,
+            elevation: 999,
             minWidth: 160,
+            ...(Platform.OS === 'web' ? { boxShadow: '0 4px 24px rgba(0,0,0,0.5)' } as any : {}),
           }}
         >
           {isOwnPost && (

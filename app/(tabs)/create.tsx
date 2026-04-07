@@ -67,7 +67,12 @@ export default function CreateScreen() {
   };
 
   const handlePost = async () => {
-    if ((!content.trim() && !mediaUri) || !sdk) return;
+    if (!content.trim() && !mediaUri) {
+      if (Platform.OS === 'web') alert('Write something to share');
+      else Alert.alert('', 'Write something to share');
+      return;
+    }
+    if (!sdk) return;
     setPosting(true);
     try {
       let mediaUrls: string[] | undefined;
@@ -187,11 +192,12 @@ export default function CreateScreen() {
               source={{ uri: mediaUri }}
               style={{
                 width: '100%',
-                height: 200,
+                aspectRatio: 16 / 9,
+                maxHeight: 300,
                 borderRadius: radius.md,
                 backgroundColor: colors.surfaceHover,
               }}
-              resizeMode="cover"
+              resizeMode="contain"
             />
             <Pressable
               onPress={() => setMediaUri(null)}
