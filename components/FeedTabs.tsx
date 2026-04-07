@@ -2,7 +2,7 @@ import { View, Pressable, Platform } from 'react-native';
 import { Text } from './Text';
 import { colors, spacing } from '../constants/theme';
 
-type FeedTab = 'foryou' | 'latest' | 'following';
+type FeedTab = 'foryou' | 'latest' | 'following' | 'trending';
 
 interface Props {
   active: FeedTab;
@@ -11,6 +11,7 @@ interface Props {
 
 const TABS: { key: FeedTab; label: string }[] = [
   { key: 'foryou', label: 'For You' },
+  { key: 'trending', label: 'Trending' },
   { key: 'latest', label: 'Latest' },
   { key: 'following', label: 'Following' },
 ];

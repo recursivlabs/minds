@@ -18,7 +18,7 @@ type NavItem = { name: string; label: string; icon: string; activeIcon: string }
 
 const NAV_ITEMS: NavItem[] = [
   { name: 'index', label: 'Feed', icon: 'newspaper-outline', activeIcon: 'newspaper' },
-  { name: 'explore', label: 'Explore', icon: 'compass-outline', activeIcon: 'compass' },
+  { name: 'explore', label: 'Leaderboard', icon: 'trophy-outline', activeIcon: 'trophy' },
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
   { name: 'wallet', label: 'Tokens', icon: 'bulb-outline', activeIcon: 'bulb' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
