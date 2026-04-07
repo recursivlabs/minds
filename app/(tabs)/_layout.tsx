@@ -1,13 +1,15 @@
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { View, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../../constants/theme';
+import { spacing } from '../../constants/theme';
+import { useTheme } from '../../lib/theme';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web';
   const sidebar = useSidebarState();
+  const { colors } = useTheme();
 
   if (isDesktop) {
     return (
