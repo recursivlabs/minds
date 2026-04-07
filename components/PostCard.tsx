@@ -106,7 +106,8 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         if (prevVote) await sdk.posts.unreact(post.id);
         await sdk.posts.react(post.id, type as any);
       }
-    } catch {
+    } catch (err: any) {
+      console.error('[Vote] Failed:', err?.message || err, 'postId:', post.id, 'type:', type);
       setUserVote(prevVote);
       setScore(prevScore);
       onVoteChange?.(post.id, prevScore, prevVote);
