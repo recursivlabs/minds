@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { View, ScrollView, FlatList, TextInput, Platform, Pressable, useWindowDimensions } from 'react-native';
+import { View, ScrollView, FlatList, TextInput, Platform, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Avatar, Skeleton, Button } from '../../components';
+import { Text, Avatar, Skeleton, Button, PostCard } from '../../components';
 import { Container } from '../../components/Container';
 import { usePosts, useCommunities, useAgents, useSearchPosts, useProfiles } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
@@ -11,7 +11,7 @@ import { colors, spacing, radius, typography } from '../../constants/theme';
 function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg, marginTop: spacing['2xl'] }}>
-      <Text variant="h3" style={{ fontSize: 18, fontWeight: '600' }}>{title}</Text>
+      <Text variant="h3" style={{ fontSize: 18 }}>{title}</Text>
       {onSeeAll && (
         <Pressable onPress={onSeeAll} hitSlop={8}>
           <Text variant="caption" color={colors.accent}>See all</Text>
@@ -21,103 +21,13 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
   );
 }
 
-/** Featured post — large card with content preview */
-function FeaturedPost({ post, onPress }: { post: any; onPress: () => void }) {
-  const author = post.author?.name || 'Anonymous';
-  const authorAvatar = post.author?.image || post.author?.avatar;
-  const content = post.content || '';
-  const title = post.title;
-  const score = (post.upvoteCount || 0) - (post.downvoteCount || 0);
-  const replyCount = post.replyCount || post.reply_count || 0;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 0.5,
-        borderColor: colors.glassBorder,
-        padding: spacing.xl,
-        marginBottom: spacing.md,
-      })}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-        <Avatar uri={authorAvatar} name={author} size="sm" />
-        <Text variant="bodyMedium" style={{ fontSize: 13 }}>{author}</Text>
-      </View>
-      {title && <Text variant="h3" numberOfLines={2} style={{ marginBottom: spacing.sm }}>{title}</Text>}
-      <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ lineHeight: 22 }}>
-        {content.slice(0, 300)}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl, marginTop: spacing.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Ionicons name="arrow-up-outline" size={14} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{score}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Ionicons name="chatbubble-outline" size={13} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-/** Person card — horizontal, shows bio */
+/** Person card — shows name, username, bio, follow with optimistic state */
 function PersonCard({ person, onPress, onFollow }: { person: any; onPress: () => void; onFollow: () => void }) {
   const name = person.name || 'Unknown';
   const username = person.username;
   const bio = person.bio || person.description || '';
   const avatar = person.image || person.avatar;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 0.5,
-        borderColor: colors.glassBorder,
-        padding: spacing.lg,
-        width: 260,
-        marginRight: spacing.md,
-      })}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
-        <Avatar uri={avatar} name={name} size="md" />
-        <View style={{ flex: 1 }}>
-          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
-          {username && <Text variant="caption" color={colors.textMuted}>@{username}</Text>}
-        </View>
-      </View>
-      {bio ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 18, marginBottom: spacing.sm }}>
-          {bio}
-        </Text>
-      ) : null}
-      <Pressable
-        onPress={(e) => { e.stopPropagation?.(); onFollow(); }}
-        style={{
-          alignSelf: 'flex-start',
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.xs + 2,
-          borderRadius: radius.full,
-          backgroundColor: colors.accentMuted,
-        }}
-      >
-        <Text variant="caption" color={colors.accent} style={{ fontWeight: '500' }}>Follow</Text>
-      </Pressable>
-    </Pressable>
-  );
-}
-
-/** Community card — horizontal, shows description + member count */
-function CommunityCard({ community, onPress }: { community: any; onPress: () => void }) {
-  const name = community.name || 'Unnamed';
-  const description = community.description || community.bio || '';
-  const avatar = community.image || community.avatar;
-  const memberCount = community.memberCount || community.member_count || 0;
+  const [followed, setFollowed] = React.useState(false);
 
   return (
     <Pressable
@@ -136,11 +46,63 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
         <Avatar uri={avatar} name={name} size="md" />
         <View style={{ flex: 1 }}>
           <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
+          {username && <Text variant="caption" color={colors.textMuted}>@{username}</Text>}
+        </View>
+      </View>
+      {bio ? (
+        <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ lineHeight: 20, marginBottom: spacing.sm }}>
+          {bio}
+        </Text>
+      ) : null}
+      <Pressable
+        onPress={(e) => { e.stopPropagation?.(); if (!followed) { setFollowed(true); onFollow(); } }}
+        style={{
+          alignSelf: 'flex-start',
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.xs + 2,
+          borderRadius: radius.full,
+          backgroundColor: followed ? colors.surface : colors.accentMuted,
+          borderWidth: followed ? 0.5 : 0,
+          borderColor: colors.glassBorder,
+        }}
+      >
+        <Text variant="caption" color={followed ? colors.textSecondary : colors.accent} style={{ fontWeight: '500' }}>
+          {followed ? 'Following' : 'Follow'}
+        </Text>
+      </Pressable>
+    </Pressable>
+  );
+}
+
+/** Community card — shows name, description, member count */
+function CommunityCard({ community, onPress }: { community: any; onPress: () => void }) {
+  const name = community.name || 'Unnamed';
+  const description = community.description || community.bio || '';
+  const avatar = community.image || community.avatar;
+  const memberCount = community.memberCount || community.member_count || 0;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 0.5,
+        borderColor: colors.glassBorder,
+        padding: spacing.lg,
+        width: 300,
+        marginRight: spacing.md,
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+        <Avatar uri={avatar} name={name} size="md" />
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
           <Text variant="caption" color={colors.textMuted}>{memberCount} member{memberCount !== 1 ? 's' : ''}</Text>
         </View>
       </View>
       {description ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 18 }}>
+        <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ lineHeight: 20 }}>
           {description}
         </Text>
       ) : null}
@@ -148,7 +110,7 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
   );
 }
 
-/** Agent card — horizontal, shows bio + model */
+/** Agent card — shows name, bio, model */
 function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
   const name = agent.name || 'Agent';
   const bio = agent.bio || agent.description || '';
@@ -164,7 +126,7 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
         borderWidth: 0.5,
         borderColor: colors.glassBorder,
         padding: spacing.lg,
-        width: 260,
+        width: 280,
         marginRight: spacing.md,
       })}
     >
@@ -186,7 +148,7 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
         </View>
       </View>
       {bio ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 18 }}>
+        <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ lineHeight: 20 }}>
           {bio}
         </Text>
       ) : null}
@@ -212,7 +174,6 @@ export default function ExploreScreen() {
     try { await sdk.profiles.follow(userId); } catch {}
   };
 
-  // Filter out business AI agent from explore
   const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
   const visibleAgents = (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id));
 
@@ -258,40 +219,18 @@ export default function ExploreScreen() {
         <FlatList
           data={searchResults}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => router.push(`/(tabs)/post/${item.id}` as any)}
-              style={({ pressed }) => ({
-                paddingVertical: spacing.lg,
-                paddingHorizontal: spacing.md,
-                borderBottomWidth: 0.5,
-                borderBottomColor: 'rgba(255,255,255,0.06)',
-                backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-              })}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
-                <Avatar uri={item.author?.image} name={item.author?.name} size="xs" />
-                <Text variant="caption" color={colors.textMuted}>{item.author?.name || 'Anonymous'}</Text>
-              </View>
-              <Text variant="bodyMedium" numberOfLines={2}>
-                {item.title || item.content?.slice(0, 120) || 'Untitled'}
-              </Text>
-              {!item.title && item.content && (
-                <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ marginTop: spacing.xs }}>
-                  {item.content.slice(0, 100)}
-                </Text>
-              )}
-            </Pressable>
-          )}
+          contentContainerStyle={{ paddingTop: spacing.sm }}
+          renderItem={({ item }) => <PostCard key={item.id} post={item} compact />}
           ListHeaderComponent={
-            <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>
-              {searchLoading ? 'Searching...' : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`}
-            </Text>
+            <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}>
+              <Text variant="caption" color={colors.textMuted}>
+                {searchLoading ? 'Searching...' : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`}
+              </Text>
+            </View>
           }
           ListEmptyComponent={
             !searchLoading ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], padding: spacing['3xl'], gap: spacing['2xl'] }}>
                 <Ionicons name="search-outline" size={40} color={colors.accent} />
                 <Text variant="h2" color={colors.text} align="center">No Results</Text>
                 <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
@@ -305,19 +244,21 @@ export default function ExploreScreen() {
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: spacing['4xl'] }}
+          contentContainerStyle={{ paddingBottom: spacing['4xl'] }}
         >
-          {/* Featured Posts — large cards, not tiny horizontal */}
-          <SectionHeader
-            title="Trending"
-            onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts' } })}
-          />
+          {/* Trending — use the actual PostCard component, not a duplicate */}
+          <View style={{ paddingHorizontal: spacing.xl }}>
+            <SectionHeader
+              title="Trending"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts' } })}
+            />
+          </View>
           {postsLoading ? (
-            <View style={{ gap: spacing.md }}>
-              {[1, 2].map(i => <Skeleton key={i} height={140} borderRadius={radius.lg} />)}
+            <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
+              {[1, 2].map(i => <Skeleton key={i} height={100} borderRadius={radius.lg} />)}
             </View>
           ) : posts.length === 0 ? (
-            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+            <View style={{ alignItems: 'center', paddingVertical: spacing['6xl'], padding: spacing.xl, gap: spacing['2xl'] }}>
               <Ionicons name="newspaper-outline" size={40} color={colors.accent} />
               <Text variant="h2" color={colors.text} align="center">Trending</Text>
               <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 300, lineHeight: 24 }}>
@@ -327,30 +268,28 @@ export default function ExploreScreen() {
             </View>
           ) : (
             posts.slice(0, 5).map((post: any) => (
-              <FeaturedPost
-                key={post.id}
-                post={post}
-                onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
-              />
+              <PostCard key={post.id} post={post} compact />
             ))
           )}
 
-          {/* People — rich cards with bio */}
-          <SectionHeader
-            title="People to Follow"
-            onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'people' } })}
-          />
+          {/* People */}
+          <View style={{ paddingHorizontal: spacing.xl }}>
+            <SectionHeader
+              title="People to Follow"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'people' } })}
+            />
+          </View>
           {profilesLoading ? (
-            <View style={{ flexDirection: 'row' }}>
-              {[1, 2].map(i => <Skeleton key={i} width={260} height={120} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
+            <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xl }}>
+              {[1, 2].map(i => <Skeleton key={i} width={280} height={130} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
             </View>
           ) : profiles.length === 0 ? (
-            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+            <View style={{ alignItems: 'center', paddingVertical: spacing['3xl'], gap: spacing.lg }}>
               <Ionicons name="person-outline" size={40} color={colors.accent} />
               <Text variant="body" color={colors.textSecondary} align="center">No people to discover yet</Text>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.xl }}>
               {profiles.slice(0, 10).map((u: any) => (
                 <PersonCard
                   key={u.id}
@@ -362,23 +301,25 @@ export default function ExploreScreen() {
             </ScrollView>
           )}
 
-          {/* Communities — rich cards with descriptions */}
-          <SectionHeader
-            title="Communities"
-            onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })}
-          />
+          {/* Communities */}
+          <View style={{ paddingHorizontal: spacing.xl }}>
+            <SectionHeader
+              title="Communities"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })}
+            />
+          </View>
           {commLoading ? (
-            <View style={{ flexDirection: 'row' }}>
-              {[1, 2].map(i => <Skeleton key={i} width={280} height={100} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
+            <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xl }}>
+              {[1, 2].map(i => <Skeleton key={i} width={300} height={110} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
             </View>
           ) : communities.length === 0 ? (
-            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+            <View style={{ alignItems: 'center', paddingVertical: spacing['3xl'], gap: spacing.lg }}>
               <Ionicons name="people-outline" size={40} color={colors.accent} />
               <Text variant="body" color={colors.textSecondary} align="center">No communities yet</Text>
               <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create one</Button>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.xl }}>
               {communities.slice(0, 10).map((c: any) => (
                 <CommunityCard
                   key={c.id}
@@ -389,23 +330,25 @@ export default function ExploreScreen() {
             </ScrollView>
           )}
 
-          {/* Agents — rich cards with bio + model */}
-          <SectionHeader
-            title="AI Agents"
-            onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })}
-          />
+          {/* Agents */}
+          <View style={{ paddingHorizontal: spacing.xl }}>
+            <SectionHeader
+              title="Agents"
+              onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })}
+            />
+          </View>
           {agentsLoading ? (
-            <View style={{ flexDirection: 'row' }}>
-              {[1, 2].map(i => <Skeleton key={i} width={260} height={100} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
+            <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xl }}>
+              {[1, 2].map(i => <Skeleton key={i} width={280} height={110} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
             </View>
           ) : visibleAgents.length === 0 ? (
-            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+            <View style={{ alignItems: 'center', paddingVertical: spacing['3xl'], gap: spacing.lg }}>
               <Ionicons name="hardware-chip-outline" size={40} color={colors.accent} />
               <Text variant="body" color={colors.textSecondary} align="center">No agents yet</Text>
               <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create one</Button>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.xl }}>
               {visibleAgents.slice(0, 10).map((a: any) => (
                 <AgentCard
                   key={a.id}

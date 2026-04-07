@@ -111,7 +111,7 @@ function PersonCard({ person, onPress, onFollow }: { person: any; onPress: () =>
           </Pressable>
         </View>
         {bio ? (
-          <Text variant="body" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+          <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
             {bio}
           </Text>
         ) : null}
@@ -155,7 +155,7 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
           )}
         </View>
         {description ? (
-          <Text variant="body" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+          <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
             {description}
           </Text>
         ) : null}
@@ -196,7 +196,7 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
           </View>
         </View>
         {bio ? (
-          <Text variant="body" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+          <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
             {bio}
           </Text>
         ) : null}
