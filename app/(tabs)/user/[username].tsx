@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Button, Divider, PostCard, Skeleton } from '../../../components';
+import { Container } from '../../../components/Container';
+import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { useProfile } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
@@ -68,56 +70,31 @@ export default function UserProfileScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
-        </View>
+      <Container safeTop padded={false}>
+        <ScreenHeader title="" />
         <View style={{ padding: spacing['3xl'], gap: spacing.lg }}>
           <Skeleton width={80} height={80} borderRadius={40} />
           <Skeleton width={160} height={20} />
           <Skeleton width={120} height={14} />
         </View>
-      </View>
+      </Container>
     );
   }
 
   if (error || !profile) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
-          <Text variant="h3">User</Text>
-        </View>
+      <Container safeTop padded={false}>
+        <ScreenHeader title="User" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Text variant="body" color={colors.textMuted}>{error || 'User not found'}</Text>
         </View>
-      </View>
+      </Container>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.md,
-          borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
-        }}
-      >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text variant="h3" style={{ flex: 1 }}>@{username}</Text>
-      </View>
+    <Container safeTop padded={false}>
+      <ScreenHeader title={`@${username}`} />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
@@ -213,6 +190,6 @@ export default function UserProfileScreen() {
 
         <View style={{ height: spacing['4xl'] }} />
       </ScrollView>
-    </View>
+    </Container>
   );
 }
