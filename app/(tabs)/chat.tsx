@@ -8,6 +8,7 @@ import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
 import { colors, spacing, radius, typography } from '../../constants/theme';
+import { getCached, setCache } from '../../lib/cache';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -298,60 +299,79 @@ async function callAgentSSE(
 function ConversationView({ conversationId, onBack }: { conversationId: string; onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
-  const [messages, setMessages] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cachedMsgs = getCached(`messages:${conversationId}`);
+  const cachedSorted = React.useMemo(() => {
+    if (!cachedMsgs) return [];
+    return [...cachedMsgs].reverse().map((m: any) => ({
+      id: m.id,
+      content: m.content || m.text || '',
+      sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
+      createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+    }));
+  }, [cachedMsgs]);
+  const [messages, setMessages] = React.useState<any[]>(cachedSorted);
+  const [loading, setLoading] = React.useState(cachedSorted.length === 0);
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
   const [agentTyping, setAgentTyping] = React.useState(false);
   const flatListRef = React.useRef<FlatList>(null);
-  const [partnerName, setPartnerName] = React.useState<string>('Conversation');
-  const [partnerInfo, setPartnerInfo] = React.useState<any>(null);
+  // Try to get partner info from cached conversation list for instant name
+  const cachedConvo = React.useMemo(() => {
+    const convos = getCached('conversations') || [];
+    return convos.find((c: any) => c.id === conversationId);
+  }, [conversationId]);
+  const cachedOther = React.useMemo(() => {
+    if (!cachedConvo) return null;
+    return cachedConvo.participants?.find((p: any) => p.id !== user?.id) || cachedConvo.participants?.[0];
+  }, [cachedConvo, user?.id]);
+  const [partnerName, setPartnerName] = React.useState<string>(
+    cachedConvo?.name || cachedOther?.name || 'Conversation'
+  );
+  const [partnerInfo, setPartnerInfo] = React.useState<any>(cachedOther || null);
   const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
-  const messageIdsRef = React.useRef<Set<string>>(new Set());
+  const messageIdsRef = React.useRef<Set<string>>(new Set(cachedSorted.map((m: any) => m.id)));
 
-  // Load conversation info + initial messages
+  // Load conversation info + messages in PARALLEL (not sequential)
   React.useEffect(() => {
     if (!sdk) return;
     let cancelled = false;
 
-    (async () => {
-      try {
-        // Fetch conversation details for partner info
-        const convoRes = await sdk.chat.conversation(conversationId);
+    // Fetch details and messages at the same time
+    const detailsPromise = sdk.chat.conversation(conversationId).catch(() => null);
+    const messagesPromise = sdk.chat.messages(conversationId, { limit: 50 }).catch(() => null);
+
+    Promise.all([detailsPromise, messagesPromise]).then(([convoRes, msgRes]) => {
+      if (cancelled) return;
+
+      // Process conversation details
+      if (convoRes) {
         const convo = convoRes.data as any;
         const participants = convo?.participants || convo?.members || [];
         const other = participants.find((p: any) => {
           const pId = p.id || p.user?.id || p.userId;
           return pId !== user?.id;
         });
+        const name = other?.name || other?.user?.name || convo?.name || 'Conversation';
+        setPartnerName(name);
+        setPartnerInfo(other);
+      }
 
-        if (!cancelled) {
-          const name = other?.name || other?.user?.name || convo?.name || 'Conversation';
-          setPartnerName(name);
-          setPartnerInfo(other);
-        }
-
-        // Fetch message history (API returns newest first)
-        const msgRes = await sdk.chat.messages(conversationId, { limit: 50 });
+      // Process messages
+      if (msgRes) {
         const rawMessages = msgRes.data || [];
-
-        // Reverse to get chronological order (oldest first)
+        setCache(`messages:${conversationId}`, rawMessages);
         const sorted = [...rawMessages].reverse().map((m: any) => ({
           id: m.id,
           content: m.content || m.text || '',
           sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
           createdAt: m.createdAt || m.created_at || new Date().toISOString(),
         }));
-
-        if (!cancelled) {
-          setMessages(sorted);
-          messageIdsRef.current = new Set(sorted.map((m: any) => m.id));
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) setLoading(false);
+        setMessages(sorted);
+        messageIdsRef.current = new Set(sorted.map((m: any) => m.id));
       }
-    })();
+
+      setLoading(false);
+    });
 
     return () => { cancelled = true; };
   }, [conversationId, sdk, user?.id]);
