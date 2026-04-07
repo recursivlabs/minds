@@ -12,6 +12,7 @@ import { BASE_ORIGIN } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
+import { isMuted, toggleMute } from '../lib/muted';
 import { colors, spacing, radius, typography } from '../constants/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
@@ -405,6 +406,21 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               style={{ padding: spacing.md }}
             >
               <Text variant="body" color={colors.error}>Delete</Text>
+            </Pressable>
+          )}
+          {!isOwnPost && (
+            <Pressable
+              onPress={() => {
+                setShowMenu(false);
+                const authorId = author.id;
+                if (authorId) {
+                  const muted = toggleMute(authorId);
+                  toast.show(muted ? `Muted ${authorName}` : `Unmuted ${authorName}`);
+                }
+              }}
+              style={{ padding: spacing.md }}
+            >
+              <Text variant="body">{isMuted(author.id) ? 'Unmute' : 'Mute'}</Text>
             </Pressable>
           )}
           <Pressable

@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useAuth } from './auth';
 import { getSdk, ORG_ID } from './recursiv';
 import { getCached, setCache, isFresh, invalidatePrefix } from './cache';
+import { filterMuted } from './muted';
 
 /**
  * Fetch posts from the feed.
@@ -55,7 +56,8 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         });
       }
 
-      // Pre-cache individual posts so detail view is instant
+      // Filter muted users + pre-cache individual posts
+      data = filterMuted(data);
       data.forEach((p: any) => { if (p.id) setCache(`post:${p.id}`, p); });
 
       if (refresh) {
