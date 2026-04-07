@@ -50,9 +50,8 @@ interface AuthContextValue {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-// Anonymous SDK for auth operations — uses a dummy key since the SDK
-// requires one at construction, but auth endpoints don't need it
-const anonSdk = new Recursiv({ apiKey: 'anonymous', baseUrl: BASE_URL, timeout: 30_000 });
+// Anonymous SDK for auth operations (signUp/signIn don't need an API key)
+const anonSdk = new Recursiv({ apiKey: 'anonymous', baseUrl: BASE_URL, timeout: 30_000 } as any);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
