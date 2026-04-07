@@ -118,7 +118,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             color={active ? colors.accent : colors.textMuted}
           />
           {/* Gold dot badge for notifications */}
-          {isNotifications && (
+          {item.name === 'notifications' && (
             <View
               style={{
                 position: 'absolute',
