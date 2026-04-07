@@ -76,6 +76,66 @@ function TrendingItem({ post, onPress }: { post: any; onPress: () => void }) {
   );
 }
 
+function FederatedSection({ sdk }: { sdk: any }) {
+  const [items, setItems] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!sdk) { setLoading(false); return; }
+    (async () => {
+      try {
+        const res = await (sdk as any).protocols.search({ query: '', limit: 10 });
+        setItems(Array.isArray(res) ? res : res?.results || []);
+      } catch {}
+      setLoading(false);
+    })();
+  }, [sdk]);
+
+  if (!loading && items.length === 0) return null;
+
+  return (
+    <>
+      <SectionHeader title="Federated" />
+      {loading ? (
+        <View style={{ flexDirection: 'row' }}>
+          {[1, 2, 3].map(i => <Skeleton key={i} width={200} height={80} borderRadius={radius.md} style={{ marginRight: spacing.md }} />)}
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {items.map((item: any, i: number) => (
+            <View
+              key={item.id || i}
+              style={{
+                width: 200,
+                marginRight: spacing.md,
+                backgroundColor: colors.surface,
+                borderRadius: radius.md,
+                padding: spacing.md,
+                borderWidth: 0.5,
+                borderColor: colors.glassBorder,
+              }}
+            >
+              <Text variant="bodyMedium" numberOfLines={2} style={{ fontSize: 13 }}>
+                {item.title || item.content?.slice(0, 80) || 'Untitled'}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm }}>
+                {item.protocol && (
+                  <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs, paddingVertical: 1, borderRadius: 4 }}>
+                    <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>{item.protocol}</Text>
+                  </View>
+                )}
+                <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
+                  {item.author || item.source || 'Unknown'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </>
+  );
+}
+
 export default function ExploreScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
@@ -259,6 +319,9 @@ export default function ExploreScreen() {
               ))}
             </ScrollView>
           )}
+
+          {/* Federated Content */}
+          <FederatedSection sdk={sdk} />
         </ScrollView>
       )}
     </Container>

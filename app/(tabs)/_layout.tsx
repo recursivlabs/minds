@@ -33,6 +33,12 @@ export default function TabLayout() {
             <Tabs.Screen name="settings" options={{ href: null }} />
             <Tabs.Screen name="billing" options={{ href: null }} />
             <Tabs.Screen name="invites" options={{ href: null }} />
+            <Tabs.Screen name="email" options={{ href: null }} />
+            <Tabs.Screen name="protocols" options={{ href: null }} />
+            <Tabs.Screen name="apps" options={{ href: null }} />
+            <Tabs.Screen name="org-settings" options={{ href: null }} />
+            <Tabs.Screen name="webhooks" options={{ href: null }} />
+            <Tabs.Screen name="jobs" options={{ href: null }} />
             <Tabs.Screen name="post/[id]" options={{ href: null }} />
             <Tabs.Screen name="user/[username]" options={{ href: null }} />
             <Tabs.Screen name="community/[id]" options={{ href: null }} />
@@ -117,6 +123,12 @@ export default function TabLayout() {
       <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen name="billing" options={{ href: null }} />
       <Tabs.Screen name="invites" options={{ href: null }} />
+      <Tabs.Screen name="email" options={{ href: null }} />
+      <Tabs.Screen name="protocols" options={{ href: null }} />
+      <Tabs.Screen name="apps" options={{ href: null }} />
+      <Tabs.Screen name="org-settings" options={{ href: null }} />
+      <Tabs.Screen name="webhooks" options={{ href: null }} />
+      <Tabs.Screen name="jobs" options={{ href: null }} />
       <Tabs.Screen name="post/[id]" options={{ href: null }} />
       <Tabs.Screen name="user/[username]" options={{ href: null }} />
       <Tabs.Screen name="community/[id]" options={{ href: null }} />
