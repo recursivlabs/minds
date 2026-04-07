@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, PostCard, Avatar, Skeleton } from '../../../components';
+import { Container } from '../../../components/Container';
+import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { usePost } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
@@ -61,34 +63,24 @@ export default function PostDetailScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
-          <Text variant="h3">Post</Text>
-        </View>
+      <Container safeTop padded={false}>
+        <ScreenHeader title="Post" />
         <View style={{ padding: spacing.xl, gap: spacing.lg }}>
           <Skeleton width={140} height={14} />
           <Skeleton height={60} />
         </View>
-      </View>
+      </Container>
     );
   }
 
   if (error || !post) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
-          <Text variant="h3">Post</Text>
-        </View>
+      <Container safeTop padded={false}>
+        <ScreenHeader title="Post" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Text variant="body" color={colors.textMuted}>{error || 'Post not found'}</Text>
         </View>
-      </View>
+      </Container>
     );
   }
 
@@ -97,23 +89,7 @@ export default function PostDetailScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}
     >
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.md,
-          borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
-        }}
-      >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text variant="h3">Post</Text>
-      </View>
+      <ScreenHeader title="Post" />
 
       <FlatList
         data={replies}

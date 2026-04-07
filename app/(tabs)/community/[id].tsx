@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
+import { Container } from '../../../components/Container';
+import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../../constants/theme';
@@ -70,59 +72,32 @@ export default function CommunityDetailScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
-        </View>
+      <Container safeTop padded={false}>
+        <ScreenHeader title="" />
         <View style={{ padding: spacing.xl, gap: spacing.lg, alignItems: 'center' }}>
           <Skeleton width={56} height={56} borderRadius={28} />
           <Skeleton width={180} height={20} />
         </View>
-      </View>
+      </Container>
     );
   }
 
   if (!community) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
-          <Text variant="h3">Community</Text>
-        </View>
+      <Container safeTop padded={false}>
+        <ScreenHeader title="Community" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Text variant="body" color={colors.textMuted}>Community not found</Text>
         </View>
-      </View>
+      </Container>
     );
   }
 
   const memberCount = community.memberCount || community.member_count || 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.md,
-          borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
-        }}
-      >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>
-          {community.name}
-        </Text>
-      </View>
+    <Container safeTop padded={false}>
+      <ScreenHeader title={community.name} />
 
       <FlatList
         data={posts}
@@ -184,6 +159,6 @@ export default function CommunityDetailScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </Container>
   );
 }
