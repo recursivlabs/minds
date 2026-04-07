@@ -77,34 +77,55 @@ export default function FeedScreen() {
     const comms = communities || [];
     const agts = visibleAgents;
 
-    let pi = 0, ui = 0, ci = 0, ai = 0;
+    let pi = 0;
     let suggestionRound = 0;
 
-    // Safety: max 200 items to prevent infinite loops
-    while (items.length < 200 && (pi < allPosts.length || ui < people.length || ci < comms.length || ai < agts.length)) {
-      // Add up to 3 posts
+    // Build suggestion groups of 3 each
+    const suggestionGroups: { type: string; data: any[]; id: string }[] = [];
+    for (let i = 0; i < people.length; i += 3) {
+      suggestionGroups.push({ type: 'follows', data: people.slice(i, i + 3), id: `follows-${i}` });
+    }
+    for (let i = 0; i < agts.length; i += 3) {
+      suggestionGroups.push({ type: 'agents', data: agts.slice(i, i + 3), id: `agents-${i}` });
+    }
+    for (let i = 0; i < comms.length; i += 3) {
+      suggestionGroups.push({ type: 'communities', data: comms.slice(i, i + 3), id: `communities-${i}` });
+    }
+    // Interleave suggestion types: follows, agents, communities, boosted(placeholder), repeat
+    const orderedSuggestions: typeof suggestionGroups = [];
+    const byType: Record<string, typeof suggestionGroups> = { follows: [], agents: [], communities: [] };
+    suggestionGroups.forEach(g => byType[g.type]?.push(g));
+    const typeOrder = ['follows', 'agents', 'communities', 'boosted'];
+    let typeIdx = 0;
+    while (orderedSuggestions.length < suggestionGroups.length) {
+      const t = typeOrder[typeIdx % typeOrder.length];
+      if (t === 'boosted') {
+        // Boosted placeholder — skip for now, no boosted posts yet
+        typeIdx++;
+        continue;
+      }
+      const group = byType[t]?.shift();
+      if (group) orderedSuggestions.push(group);
+      typeIdx++;
+      // Safety
+      if (typeIdx > 100) break;
+    }
+
+    let si = 0;
+    while (items.length < 200 && (pi < allPosts.length || si < orderedSuggestions.length)) {
+      // Add 4 posts
       let addedPosts = false;
-      for (let i = 0; i < 3 && pi < allPosts.length; i++) {
+      for (let i = 0; i < 4 && pi < allPosts.length; i++) {
         items.push({ type: 'post', data: allPosts[pi], id: `post-${allPosts[pi].id}` });
         pi++;
         addedPosts = true;
       }
-
-      // Add one suggestion, rotating type
-      const round = suggestionRound % 3;
-      let addedSuggestion = false;
-      if (round === 0 && ui < people.length) {
-        const batch = people.slice(ui, ui + 3);
-        if (batch.length) { items.push({ type: 'people', data: batch, id: `people-${ui}` }); ui += batch.length; addedSuggestion = true; }
-      } else if (round === 1 && ci < comms.length) {
-        items.push({ type: 'community', data: comms[ci], id: `comm-${comms[ci].id}` }); ci++; addedSuggestion = true;
-      } else if (round === 2 && ai < agts.length) {
-        items.push({ type: 'agent', data: agts[ai], id: `agent-${agts[ai].id}` }); ai++; addedSuggestion = true;
+      // Add one suggestion group
+      if (si < orderedSuggestions.length) {
+        items.push(orderedSuggestions[si]);
+        si++;
       }
-      suggestionRound++;
-
-      // If we couldn't add posts or suggestions, we're done
-      if (!addedPosts && !addedSuggestion) break;
+      if (!addedPosts && si >= orderedSuggestions.length) break;
     }
     return items;
   }, [activeTab, posts, profiles, communities, visibleAgents]);
@@ -121,104 +142,101 @@ export default function FeedScreen() {
         />
       );
     }
-    if (item.type === 'people') {
+    // Suggestion groups — each is a list of 3 with header and "See more"
+    if (item.type === 'follows' || item.type === 'agents' || item.type === 'communities') {
+      const label = item.type === 'follows' ? 'Suggested Follows'
+        : item.type === 'agents' ? 'Suggested Agents'
+        : 'Suggested Communities';
+      const icon = item.type === 'follows' ? 'person-add-outline'
+        : item.type === 'agents' ? 'hardware-chip-outline'
+        : 'people-outline';
+      const seeMoreTab = item.type === 'follows' ? 'people'
+        : item.type === 'agents' ? 'agents' : 'communities';
+
       return (
         <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-            <Ionicons name="sparkles" size={13} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Suggested for you</Text>
-          </View>
-          {(item.data as any[]).map((person: any, idx: number) => (
-            <Pressable
-              key={person.id}
-              onPress={() => router.push(`/(tabs)/user/${person.username || person.id}` as any)}
-              style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                paddingVertical: spacing.sm + 2,
-                backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-                borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.04)',
-              })}
-            >
-              <Avatar uri={person.image || person.avatar} name={person.name} size="md" />
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyMedium" numberOfLines={1}>{person.name || 'Unknown'}</Text>
-                {person.username && <Text variant="caption" color={colors.textMuted}>@{person.username}</Text>}
-                {(person.bio || person.description) ? (
-                  <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: 2, lineHeight: 17 }}>{person.bio || person.description}</Text>
-                ) : null}
-              </View>
-              <FollowButton onFollow={() => handleFollow(person.id)} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Ionicons name={icon as any} size={14} color={colors.accent} />
+              <Text variant="label" color={colors.accent} style={{ fontSize: 12 }}>{label}</Text>
+            </View>
+            <Pressable onPress={() => router.push({ pathname: '/(tabs)/explore', params: { tab: seeMoreTab } } as any)} hitSlop={8}>
+              <Text variant="caption" color={colors.textMuted}>See more</Text>
             </Pressable>
-          ))}
+          </View>
+          {(item.data as any[]).map((entry: any, idx: number) => {
+            if (item.type === 'follows') {
+              return (
+                <Pressable
+                  key={entry.id}
+                  onPress={() => router.push(`/(tabs)/user/${entry.username || entry.id}` as any)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                    paddingVertical: spacing.sm + 2,
+                    backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                    borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.04)',
+                  })}
+                >
+                  <Avatar uri={entry.image || entry.avatar} name={entry.name} size="md" />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyMedium" numberOfLines={1}>{entry.name || 'Unknown'}</Text>
+                    {entry.username && <Text variant="caption" color={colors.textMuted}>@{entry.username}</Text>}
+                    {(entry.bio || entry.description) ? <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ marginTop: 2 }}>{entry.bio || entry.description}</Text> : null}
+                  </View>
+                  <FollowButton onFollow={() => handleFollow(entry.id)} />
+                </Pressable>
+              );
+            }
+            if (item.type === 'communities') {
+              const memberCount = entry.memberCount || entry.member_count || 0;
+              return (
+                <Pressable
+                  key={entry.id}
+                  onPress={() => router.push(`/(tabs)/community/${entry.slug || entry.id}` as any)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                    paddingVertical: spacing.sm + 2,
+                    backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                    borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.04)',
+                  })}
+                >
+                  <Avatar uri={entry.image || entry.avatar} name={entry.name} size="md" />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyMedium" numberOfLines={1}>{entry.name}</Text>
+                    <Text variant="caption" color={colors.textMuted}>{memberCount} members</Text>
+                    {(entry.description || entry.bio) ? <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ marginTop: 2 }}>{entry.description || entry.bio}</Text> : null}
+                  </View>
+                </Pressable>
+              );
+            }
+            if (item.type === 'agents') {
+              return (
+                <Pressable
+                  key={entry.id}
+                  onPress={() => router.push(`/(tabs)/user/${entry.username || entry.id}` as any)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                    paddingVertical: spacing.sm + 2,
+                    backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                    borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.04)',
+                  })}
+                >
+                  <Avatar uri={entry.image || entry.avatar} name={entry.name} size="md" />
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{entry.name}</Text>
+                      <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
+                        <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
+                      </View>
+                    </View>
+                    {(entry.bio || entry.description) ? <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ marginTop: 2 }}>{entry.bio || entry.description}</Text> : null}
+                  </View>
+                </Pressable>
+              );
+            }
+            return null;
+          })}
         </View>
-      );
-    }
-    if (item.type === 'community') {
-      const c = item.data;
-      const memberCount = c.memberCount || c.member_count || 0;
-      return (
-        <Pressable
-          onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
-          style={({ pressed }) => ({
-            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-            borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
-          })}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-            <Ionicons name="people" size={13} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Community</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-            <Avatar uri={c.image || c.avatar} name={c.name} size="md" />
-            <View style={{ flex: 1 }}>
-              <Text variant="bodyMedium">{c.name}</Text>
-              <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>{memberCount} member{memberCount !== 1 ? 's' : ''}</Text>
-              {(c.description || c.bio) ? (
-                <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{c.description || c.bio}</Text>
-              ) : null}
-            </View>
-          </View>
-        </Pressable>
-      );
-    }
-    if (item.type === 'agent') {
-      const a = item.data;
-      const model = a.model?.split('/').pop() || '';
-      return (
-        <Pressable
-          onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
-          style={({ pressed }) => ({
-            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-            borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
-          })}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-            <Ionicons name="hardware-chip" size={13} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Agent</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-            <Avatar uri={a.image || a.avatar} name={a.name} size="md" />
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <Text variant="bodyMedium" style={{ flex: 1 }}>{a.name}</Text>
-                <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
-                  <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
-                </View>
-              </View>
-              {model ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 }}>
-                  <Ionicons name="hardware-chip-outline" size={11} color={colors.textMuted} />
-                  <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{model}</Text>
-                </View>
-              ) : null}
-              {(a.bio || a.description) ? (
-                <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{a.bio || a.description}</Text>
-              ) : null}
-            </View>
-          </View>
-        </Pressable>
       );
     }
     return null;
