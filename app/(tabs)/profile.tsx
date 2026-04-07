@@ -198,16 +198,16 @@ export default function ProfileScreen() {
             </Text>
           )}
 
-          {/* Stats */}
+          {/* Stats — clickable */}
           <View style={{ flexDirection: 'row', gap: spacing['2xl'], marginTop: spacing.xl }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Pressable onPress={() => { if (user?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'following', userId: user.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followingCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Following</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            </Pressable>
+            <Pressable onPress={() => { if (user?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'followers', userId: user.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followerCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Followers</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
 
@@ -503,28 +503,33 @@ export default function ProfileScreen() {
                     if (!sdk) return;
                     setEditSaving(true);
                     try {
-                      // Upload avatar if user picked a new one
-                      let avatarUrl: string | undefined;
+                      // Upload avatar using dedicated avatar upload flow
                       if (editAvatarUri) {
                         try {
-                          const uploadRes = await (sdk as any).uploads.getMediaUploadUrl({
+                          const uploads = (sdk as any).uploads;
+                          const uploadRes = await uploads.getAvatarUploadUrl({
                             content_type: 'image/jpeg',
                             content_length: 0,
                           });
                           const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+                          const key = uploadRes.data?.key;
                           if (uploadUrl) {
                             const response = await fetch(editAvatarUri);
                             const blob = await response.blob();
                             await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
-                            avatarUrl = uploadRes.data?.public_url || uploadUrl.split('?')[0];
+                            // Confirm upload — this links the avatar to the user profile
+                            if (key) {
+                              await uploads.confirmAvatarUpload(key);
+                            }
                           }
-                        } catch { /* Avatar upload failed, save other fields */ }
+                        } catch (err: any) {
+                          console.error('[Avatar] Upload failed:', err?.message || err);
+                        }
                       }
                       await sdk.profiles.update({
                         name: editName.trim(),
                         username: editUsername.trim() || undefined,
                         bio: editBio.trim(),
-                        ...(avatarUrl ? { image: avatarUrl } : {}),
                       });
                       await refreshProfile();
                       setShowEditProfile(false);

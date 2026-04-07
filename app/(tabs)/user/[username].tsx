@@ -137,14 +137,14 @@ export default function UserProfileScreen() {
           )}
 
           <View style={{ flexDirection: 'row', gap: spacing['2xl'], marginTop: spacing.xl }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Pressable onPress={() => { if (profile?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'following', userId: profile.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followingCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Following</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            </Pressable>
+            <Pressable onPress={() => { if (profile?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'followers', userId: profile.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followerCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Followers</Text>
-            </View>
+            </Pressable>
           </View>
 
           {!isOwnProfile && (

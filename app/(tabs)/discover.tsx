@@ -213,12 +213,32 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; mode?: string; userId?: string }>();
   const { sdk } = useAuth();
   const [activeTab, setActiveTab] = React.useState<DiscoverTab>(
     (params.tab as DiscoverTab) || 'posts'
   );
   const [searchQuery, setSearchQuery] = React.useState('');
+
+  // Followers/following mode
+  const [followList, setFollowList] = React.useState<any[]>([]);
+  const [followListLoading, setFollowListLoading] = React.useState(false);
+  const followMode = params.mode as 'followers' | 'following' | undefined;
+  const followUserId = params.userId;
+
+  React.useEffect(() => {
+    if (!followMode || !followUserId || !sdk) return;
+    setFollowListLoading(true);
+    (async () => {
+      try {
+        const res = followMode === 'followers'
+          ? await sdk.profiles.followers(followUserId, { limit: 100 })
+          : await sdk.profiles.following(followUserId, { limit: 100 });
+        setFollowList(res.data || []);
+      } catch {}
+      finally { setFollowListLoading(false); }
+    })();
+  }, [followMode, followUserId, sdk]);
 
   const { posts, loading: postsLoading } = usePosts('score', 30);
   const { communities, loading: commLoading } = useCommunities(50);
@@ -247,7 +267,8 @@ export default function DiscoverScreen() {
       return filtered.map((p: any, i: number) => ({ type: 'post', data: p, key: `p-${p.id || i}` }));
     }
     if (activeTab === 'people') {
-      return filterByQuery(profiles || [], ['name', 'username', 'bio']).map((p: any, i: number) => ({ type: 'person', data: p, key: `u-${p.id || i}` }));
+      const source = followMode ? followList : profiles || [];
+      return filterByQuery(source, ['name', 'username', 'bio']).map((p: any, i: number) => ({ type: 'person', data: p, key: `u-${p.id || i}` }));
     }
     if (activeTab === 'communities') {
       return filterByQuery(communities || [], ['name', 'description']).map((c: any, i: number) => ({ type: 'community', data: c, key: `c-${c.id || i}` }));
@@ -259,7 +280,7 @@ export default function DiscoverScreen() {
   };
 
   const loading = activeTab === 'posts' ? (isSearching ? searchLoading : postsLoading)
-    : activeTab === 'people' ? profilesLoading
+    : activeTab === 'people' ? (followMode ? followListLoading : profilesLoading)
     : activeTab === 'communities' ? commLoading
     : agentsLoading;
 
@@ -319,7 +340,7 @@ export default function DiscoverScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
-        <Text variant="h3" style={{ flex: 1 }}>Discover</Text>
+        <Text variant="h3" style={{ flex: 1 }}>{followMode === 'followers' ? 'Followers' : followMode === 'following' ? 'Following' : 'Discover'}</Text>
       </View>
 
       {/* Search */}

@@ -424,6 +424,8 @@ export function useProfiles(limit = 20) {
           const res = await s.profiles.list({ limit } as any);
           data = res.data || [];
         }
+        // Filter out AI agents — they show in the Agents section
+        data = data.filter((p: any) => !p.isAi && !p.is_ai && p.type !== 'agent');
         if (!cancelled) {
           setProfiles(data);
           setCache(cacheKey, data);
