@@ -37,9 +37,7 @@ export function AgentCard({ agent, onChat }: Props) {
         router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
       }
     } catch {
-      const msg = 'Could not start chat with this agent. Please try again.';
-      if (Platform.OS === 'web') alert(msg);
-      else Alert.alert('Error', msg);
+      Alert.alert('Error', 'Could not start chat with this agent. Please try again.');
     }
   };
 

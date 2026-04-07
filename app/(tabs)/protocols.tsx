@@ -22,7 +22,9 @@ export default function ProtocolsScreen() {
   const [tab, setTab] = React.useState<'protocols' | 'search' | 'settings'>('protocols');
   const [saving, setSaving] = React.useState(false);
 
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
+  const showSuccess = (m: string) => { setStatusMsg(m); setTimeout(() => setStatusMsg(null), 2000); };
+  const showError = (m: string) => { Alert.alert('Error', m); };
 
   const load = React.useCallback(async () => {
     if (!sdk) return;
@@ -55,8 +57,8 @@ export default function ProtocolsScreen() {
     setSaving(true);
     try {
       await (sdk as any).protocols.updateSettings(settings);
-      msg('Settings saved.');
-    } catch { msg('Failed to save settings.'); }
+      showSuccess('Settings saved.');
+    } catch { showError('Failed to save settings.'); }
     setSaving(false);
   };
 

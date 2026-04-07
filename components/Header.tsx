@@ -95,7 +95,7 @@ export function Header({ showBack, title }: Props) {
         <Pressable
           hitSlop={8}
           onPress={() => {
-            if (Platform.OS === 'web') alert('Notifications coming soon');
+            // Notifications - no-op for now, navigates when ready
           }}
           style={{ position: 'relative' }}
         >

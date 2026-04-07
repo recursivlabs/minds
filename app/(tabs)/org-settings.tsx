@@ -6,7 +6,7 @@ import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, radius } from '../../constants/theme';
 
 export default function OrgSettingsScreen() {
   const router = useRouter();
@@ -19,7 +19,9 @@ export default function OrgSettingsScreen() {
   const [templateUrl, setTemplateUrl] = React.useState('');
   const [saving, setSaving] = React.useState('');
 
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
+  const showSuccess = (m: string) => { setStatusMsg(m); setTimeout(() => setStatusMsg(null), 2000); };
+  const showError = (m: string) => { Alert.alert('Error', m); };
 
   const load = React.useCallback(async () => {
     if (!sdk) return;
@@ -44,9 +46,9 @@ export default function OrgSettingsScreen() {
     setSaving('github');
     try {
       await (sdk as any).organizationSettings.connectGitHub(ORG_ID, { github_owner: githubOwner });
-      msg('GitHub connected.');
+      showSuccess('GitHub connected.');
       await load();
-    } catch { msg('Failed to connect GitHub.'); }
+    } catch { showError('Failed to connect GitHub.'); }
     setSaving('');
   };
 
@@ -56,9 +58,9 @@ export default function OrgSettingsScreen() {
     try {
       await (sdk as any).organizationSettings.disconnectGitHub(ORG_ID);
       setGithubOwner('');
-      msg('GitHub disconnected.');
+      showSuccess('GitHub disconnected.');
       await load();
-    } catch { msg('Failed to disconnect GitHub.'); }
+    } catch { showError('Failed to disconnect GitHub.'); }
     setSaving('');
   };
 
@@ -67,8 +69,8 @@ export default function OrgSettingsScreen() {
     setSaving('template');
     try {
       await (sdk as any).organizationSettings.setDefaultTemplate(ORG_ID, { url: templateUrl });
-      msg('Default template updated.');
-    } catch { msg('Failed to set template.'); }
+      showSuccess('Default template updated.');
+    } catch { showError('Failed to set template.'); }
     setSaving('');
   };
 
@@ -79,7 +81,7 @@ export default function OrgSettingsScreen() {
     setSaving('security');
     try {
       await (sdk as any).organizationSecurity.update(ORG_ID, updated);
-    } catch { msg('Failed to update security.'); await load(); }
+    } catch { showError('Failed to update security.'); await load(); }
     setSaving('');
   };
 
@@ -103,6 +105,11 @@ export default function OrgSettingsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: spacing['5xl'] }}>
+        {statusMsg && (
+          <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' }}>
+            <Text variant="body" color={colors.success}>{statusMsg}</Text>
+          </View>
+        )}
         <Card>
           <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>GitHub Integration</Text>
           <Input label="GitHub owner/org" value={githubOwner} onChangeText={setGithubOwner} placeholder="my-org" autoCapitalize="none" />

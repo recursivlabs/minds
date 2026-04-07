@@ -40,9 +40,7 @@ export default function InvitesScreen() {
       await sdk.inviteCodes.generate(1);
       await load();
     } catch {
-      const msg = 'Failed to generate invite code.';
-      if (Platform.OS === 'web') alert(msg);
-      else import('react-native').then(rn => rn.Alert.alert('Error', msg));
+      import('react-native').then(rn => rn.Alert.alert('Error', 'Failed to generate invite code.'));
     }
     setGenerating(false);
   };

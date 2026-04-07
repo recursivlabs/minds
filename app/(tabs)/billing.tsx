@@ -52,9 +52,7 @@ export default function BillingScreen() {
         else Linking.openURL(url);
       }
     } catch {
-      const msg = 'Could not open billing portal.';
-      if (Platform.OS === 'web') alert(msg);
-      else import('react-native').then(rn => rn.Alert.alert('Error', msg));
+      import('react-native').then(rn => rn.Alert.alert('Error', 'Could not open billing portal.'));
     }
     setPortalLoading(false);
   };

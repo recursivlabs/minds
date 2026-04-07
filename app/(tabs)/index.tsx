@@ -53,7 +53,7 @@ export default function FeedScreen() {
   );
 
   const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth > 768;
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth > 1024;
 
   const feedContent = (
     <>

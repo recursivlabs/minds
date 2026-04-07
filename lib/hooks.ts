@@ -184,6 +184,7 @@ export function useProfile(username: string) {
       try {
         const s = sdk || getSdk();
         let res;
+        // Try by username first
         try {
           res = await s.profiles.getByUsername(username);
         } catch {
@@ -191,15 +192,26 @@ export function useProfile(username: string) {
           try {
             res = await s.profiles.get(username);
           } catch {
-            throw new Error('User not found');
+            // Fallback: try as agent username
+            try {
+              const agentRes = await (s as any).agents.listDiscoverable({ limit: 200, organization_id: ORG_ID || undefined });
+              const agents = agentRes.data || [];
+              const match = agents.find((a: any) => a.username === username || a.id === username);
+              if (match) {
+                res = { data: { id: match.id, name: match.name, username: match.username, bio: match.bio || match.description, image: match.image || match.avatar, isAgent: true } };
+              }
+            } catch {}
+            if (!res) throw new Error('User not found');
           }
         }
         if (!cancelled && res?.data) {
           setProfile(res.data);
-          try {
-            const followRes = await s.profiles.isFollowing(res.data.id);
-            setIsFollowing(followRes.data?.is_following ?? false);
-          } catch {}
+          if (!res.data.isAgent) {
+            try {
+              const followRes = await s.profiles.isFollowing(res.data.id);
+              setIsFollowing(followRes.data?.is_following ?? false);
+            } catch {}
+          }
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'User not found');

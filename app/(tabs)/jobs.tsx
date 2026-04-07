@@ -20,7 +20,7 @@ export default function JobsScreen() {
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const showError = (m: string) => { Alert.alert('Error', m); };
 
   const load = React.useCallback(async () => {
     if (!sdk) return;
@@ -42,7 +42,7 @@ export default function JobsScreen() {
       setShowCreate(false);
       setForm({ name: '', cron: '', handler_code: '' });
       await load();
-    } catch { msg('Failed to create job.'); }
+    } catch { showError('Failed to create job.'); }
     setSaving(false);
   };
 
@@ -52,7 +52,7 @@ export default function JobsScreen() {
     try {
       await (sdk as any).jobs.delete(id);
       setJobs(j => j.filter(x => x.id !== id));
-    } catch { msg('Failed to delete job.'); }
+    } catch { showError('Failed to delete job.'); }
     setDeleting(null);
   };
 

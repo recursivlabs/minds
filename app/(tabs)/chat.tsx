@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
 import { Container } from '../../components/Container';
@@ -10,10 +11,19 @@ import { colors, spacing, radius, typography } from '../../constants/theme';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
+  const params = useLocalSearchParams<{ id?: string }>();
   const { conversations, loading, refresh } = useConversations();
-  const [activeConvoId, setActiveConvoId] = React.useState<string | null>(null);
+  const [activeConvoId, setActiveConvoId] = React.useState<string | null>(params.id || null);
   const [showNewChat, setShowNewChat] = React.useState(false);
   const [dmUsername, setDmUsername] = React.useState('');
+  const [dmError, setDmError] = React.useState<string | null>(null);
+
+  // Open conversation from route params
+  React.useEffect(() => {
+    if (params.id && params.id !== activeConvoId) {
+      setActiveConvoId(params.id);
+    }
+  }, [params.id]);
 
   if (activeConvoId) {
     return (
@@ -26,18 +36,31 @@ export default function ChatScreen() {
 
   const handleNewDM = async () => {
     if (!sdk || !dmUsername.trim()) return;
+    setDmError(null);
     try {
-      const profileRes = await sdk.profiles.getByUsername(dmUsername.trim());
-      const userId = profileRes.data?.id;
-      if (!userId) { alert('User not found'); return; }
+      let userId: string | undefined;
+      try {
+        const profileRes = await sdk.profiles.getByUsername(dmUsername.trim());
+        userId = profileRes.data?.id;
+      } catch {
+        // Try as agent username
+        try {
+          const agentRes = await (sdk as any).agents.listDiscoverable({ limit: 100 });
+          const agents = agentRes.data || [];
+          const match = agents.find((a: any) => a.username === dmUsername.trim() || a.name?.toLowerCase() === dmUsername.trim().toLowerCase());
+          userId = match?.id;
+        } catch {}
+      }
+      if (!userId) { setDmError('User not found'); return; }
       const res = await sdk.chat.dm({ user_id: userId });
       if (res.data?.id) {
         setActiveConvoId(res.data.id);
         setShowNewChat(false);
         setDmUsername('');
+        setDmError(null);
       }
     } catch {
-      alert('Could not start conversation.');
+      setDmError('Could not start conversation.');
     }
   };
 
@@ -63,39 +86,46 @@ export default function ChatScreen() {
 
       {/* New chat */}
       {showNewChat && (
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: spacing.sm,
-            padding: spacing.xl,
-            borderBottomWidth: 0.5,
-            borderBottomColor: 'rgba(255,255,255,0.06)',
-          }}
-        >
-          <TextInput
-            placeholder="Username..."
-            placeholderTextColor={colors.textMuted}
-            value={dmUsername}
-            onChangeText={setDmUsername}
-            autoCapitalize="none"
-            onSubmitEditing={handleNewDM}
+        <>
+          <View
             style={{
-              flex: 1,
-              backgroundColor: colors.surface,
-              borderWidth: 0.5,
-              borderColor: colors.glassBorder,
-              borderRadius: radius.md,
-              paddingHorizontal: spacing.md,
-              paddingVertical: 10,
-              color: colors.text,
-              ...typography.body,
-              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+              flexDirection: 'row',
+              gap: spacing.sm,
+              padding: spacing.xl,
+              borderBottomWidth: 0.5,
+              borderBottomColor: 'rgba(255,255,255,0.06)',
             }}
-          />
-          <Button onPress={handleNewDM} size="sm" disabled={!dmUsername.trim()}>
-            Start
-          </Button>
-        </View>
+          >
+            <TextInput
+              placeholder="Username or agent name..."
+              placeholderTextColor={colors.textMuted}
+              value={dmUsername}
+              onChangeText={(t) => { setDmUsername(t); setDmError(null); }}
+              autoCapitalize="none"
+              onSubmitEditing={handleNewDM}
+              style={{
+                flex: 1,
+                backgroundColor: colors.surface,
+                borderWidth: 0.5,
+                borderColor: dmError ? colors.error : colors.glassBorder,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: 10,
+                color: colors.text,
+                ...typography.body,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+              }}
+            />
+            <Button onPress={handleNewDM} size="sm" disabled={!dmUsername.trim()}>
+              Start
+            </Button>
+          </View>
+          {dmError && (
+            <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}>
+              <Text variant="caption" color={colors.error}>{dmError}</Text>
+            </View>
+          )}
+        </>
       )}
 
       {loading ? (
@@ -112,7 +142,11 @@ export default function ChatScreen() {
         </View>
       ) : conversations.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-          <Text variant="body" color={colors.textMuted}>No conversations yet</Text>
+          <Ionicons name="chatbubbles-outline" size={32} color={colors.textMuted} />
+          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>No conversations yet</Text>
+          <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>
+            Start a conversation with someone or chat with an agent.
+          </Text>
           <Button onPress={() => setShowNewChat(true)} size="sm">
             Start a conversation
           </Button>
@@ -190,6 +224,25 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
   const flatListRef = React.useRef<FlatList>(null);
+  const [partnerName, setPartnerName] = React.useState<string>('Conversation');
+
+  // Fetch partner name
+  React.useEffect(() => {
+    if (!sdk) return;
+    (async () => {
+      try {
+        const convoRes = await sdk.chat.conversation(conversationId);
+        const convo = convoRes.data as any;
+        const participants = convo?.participants || convo?.members || [];
+        const other = participants.find((p: any) => {
+          const pId = p.id || p.user?.id || p.userId;
+          return pId !== user?.id;
+        });
+        const name = other?.name || other?.user?.name || convo?.name;
+        if (name) setPartnerName(name);
+      } catch {}
+    })();
+  }, [conversationId, sdk, user?.id]);
 
   // Real-time WebSocket for live messages
   React.useEffect(() => {
@@ -249,22 +302,50 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
 
     try {
       await sdk.chat.send({ conversation_id: conversationId, content: messageText });
-      // Check if this is an agent conversation and trigger agent response
+      // Check if conversation partner is an agent and trigger auto-response
       try {
         const convoRes = await sdk.chat.conversation(conversationId);
-        const members = (convoRes.data as any)?.members || [];
-        const otherMember = members.find((m: any) => m.user?.id !== user?.id || m.userId !== user?.id);
-        const agentId = otherMember?.user?.isAi ? (otherMember.user.id || otherMember.userId) : null;
-        if (agentId) {
-          const agentRes = await (sdk as any).agents.chat(agentId, { message: messageText });
-          const reply = (agentRes.data as any)?.content || (agentRes.data as any)?.message;
+        const convo = convoRes.data as any;
+        // Try multiple ways to find the other participant
+        const participants = convo?.participants || convo?.members || [];
+        const other = participants.find((p: any) => {
+          const pId = p.id || p.user?.id || p.userId;
+          return pId !== user?.id;
+        });
+        const otherId = other?.id || other?.user?.id || other?.userId;
+        const otherName = other?.name || other?.user?.name || 'Agent';
+        // Check if other participant is an agent: isAi flag, or isAgent, or type === 'agent'
+        const isAgent = other?.isAi || other?.is_ai || other?.user?.isAi || other?.user?.is_ai
+          || other?.type === 'agent' || other?.user?.type === 'agent'
+          || convo?.type === 'agent' || convo?.is_agent;
+        if (isAgent && otherId) {
+          const agentRes = await (sdk as any).agents.chat(otherId, { message: messageText });
+          const agentData = agentRes?.data || agentRes;
+          const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
           if (reply) {
             setMessages(prev => [...prev, {
               id: 'agent-' + Date.now(),
               content: reply,
-              sender: { id: agentId, name: otherMember.user?.name || 'Agent' },
+              sender: { id: otherId, name: otherName },
               createdAt: new Date().toISOString(),
             }]);
+          }
+        } else if (otherId) {
+          // Fallback: try agents.chat anyway — if it fails silently, it wasn't an agent
+          try {
+            const agentRes = await (sdk as any).agents.chat(otherId, { message: messageText });
+            const agentData = agentRes?.data || agentRes;
+            const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
+            if (reply) {
+              setMessages(prev => [...prev, {
+                id: 'agent-' + Date.now(),
+                content: reply,
+                sender: { id: otherId, name: otherName },
+                createdAt: new Date().toISOString(),
+              }]);
+            }
+          } catch {
+            // Not an agent, that's fine
           }
         }
       } catch {}
@@ -296,7 +377,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         <Pressable onPress={onBack} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
-        <Text variant="h3" style={{ flex: 1 }}>Conversation</Text>
+        <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>{partnerName}</Text>
       </View>
 
       {/* Messages */}
@@ -347,6 +428,12 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           value={text}
           onChangeText={setText}
           multiline
+          onKeyPress={(e: any) => {
+            if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
           style={{
             flex: 1,
             backgroundColor: colors.surface,

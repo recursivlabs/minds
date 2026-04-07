@@ -38,7 +38,7 @@ export default function EmailScreen() {
   const [saving, setSaving] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState('');
 
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const showError = (m: string) => { Alert.alert('Error', m); };
 
   const load = React.useCallback(async () => {
     if (!sdk) return;
@@ -60,7 +60,7 @@ export default function EmailScreen() {
       setShowCreate(false);
       setForm({ name: '', subject: '', from_email: '', html_content: '' });
       await load();
-    } catch { msg('Failed to create campaign.'); }
+    } catch { showError('Failed to create campaign.'); }
     setSaving(false);
   };
 
@@ -73,7 +73,7 @@ export default function EmailScreen() {
       ]);
       setDetail(d);
       setStats(s);
-    } catch { msg('Failed to load campaign.'); }
+    } catch { showError('Failed to load campaign.'); }
   };
 
   const campaignAction = async (id: string, action: 'start' | 'pause' | 'resume') => {

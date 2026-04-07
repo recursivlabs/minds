@@ -45,6 +45,8 @@ export default function CreateScreen() {
   const [agentName, setAgentName] = React.useState('');
   const [agentBio, setAgentBio] = React.useState('');
   const [agentPrompt, setAgentPrompt] = React.useState('');
+  const [agentModelIdx, setAgentModelIdx] = React.useState(0);
+  const MODELS = ['google/gemini-3.1-pro-preview', 'anthropic/claude-sonnet-4.6', 'openai/gpt-5.4', 'google/gemini-3-flash-preview'];
 
   // App state
   const [appName, setAppName] = React.useState('');
@@ -56,6 +58,39 @@ export default function CreateScreen() {
   const [communityPrivate, setCommunityPrivate] = React.useState(false);
 
   const [submitting, setSubmitting] = React.useState(false);
+  const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
+
+  // Avatar state for agent/app/community creation
+  const [avatarUri, setAvatarUri] = React.useState<string | null>(null);
+
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 2000);
+  };
+
+  const handlePickAvatar = async () => {
+    try {
+      const picker = getImagePicker();
+      if (picker) {
+        const result = await picker.launchImageLibraryAsync({
+          mediaTypes: picker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+        if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
+      } else if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) setAvatarUri(URL.createObjectURL(file));
+        };
+        input.click();
+      }
+    } catch {}
+  };
 
   const handlePickImage = async () => {
     try {
@@ -86,14 +121,29 @@ export default function CreateScreen() {
     try {
       if (mode === 'post') {
         if (!content.trim() && !mediaUri) {
-          if (Platform.OS === 'web') alert('Write something to share');
-          else Alert.alert('', 'Write something to share');
           setSubmitting(false);
           return;
+        }
+        let mediaUrls: string[] | undefined;
+        if (mediaUri) {
+          try {
+            const uploadRes = await (sdk as any).uploads.getMediaUploadUrl({
+              content_type: 'image/jpeg',
+              content_length: 0,
+            });
+            const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+            if (uploadUrl) {
+              const response = await fetch(mediaUri);
+              const blob = await response.blob();
+              await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+              mediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
+            }
+          } catch { /* Image upload failed, post without media */ }
         }
         await sdk.posts.create({
           content: content.trim() || ' ',
           organization_id: ORG_ID || undefined,
+          media_urls: mediaUrls,
         } as any);
         router.back();
       } else if (mode === 'agent') {
@@ -104,14 +154,13 @@ export default function CreateScreen() {
           username,
           bio: agentBio.trim() || undefined,
           system_prompt: agentPrompt.trim() || undefined,
-          model: 'google/gemini-3.1-pro-preview',
+          model: MODELS[agentModelIdx],
           organization_id: ORG_ID || undefined,
           social_mode: 'chat_only',
           tool_mode: 'chat_only',
         });
-        if (Platform.OS === 'web') alert('Agent created!');
-        else Alert.alert('', 'Agent created!');
-        setAgentName(''); setAgentBio(''); setAgentPrompt('');
+        setAgentName(''); setAgentBio(''); setAgentPrompt(''); setAvatarUri(null);
+        showSuccess('Agent created');
         setMode('post');
       } else if (mode === 'app') {
         if (!appName.trim()) { setSubmitting(false); return; }
@@ -119,9 +168,8 @@ export default function CreateScreen() {
           name: appName.trim(),
           organization_id: ORG_ID || undefined,
         } as any);
-        if (Platform.OS === 'web') alert('App created!');
-        else Alert.alert('', 'App created!');
-        setAppName(''); setAppDesc('');
+        setAppName(''); setAppDesc(''); setAvatarUri(null);
+        showSuccess('App created');
         setMode('post');
       } else if (mode === 'community') {
         if (!communityName.trim()) { setSubmitting(false); return; }
@@ -131,16 +179,16 @@ export default function CreateScreen() {
           slug,
           description: communityDesc.trim() || undefined,
           privacy: communityPrivate ? 'private' : 'public',
+          organization_id: ORG_ID || undefined,
         } as any);
-        if (Platform.OS === 'web') alert('Community created!');
-        else Alert.alert('', 'Community created!');
-        setCommunityName(''); setCommunityDesc('');
+        setCommunityName(''); setCommunityDesc(''); setAvatarUri(null);
+        showSuccess('Community created');
         setMode('post');
       }
     } catch (err: any) {
-      const msg = err?.message || 'Something went wrong';
-      if (Platform.OS === 'web') alert(msg);
-      else Alert.alert('Error', msg);
+      const errMsg = err?.message || 'Something went wrong';
+      setSuccessMsg(null);
+      Alert.alert('Error', errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -232,6 +280,12 @@ export default function CreateScreen() {
                 onChangeText={setContent}
                 multiline
                 autoFocus
+                onKeyPress={(e: any) => {
+                  if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
                 style={{
                   color: colors.text,
                   ...typography.body,
@@ -290,6 +344,27 @@ export default function CreateScreen() {
         </View>
       ) : (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
+          {/* Avatar picker for agent/app/community */}
+          <Pressable
+            onPress={handlePickAvatar}
+            style={{ alignSelf: 'center', alignItems: 'center', justifyContent: 'center', width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surfaceHover, overflow: 'hidden', borderWidth: 1, borderColor: colors.glassBorder }}
+          >
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={{ width: 80, height: 80, borderRadius: 40 }} />
+            ) : (
+              <Ionicons name="camera-outline" size={28} color={colors.textMuted} />
+            )}
+          </Pressable>
+          <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', marginTop: -spacing.sm }}>
+            Tap to add avatar
+          </Text>
+
+          {successMsg && (
+            <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' }}>
+              <Text variant="body" color={colors.success}>{successMsg}</Text>
+            </View>
+          )}
+
           {mode === 'agent' && (
             <>
               <TextInput placeholder="Agent name" placeholderTextColor={colors.textMuted} value={agentName} onChangeText={setAgentName} autoFocus
@@ -298,6 +373,14 @@ export default function CreateScreen() {
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
               <TextInput placeholder="What should this agent do?" placeholderTextColor={colors.textMuted} value={agentPrompt} onChangeText={setAgentPrompt} multiline
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, minHeight: 100, textAlignVertical: 'top', ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
+              <Pressable
+                onPress={() => setAgentModelIdx((agentModelIdx + 1) % MODELS.length)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 0.5, borderColor: colors.glassBorder }}
+              >
+                <Ionicons name="hardware-chip-outline" size={18} color={colors.accent} />
+                <Text variant="caption" color={colors.textSecondary}>{MODELS[agentModelIdx].split('/')[1]}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+              </Pressable>
             </>
           )}
           {mode === 'app' && (

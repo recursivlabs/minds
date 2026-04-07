@@ -21,7 +21,7 @@ export default function WebhooksScreen() {
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const showError = (m: string) => { Alert.alert('Error', m); };
 
   const load = React.useCallback(async () => {
     if (!sdk) return;
@@ -45,7 +45,7 @@ export default function WebhooksScreen() {
       setUrl('');
       setEvents('');
       await load();
-    } catch { msg('Failed to register webhook.'); }
+    } catch { showError('Failed to register webhook.'); }
     setSaving(false);
   };
 
@@ -55,7 +55,7 @@ export default function WebhooksScreen() {
     try {
       await (sdk as any).webhooks.delete(id);
       setWebhooks(w => w.filter(x => x.id !== id));
-    } catch { msg('Failed to delete webhook.'); }
+    } catch { showError('Failed to delete webhook.'); }
     setDeleting(null);
   };
 

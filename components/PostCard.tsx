@@ -35,9 +35,9 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
   const router = useRouter();
   const { sdk, user } = useAuth();
   const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(
-    post.userReaction || post.user_reaction || null
+    post.userReaction || post.user_reaction || post.userVote || post.user_vote || null
   );
-  const [score, setScore] = React.useState(post.score || 0);
+  const [score, setScore] = React.useState(post.score ?? post.vote_count ?? post.voteCount ?? 0);
   const [showMenu, setShowMenu] = React.useState(false);
   const [showReport, setShowReport] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
@@ -45,6 +45,15 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
   const [editSaving, setEditSaving] = React.useState(false);
   const [currentContent, setCurrentContent] = React.useState(post.content || post.body || '');
   const [isDeleted, setIsDeleted] = React.useState(false);
+  const [linkCopied, setLinkCopied] = React.useState(false);
+
+  // Sync state if post prop changes (e.g., after refresh)
+  React.useEffect(() => {
+    const newVote = post.userReaction || post.user_reaction || post.userVote || post.user_vote || null;
+    if (newVote !== undefined) setUserVote(newVote);
+    const newScore = post.score ?? post.vote_count ?? post.voteCount ?? 0;
+    setScore(newScore);
+  }, [post.id, post.score, post.userReaction, post.user_reaction, post.userVote, post.user_vote]);
 
   const author = post.author || post.user || {};
   const authorName = author.name || author.username || 'Anonymous';
@@ -126,9 +135,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         setIsDeleted(true);
         onPostDeleted?.(post.id);
       } catch {
-        const errMsg = 'Failed to delete post.';
-        if (Platform.OS === 'web') alert(errMsg);
-        else Alert.alert('Error', errMsg);
+        Alert.alert('Error', 'Failed to delete post.');
       }
     };
 
@@ -150,9 +157,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
       setCurrentContent(editContent.trim());
       setIsEditing(false);
     } catch {
-      const errMsg = 'Failed to update post.';
-      if (Platform.OS === 'web') alert(errMsg);
-      else Alert.alert('Error', errMsg);
+      Alert.alert('Error', 'Failed to update post.');
     } finally {
       setEditSaving(false);
     }
@@ -334,6 +339,17 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         </Pressable>
       </View>
 
+      {/* Backdrop overlay for menu */}
+      {showMenu && (
+        <Pressable
+          onPress={() => setShowMenu(false)}
+          style={{
+            ...(Platform.OS === 'web'
+              ? { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998 }
+              : { position: 'absolute', top: -1000, left: -1000, right: -1000, bottom: -1000, zIndex: 99998 }),
+          }}
+        />
+      )}
       {/* Context menu */}
       {showMenu && (
         <View
@@ -341,15 +357,15 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
             position: 'absolute',
             right: spacing.xl,
             bottom: spacing['5xl'],
-            backgroundColor: colors.surfaceRaised,
+            backgroundColor: '#1a1a1e',
             borderRadius: radius.md,
             borderWidth: 1,
             borderColor: colors.border,
             padding: spacing.xs,
-            zIndex: 9999,
+            zIndex: 99999,
             elevation: 999,
             minWidth: 160,
-            ...(Platform.OS === 'web' ? { boxShadow: '0 4px 24px rgba(0,0,0,0.5)' } as any : {}),
+            ...(Platform.OS === 'web' ? { boxShadow: '0 8px 32px rgba(0,0,0,0.8)' } as any : {}),
           }}
         >
           {isOwnPost && (
@@ -381,13 +397,14 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
               try {
                 if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator?.clipboard) {
                   await navigator.clipboard.writeText(url);
-                  alert('Link copied!');
+                  setLinkCopied(true);
+                  setTimeout(() => setLinkCopied(false), 2000);
                 }
               } catch {}
             }}
             style={{ padding: spacing.md }}
           >
-            <Text variant="body">Copy Link</Text>
+            <Text variant="body">{linkCopied ? 'Copied!' : 'Copy Link'}</Text>
           </Pressable>
         </View>
       )}

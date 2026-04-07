@@ -5,9 +5,110 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
+import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type Tab = 'dashboard' | 'users' | 'content' | 'invites' | 'network';
+type Tab = 'ai' | 'dashboard' | 'users' | 'content' | 'invites' | 'network';
+
+const BUSINESS_AI_AGENT_ID = '411ac3a9-dfbc-4463-8963-2e26a645211e';
+
+/* --- AI Chat --- */
+function AITab({ sdk }: { sdk: any }) {
+  const [messages, setMessages] = React.useState<{ role: 'user' | 'agent'; text: string }[]>([]);
+  const [input, setInput] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+
+  const handleSend = async () => {
+    if (!input.trim() || sending) return;
+    const msg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: msg }]);
+    setSending(true);
+    try {
+      const res = await (sdk as any).agents.chat(BUSINESS_AI_AGENT_ID, { message: msg });
+      const data = res?.data || res;
+      const reply = data?.content || data?.message || data?.response || (typeof data === 'string' ? data : 'No response');
+      setMessages(prev => [...prev, { role: 'agent', text: reply }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'agent', text: 'Failed to get response from AI.' }]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, gap: spacing.md }}>
+      <View style={{ flex: 1, gap: spacing.sm }}>
+        {messages.length === 0 && (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+            <Ionicons name="sparkles" size={32} color={colors.textMuted} />
+            <Text variant="body" color={colors.textSecondary} align="center">Minds Business AI</Text>
+            <Text variant="caption" color={colors.textMuted} align="center" style={{ maxWidth: 280 }}>
+              Ask anything about your network, analytics, or strategy.
+            </Text>
+          </View>
+        )}
+        {messages.map((m, i) => (
+          <View
+            key={i}
+            style={{
+              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+              backgroundColor: m.role === 'user' ? colors.accent : colors.surface,
+              borderRadius: radius.md,
+              padding: spacing.md,
+              maxWidth: '80%' as any,
+              borderWidth: m.role === 'agent' ? 0.5 : 0,
+              borderColor: colors.glassBorder,
+            }}
+          >
+            <Text variant="body" color={m.role === 'user' ? colors.textInverse : colors.text}>
+              {m.text}
+            </Text>
+          </View>
+        ))}
+        {sending && (
+          <View style={{ alignSelf: 'flex-start', padding: spacing.md }}>
+            <Text variant="caption" color={colors.textMuted}>Thinking...</Text>
+          </View>
+        )}
+      </View>
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <TextInput
+          placeholder="Ask the AI..."
+          placeholderTextColor={colors.textMuted}
+          value={input}
+          onChangeText={setInput}
+          onSubmitEditing={handleSend}
+          style={{
+            flex: 1,
+            backgroundColor: colors.surface,
+            borderWidth: 0.5,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.md,
+            paddingHorizontal: spacing.md,
+            paddingVertical: 10,
+            color: colors.text,
+            ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+          }}
+        />
+        <Pressable
+          onPress={handleSend}
+          disabled={!input.trim() || sending}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: input.trim() ? colors.accent : colors.surfaceHover,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="send" size={16} color={input.trim() ? '#fff' : colors.textMuted} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 function TabButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
@@ -34,40 +135,71 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-/* ─── Dashboard ─── */
+/* --- Dashboard --- */
 function DashboardTab({ sdk }: { sdk: any }) {
   const [stats, setStats] = React.useState<any>(null);
   const [signups, setSignups] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     (async () => {
       try {
-        const [s, su] = await Promise.all([
-          sdk.admin.stats().catch(() => null),
-          sdk.admin.signupsByDay({ days: 14 }).catch(() => []),
-        ]);
+        // Try org-scoped admin stats first
+        let s: any = null;
+        try {
+          s = await sdk.admin.stats({ organization_id: ORG_ID || undefined });
+        } catch {
+          try { s = await sdk.admin.stats(); } catch {}
+        }
+        // Try org members count as fallback for user count
+        if (!s && ORG_ID) {
+          try {
+            const membersRes = await sdk.organizations.members(ORG_ID, { limit: 1 });
+            const postsRes = await sdk.posts.list({ limit: 1, organization_id: ORG_ID });
+            const commRes = await sdk.communities.list({ limit: 1, organization_id: ORG_ID });
+            s = {
+              users: membersRes.meta?.total ?? membersRes.data?.length ?? 0,
+              posts: postsRes.meta?.total ?? postsRes.data?.length ?? 0,
+              communities: commRes.meta?.total ?? commRes.data?.length ?? 0,
+            };
+          } catch {}
+        }
         setStats(s);
+
+        let su: any = [];
+        try {
+          su = await sdk.admin.signupsByDay({ days: 14, organization_id: ORG_ID || undefined });
+        } catch {
+          try { su = await sdk.admin.signupsByDay({ days: 14 }); } catch {}
+        }
         setSignups(Array.isArray(su) ? su : su?.days || []);
-      } catch {}
+      } catch {
+        setError('Could not load dashboard data.');
+      }
       setLoading(false);
     })();
   }, [sdk]);
 
   if (loading) return <View style={{ gap: spacing.xl }}><Skeleton height={80} /><Skeleton height={120} /></View>;
+  if (error) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+      <Ionicons name="bar-chart-outline" size={32} color={colors.textMuted} />
+      <Text variant="body" color={colors.textSecondary} align="center">{error}</Text>
+      <Text variant="caption" color={colors.textMuted} align="center" style={{ maxWidth: 280 }}>Check your admin permissions or try again later.</Text>
+    </View>
+  );
 
   return (
     <View style={{ gap: spacing.xl }}>
       <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
-        <StatCard label="Users" value={stats?.users ?? stats?.totalUsers ?? 0} />
-        <StatCard label="Posts" value={stats?.posts ?? stats?.totalPosts ?? 0} />
-        <StatCard label="Communities" value={stats?.communities ?? stats?.totalCommunities ?? 0} />
+        <StatCard label="Users" value={stats?.users ?? stats?.totalUsers ?? '---'} />
+        <StatCard label="Posts" value={stats?.posts ?? stats?.totalPosts ?? '---'} />
+        <StatCard label="Communities" value={stats?.communities ?? stats?.totalCommunities ?? '---'} />
       </View>
-      <Card>
-        <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Signups (14 days)</Text>
-        {signups.length === 0 ? (
-          <Text variant="caption" color={colors.textMuted}>No signup data.</Text>
-        ) : (
+      {signups.length > 0 && (
+        <Card>
+          <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Signups (14 days)</Text>
           <View style={{ gap: spacing.xs }}>
             {signups.map((d: any, i: number) => {
               const count = d.count ?? d.signups ?? 0;
@@ -85,27 +217,43 @@ function DashboardTab({ sdk }: { sdk: any }) {
               );
             })}
           </View>
-        )}
-      </Card>
+        </Card>
+      )}
     </View>
   );
 }
 
-/* ─── Users ─── */
+/* --- Users --- */
 function UsersTab({ sdk }: { sdk: any }) {
   const [users, setUsers] = React.useState<any[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [actionId, setActionId] = React.useState('');
-
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const [error, setError] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (q?: string) => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await sdk.admin.listUsers({ search: q || undefined, limit: 50 });
+      // Try admin endpoint first
+      const res = await sdk.admin.listUsers({ search: q || undefined, limit: 50, organization_id: ORG_ID || undefined });
       setUsers(Array.isArray(res) ? res : res?.users || []);
-    } catch { setUsers([]); }
+    } catch {
+      // Fallback to org members
+      if (ORG_ID) {
+        try {
+          const res = await sdk.organizations.members(ORG_ID, { limit: 50 } as any);
+          const members = (res.data || []).map((m: any) => m.user || m);
+          setUsers(members);
+        } catch {
+          setError('Requires admin access to view users.');
+          setUsers([]);
+        }
+      } else {
+        setError('Requires admin access to view users.');
+        setUsers([]);
+      }
+    }
     setLoading(false);
   }, [sdk]);
 
@@ -115,19 +263,19 @@ function UsersTab({ sdk }: { sdk: any }) {
 
   const banUser = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.banUser(id, { reason: 'Admin action' }); await load(search); } catch { msg('Failed.'); }
+    try { await sdk.admin.banUser(id, { reason: 'Admin action' }); await load(search); } catch { Alert.alert('Error', 'Failed to ban user.'); }
     setActionId('');
   };
 
   const unbanUser = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.unbanUser(id); await load(search); } catch { msg('Failed.'); }
+    try { await sdk.admin.unbanUser(id); await load(search); } catch { Alert.alert('Error', 'Failed to unban user.'); }
     setActionId('');
   };
 
   const setRole = async (id: string, role: string) => {
     setActionId(id);
-    try { await sdk.admin.setUserRole(id, role); await load(search); } catch { msg('Failed.'); }
+    try { await sdk.admin.setUserRole(id, role); await load(search); } catch { Alert.alert('Error', 'Failed to set role.'); }
     setActionId('');
   };
 
@@ -139,14 +287,19 @@ function UsersTab({ sdk }: { sdk: any }) {
         </View>
         <Button onPress={doSearch} size="sm">Search</Button>
       </View>
-      {loading ? <Skeleton height={200} /> : users.length === 0 ? (
+      {loading ? <Skeleton height={200} /> : error ? (
+        <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.md }}>
+          <Ionicons name="lock-closed-outline" size={32} color={colors.textMuted} />
+          <Text variant="body" color={colors.textMuted} align="center">{error}</Text>
+        </View>
+      ) : users.length === 0 ? (
         <Text variant="caption" color={colors.textMuted} align="center">No users found.</Text>
       ) : users.map((u: any) => (
         <Card key={u.id}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flex: 1 }}>
               <Text variant="bodyMedium">{u.name || u.username || 'User'}</Text>
-              <Text variant="caption" color={colors.textMuted}>{u.email} {u.role ? `- ${u.role}` : ''}</Text>
+              <Text variant="caption" color={colors.textMuted}>{u.email || u.username || ''} {u.role ? `- ${u.role}` : ''}</Text>
               {u.banned && <Text variant="caption" color={colors.error}>Banned</Text>}
             </View>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
@@ -166,21 +319,31 @@ function UsersTab({ sdk }: { sdk: any }) {
   );
 }
 
-/* ─── Content ─── */
+/* --- Content --- */
 function ContentTab({ sdk }: { sdk: any }) {
   const [posts, setPosts] = React.useState<any[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [deletingId, setDeletingId] = React.useState('');
-
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const [error, setError] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (q?: string) => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await sdk.admin.listPosts({ search: q || undefined, limit: 50 });
+      // Try admin endpoint with org scope
+      const res = await sdk.admin.listPosts({ search: q || undefined, limit: 50, organization_id: ORG_ID || undefined });
       setPosts(Array.isArray(res) ? res : res?.posts || []);
-    } catch { setPosts([]); }
+    } catch {
+      // Fallback to org posts
+      try {
+        const res = await sdk.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
+        setPosts(res.data || []);
+      } catch {
+        setError('Requires admin access to view content.');
+        setPosts([]);
+      }
+    }
     setLoading(false);
   }, [sdk]);
 
@@ -188,7 +351,7 @@ function ContentTab({ sdk }: { sdk: any }) {
 
   const deletePost = async (id: string) => {
     setDeletingId(id);
-    try { await sdk.admin.deletePost(id); setPosts(p => p.filter(x => x.id !== id)); } catch { msg('Failed.'); }
+    try { await sdk.admin.deletePost(id); setPosts(p => p.filter(x => x.id !== id)); } catch { Alert.alert('Error', 'Failed to delete post.'); }
     setDeletingId('');
   };
 
@@ -200,7 +363,12 @@ function ContentTab({ sdk }: { sdk: any }) {
         </View>
         <Button onPress={() => load(search)} size="sm">Search</Button>
       </View>
-      {loading ? <Skeleton height={200} /> : posts.length === 0 ? (
+      {loading ? <Skeleton height={200} /> : error ? (
+        <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.md }}>
+          <Ionicons name="lock-closed-outline" size={32} color={colors.textMuted} />
+          <Text variant="body" color={colors.textMuted} align="center">{error}</Text>
+        </View>
+      ) : posts.length === 0 ? (
         <Text variant="caption" color={colors.textMuted} align="center">No posts found.</Text>
       ) : posts.map((p: any) => (
         <Card key={p.id}>
@@ -208,7 +376,7 @@ function ContentTab({ sdk }: { sdk: any }) {
             <View style={{ flex: 1 }}>
               <Text variant="bodyMedium" numberOfLines={2}>{p.title || p.content?.slice(0, 100) || 'Untitled'}</Text>
               <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-                {p.author?.name || 'Unknown'} {p.created_at ? `- ${new Date(p.created_at).toLocaleDateString()}` : ''}
+                {p.author?.name || 'Unknown'} {(p.created_at || p.createdAt) ? `- ${new Date(p.created_at || p.createdAt).toLocaleDateString()}` : ''}
               </Text>
             </View>
             <Pressable onPress={() => deletePost(p.id)} disabled={deletingId === p.id} hitSlop={8} style={{ opacity: deletingId === p.id ? 0.5 : 1, padding: spacing.sm }}>
@@ -221,14 +389,12 @@ function ContentTab({ sdk }: { sdk: any }) {
   );
 }
 
-/* ─── Invites ─── */
+/* --- Invites --- */
 function InvitesTab({ sdk }: { sdk: any }) {
   const [codes, setCodes] = React.useState<any[]>([]);
   const [waitlist, setWaitlist] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [actionId, setActionId] = React.useState('');
-
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
 
   React.useEffect(() => {
     (async () => {
@@ -246,13 +412,13 @@ function InvitesTab({ sdk }: { sdk: any }) {
 
   const revoke = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.revokeInviteCode(id); setCodes(c => c.map(x => x.id === id ? { ...x, status: 'revoked' } : x)); } catch { msg('Failed.'); }
+    try { await sdk.admin.revokeInviteCode(id); setCodes(c => c.map(x => x.id === id ? { ...x, status: 'revoked' } : x)); } catch { Alert.alert('Error', 'Failed to revoke code.'); }
     setActionId('');
   };
 
   const grant = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.grantWaitlistAccess(id); setWaitlist(w => w.filter(x => x.id !== id)); } catch { msg('Failed.'); }
+    try { await sdk.admin.grantWaitlistAccess(id); setWaitlist(w => w.filter(x => x.id !== id)); } catch { Alert.alert('Error', 'Failed to grant access.'); }
     setActionId('');
   };
 
@@ -294,20 +460,21 @@ function InvitesTab({ sdk }: { sdk: any }) {
   );
 }
 
-/* ─── Network ─── */
+/* --- Network --- */
 function NetworkTab({ sdk }: { sdk: any }) {
   const [settings, setSettings] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     (async () => {
       try {
         const s = await sdk.admin.getNetworkSettings();
         setSettings(s);
-      } catch {}
+      } catch {
+        setError('Requires network admin access to view settings.');
+      }
       setLoading(false);
     })();
   }, [sdk]);
@@ -315,12 +482,20 @@ function NetworkTab({ sdk }: { sdk: any }) {
   const save = async () => {
     if (!settings) return;
     setSaving(true);
-    try { await sdk.admin.updateNetworkSettings(settings); msg('Settings saved.'); } catch { msg('Failed.'); }
+    try { await sdk.admin.updateNetworkSettings(settings); } catch { Alert.alert('Error', 'Failed to save settings.'); }
     setSaving(false);
   };
 
   if (loading) return <Skeleton height={200} />;
-  if (!settings) return <Text variant="caption" color={colors.textMuted} align="center">Could not load network settings.</Text>;
+  if (error || !settings) {
+    return (
+      <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.md }}>
+        <Ionicons name="lock-closed-outline" size={32} color={colors.textMuted} />
+        <Text variant="body" color={colors.textMuted} align="center">{error || 'Could not load network settings.'}</Text>
+        <Text variant="caption" color={colors.textMuted} align="center">This requires network-level admin privileges.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ gap: spacing.xl }}>
@@ -336,11 +511,11 @@ function NetworkTab({ sdk }: { sdk: any }) {
   );
 }
 
-/* ─── Main ─── */
+/* --- Main --- */
 export default function AdminScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
-  const [tab, setTab] = React.useState<Tab>('dashboard');
+  const [tab, setTab] = React.useState<Tab>('ai');
 
   if (!sdk) {
     return (
@@ -360,12 +535,13 @@ export default function AdminScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.sm }}>
-        {(['dashboard', 'users', 'content', 'invites', 'network'] as Tab[]).map(t => (
-          <TabButton key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onPress={() => setTab(t)} />
+        {(['ai', 'dashboard', 'users', 'content', 'invites', 'network'] as Tab[]).map(t => (
+          <TabButton key={t} label={t === 'ai' ? 'AI' : t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onPress={() => setTab(t)} />
         ))}
       </ScrollView>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['5xl'] }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['5xl'], flex: tab === 'ai' ? 1 : undefined }}>
+        {tab === 'ai' && <AITab sdk={sdk} />}
         {tab === 'dashboard' && <DashboardTab sdk={sdk} />}
         {tab === 'users' && <UsersTab sdk={sdk} />}
         {tab === 'content' && <ContentTab sdk={sdk} />}

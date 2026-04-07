@@ -6,7 +6,7 @@ import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
   const { width } = useWindowDimensions();
-  const isDesktop = Platform.OS === 'web' && width > 768;
+  const isDesktop = Platform.OS === 'web' && width > 1024;
   const sidebar = useSidebarState();
 
   if (isDesktop) {

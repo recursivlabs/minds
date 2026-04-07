@@ -22,16 +22,16 @@ export function TipModal({ visible, onClose, recipientName, recipientAvatar, onS
   const [message, setMessage] = React.useState('');
   const [sending, setSending] = React.useState(false);
 
+  const [comingSoon, setComingSoon] = React.useState(false);
+
   const handleSend = async () => {
-    const msg = 'Tipping coming soon — this feature will use MINDS tokens';
-    if (Platform.OS === 'web') {
-      alert(msg);
-    } else {
-      Alert.alert('Coming Soon', msg);
-    }
-    setAmount('1');
-    setMessage('');
-    onClose();
+    setComingSoon(true);
+    setTimeout(() => {
+      setComingSoon(false);
+      setAmount('1');
+      setMessage('');
+      onClose();
+    }, 2000);
   };
 
   return (
@@ -113,6 +113,13 @@ export function TipModal({ visible, onClose, recipientName, recipientAvatar, onS
             value={message}
             onChangeText={setMessage}
           />
+
+          {comingSoon && (
+            <View style={{ backgroundColor: colors.warningMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center', marginTop: spacing.sm }}>
+              <Text variant="body" color={colors.warning}>Tipping coming soon</Text>
+              <Text variant="caption" color={colors.textMuted}>This feature will use MINDS tokens</Text>
+            </View>
+          )}
 
           <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
             <View style={{ flex: 1 }}>

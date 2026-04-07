@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { View, Modal, Pressable, ScrollView, Alert, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -25,26 +26,22 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
   const [selectedReason, setSelectedReason] = React.useState('');
   const [details, setDetails] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
+  const [submitted, setSubmitted] = React.useState(false);
 
   const handleSubmit = async () => {
     if (!selectedReason) return;
     setSubmitting(true);
     try {
       await onSubmit(selectedReason, details);
-      if (Platform.OS === 'web') {
-        alert('Report submitted. Thank you for helping keep Minds safe.');
-      } else {
-        Alert.alert('Report Submitted', 'Thank you for helping keep Minds safe.');
-      }
-      setSelectedReason('');
-      setDetails('');
-      onClose();
+      setSubmitted(true);
+      setTimeout(() => {
+        setSelectedReason('');
+        setDetails('');
+        setSubmitted(false);
+        onClose();
+      }, 1500);
     } catch {
-      if (Platform.OS === 'web') {
-        alert('Failed to submit report. Please try again.');
-      } else {
-        Alert.alert('Error', 'Failed to submit report. Please try again.');
-      }
+      Alert.alert('Error', 'Failed to submit report. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -56,7 +53,7 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: colors.overlay,
+          backgroundColor: 'rgba(0,0,0,0.85)',
           justifyContent: 'center',
           alignItems: 'center',
           padding: spacing.xl,
@@ -65,7 +62,7 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
         <Pressable
           onPress={(e) => e.stopPropagation()}
           style={{
-            backgroundColor: colors.surface,
+            backgroundColor: '#1a1a1e',
             borderRadius: radius.xl,
             padding: spacing['2xl'],
             width: '100%',
@@ -75,6 +72,13 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
             borderColor: colors.border,
           }}
         >
+          {submitted ? (
+            <View style={{ alignItems: 'center', padding: spacing['2xl'], gap: spacing.md }}>
+              <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+              <Text variant="h3" color={colors.success}>Report Submitted</Text>
+              <Text variant="body" color={colors.textMuted} align="center">Thank you for helping keep Minds safe.</Text>
+            </View>
+          ) : (<>
           <Text variant="h3" style={{ marginBottom: spacing.xl }}>
             Report Content
           </Text>
@@ -155,6 +159,7 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
               </Button>
             </View>
           </View>
+          </>)}
         </Pressable>
       </Pressable>
     </Modal>

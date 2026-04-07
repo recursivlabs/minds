@@ -45,15 +45,17 @@ export default function DiscoverScreen() {
   const getData = () => {
     switch (activeTab) {
       case 'communities':
-        return { items: filterByQuery(communities, ['name', 'description']), loading: commLoading };
+        return { items: filterByQuery(communities || [], ['name', 'description']), loading: commLoading };
       case 'agents':
-        return { items: filterByQuery(agents, ['name', 'description']), loading: agentsLoading };
+        return { items: filterByQuery(agents || [], ['name', 'description']), loading: agentsLoading };
       case 'people':
-        return { items: filterByQuery(profiles, ['name', 'username']), loading: profilesLoading };
+        return { items: filterByQuery(profiles || [], ['name', 'username']), loading: profilesLoading };
+      default:
+        return { items: [], loading: false };
     }
   };
 
-  const { items, loading } = getData();
+  const { items = [], loading = false } = getData() || {};
 
   const renderItem = ({ item }: { item: any }) => {
     const name = item.name || 'Unknown';
@@ -230,10 +232,17 @@ export default function DiscoverScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-              <Text variant="body" color={colors.textMuted}>
-                {searchQuery ? 'No results found' : 'Nothing here yet'}
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+              <Ionicons name={activeTab === 'communities' ? 'people-outline' : activeTab === 'agents' ? 'hardware-chip-outline' : 'person-outline'} size={32} color={colors.textMuted} />
+              <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>
+                {searchQuery ? 'No results found' : `No ${activeTab} yet`}
               </Text>
+              <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>
+                {searchQuery ? 'Try a different search term.' : `Be the first to create one.`}
+              </Text>
+              {!searchQuery && (
+                <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create</Button>
+              )}
             </View>
           }
           showsVerticalScrollIndicator={false}

@@ -54,9 +54,15 @@ export default function SettingsScreen() {
 
   React.useEffect(() => { load(); }, [load]);
 
-  const showMsg = (msg: string) => {
-    if (Platform.OS === 'web') alert(msg);
-    else Alert.alert('', msg);
+  const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
+
+  const showMsg = (msg: string, isError = false) => {
+    if (isError) {
+      Alert.alert('Error', msg);
+    } else {
+      setStatusMsg(msg);
+      setTimeout(() => setStatusMsg(null), 3000);
+    }
   };
 
   const changePassword = async () => {
@@ -66,7 +72,7 @@ export default function SettingsScreen() {
       await sdk.settings.changePassword({ current_password: pw.current, new_password: pw.next });
       setPw({ current: '', next: '' });
       showMsg('Password changed.');
-    } catch { showMsg('Failed to change password.'); }
+    } catch { showMsg('Failed to change password.', true); }
     setSaving('');
   };
 
@@ -77,7 +83,7 @@ export default function SettingsScreen() {
       await sdk.settings.requestEmailChange({ new_email: newEmail, password: emailPw });
       setNewEmail(''); setEmailPw('');
       showMsg('Check your email to confirm the change.');
-    } catch { showMsg('Failed to request email change.'); }
+    } catch { showMsg('Failed to request email change.', true); }
     setSaving('');
   };
 
@@ -90,7 +96,7 @@ export default function SettingsScreen() {
         profile_public: updated.profilePublic,
         show_email: updated.showEmail,
       });
-    } catch { setPrivacy(privacy); showMsg('Failed to update privacy.'); }
+    } catch { setPrivacy(privacy); showMsg('Failed to update privacy.', true); }
   };
 
   const revokeSession = async (id: string) => {
@@ -98,7 +104,7 @@ export default function SettingsScreen() {
     try {
       await sdk.settings.revokeSession(id);
       setSessions(s => s.filter(x => x.id !== id));
-    } catch { showMsg('Failed to revoke session.'); }
+    } catch { showMsg('Failed to revoke session.', true); }
   };
 
   const deleteAccount = async () => {
@@ -108,7 +114,7 @@ export default function SettingsScreen() {
       await sdk.settings.requestDeletion({ password: deletePw, reason: 'User requested' });
       showMsg('Account deletion requested.');
       setDeleteConfirm(false); setDeletePw('');
-    } catch { showMsg('Failed to request deletion.'); }
+    } catch { showMsg('Failed to request deletion.', true); }
     setSaving('');
   };
 
@@ -132,6 +138,11 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: spacing['5xl'] }}>
+        {statusMsg && (
+          <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' }}>
+            <Text variant="body" color={colors.success}>{statusMsg}</Text>
+          </View>
+        )}
         <Section title="Account">
           <Input label="Current password" secureTextEntry value={pw.current} onChangeText={t => setPw(p => ({ ...p, current: t }))} placeholder="Current password" />
           <Input label="New password" secureTextEntry value={pw.next} onChangeText={t => setPw(p => ({ ...p, next: t }))} placeholder="New password" />

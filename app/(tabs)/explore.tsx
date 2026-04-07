@@ -49,6 +49,36 @@ function SmallItem({ name, avatar, onPress }: { name: string; avatar?: string | 
   );
 }
 
+function DescriptiveItem({ name, avatar, description, onPress }: { name: string; avatar?: string | null; description?: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        width: 220,
+        marginRight: spacing.md,
+        backgroundColor: colors.surface,
+        borderRadius: radius.md,
+        padding: spacing.md,
+        borderWidth: 0.5,
+        borderColor: colors.glassBorder,
+      }}
+    >
+      <Avatar uri={avatar} name={name} size="md" />
+      <View style={{ flex: 1 }}>
+        <Text variant="bodyMedium" numberOfLines={1} style={{ fontSize: 13 }}>{name}</Text>
+        {description ? (
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ marginTop: 2 }}>
+            {description}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 function TrendingItem({ post, onPress }: { post: any; onPress: () => void }) {
   const title = post.title || post.content?.slice(0, 60) || 'Untitled';
   const author = post.author?.name || 'Anonymous';
@@ -221,8 +251,12 @@ export default function ExploreScreen() {
           }
           ListEmptyComponent={
             !searchLoading ? (
-              <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-                <Text variant="body" color={colors.textMuted}>No results found</Text>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+                <Ionicons name="search-outline" size={32} color={colors.textMuted} />
+                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>No results found</Text>
+                <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>
+                  Try searching for something else.
+                </Text>
               </View>
             ) : null
           }
@@ -283,15 +317,16 @@ export default function ExploreScreen() {
           />
           {commLoading ? (
             <View style={{ flexDirection: 'row' }}>
-              {[1, 2, 3].map(i => <Skeleton key={i} width={56} height={56} borderRadius={28} style={{ marginRight: spacing.md }} />)}
+              {[1, 2, 3].map(i => <Skeleton key={i} width={220} height={60} borderRadius={radius.md} style={{ marginRight: spacing.md }} />)}
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {communities.slice(0, 10).map((c: any) => (
-                <SmallItem
+                <DescriptiveItem
                   key={c.id}
                   name={c.name}
                   avatar={c.image || c.avatar}
+                  description={c.description || c.bio || undefined}
                   onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
                 />
               ))}
@@ -305,16 +340,17 @@ export default function ExploreScreen() {
           />
           {agentsLoading ? (
             <View style={{ flexDirection: 'row' }}>
-              {[1, 2, 3].map(i => <Skeleton key={i} width={56} height={56} borderRadius={28} style={{ marginRight: spacing.md }} />)}
+              {[1, 2, 3].map(i => <Skeleton key={i} width={220} height={60} borderRadius={radius.md} style={{ marginRight: spacing.md }} />)}
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {agents.slice(0, 10).map((a: any) => (
-                <SmallItem
+                <DescriptiveItem
                   key={a.id}
                   name={a.name}
                   avatar={a.image || a.avatar}
-                  onPress={() => router.push(`/(tabs)/explore` as any)}
+                  description={a.bio || a.description || a.system_prompt?.slice(0, 60) || undefined}
+                  onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
                 />
               ))}
             </ScrollView>

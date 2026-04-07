@@ -53,6 +53,7 @@ export default function PostDetailScreen() {
           ...prev,
           { ...res.data, author: { name: user?.name, username: user?.username, image: user?.image } },
         ]);
+        setPost((prev: any) => prev ? { ...prev, replyCount: (prev.replyCount || prev.reply_count || 0) + 1 } : prev);
       }
     } catch {}
     finally { setSubmitting(false); }
@@ -170,6 +171,12 @@ export default function PostDetailScreen() {
           value={replyText}
           onChangeText={setReplyText}
           multiline
+          onKeyPress={(e: any) => {
+            if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+              e.preventDefault();
+              handleReply();
+            }
+          }}
           style={{
             flex: 1,
             backgroundColor: colors.surface,

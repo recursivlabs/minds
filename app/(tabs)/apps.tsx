@@ -28,7 +28,9 @@ export default function AppsScreen() {
   const [saving, setSaving] = React.useState(false);
   const [deploying, setDeploying] = React.useState(false);
 
-  const msg = (m: string) => { Platform.OS === 'web' ? alert(m) : Alert.alert('', m); };
+  const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
+  const showSuccess = (m: string) => { setStatusMsg(m); setTimeout(() => setStatusMsg(null), 2000); };
+  const showError = (m: string) => { Alert.alert('Error', m); };
 
   const load = React.useCallback(async () => {
     if (!sdk) return;
@@ -50,7 +52,7 @@ export default function AppsScreen() {
       setShowCreate(false);
       setForm({ name: '', description: '' });
       await load();
-    } catch { msg('Failed to create app.'); }
+    } catch { showError('Failed to create app.'); }
     setSaving(false);
   };
 
@@ -63,7 +65,7 @@ export default function AppsScreen() {
       ]);
       setDetail(p);
       setDeployments(Array.isArray(d) ? d : d?.deployments || []);
-    } catch { msg('Failed to load app details.'); }
+    } catch { showError('Failed to load app details.'); }
   };
 
   const deploy = async (id: string) => {
@@ -71,9 +73,9 @@ export default function AppsScreen() {
     setDeploying(true);
     try {
       await (sdk as any).projects.deploy(id, { type: 'production' });
-      msg('Deployment started.');
+      showSuccess('Deployment started.');
       await openDetail(id);
-    } catch { msg('Failed to deploy.'); }
+    } catch { showError('Failed to deploy.'); }
     setDeploying(false);
   };
 
@@ -97,6 +99,11 @@ export default function AppsScreen() {
           <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>{detail.name}</Text>
         </View>
         <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl }} showsVerticalScrollIndicator={false}>
+          {statusMsg && (
+            <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' }}>
+              <Text variant="body" color={colors.success}>{statusMsg}</Text>
+            </View>
+          )}
           <Card>
             <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>App Info</Text>
             <Text variant="body">{detail.name}</Text>

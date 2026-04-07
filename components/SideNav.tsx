@@ -18,7 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'index', label: 'Feed', icon: 'newspaper-outline', activeIcon: 'newspaper' },
   { name: 'explore', label: 'Explore', icon: 'compass-outline', activeIcon: 'compass' },
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
-  { name: 'wallet', label: 'Wallet', icon: 'diamond-outline', activeIcon: 'diamond' },
+  { name: 'wallet', label: 'Wallet', icon: 'flash-outline', activeIcon: 'flash' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
 ];
 
@@ -57,13 +57,31 @@ interface SideNavProps {
 export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, sdk } = useAuth();
   const { conversations } = useConversations();
   const { communities } = useCommunities(5);
+  const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
+
+  // Real-time unread tracking
+  React.useEffect(() => {
+    if (!sdk) return;
+    let unsub: (() => void) | undefined;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        unsub = sdk.realtime.onMessage((msg: any) => {
+          const convoId = msg.conversationId || msg.conversation_id;
+          if (convoId && msg.senderId !== user?.id && msg.sender?.id !== user?.id) {
+            setUnreadConvos(prev => new Set(prev).add(convoId));
+          }
+        });
+      } catch {}
+    })();
+    return () => { unsub?.(); };
+  }, [sdk, user?.id]);
 
   const isActive = (name: string) => {
     if (name === 'index') return pathname === '/' || pathname === '';
-    if (name === 'notifications') return false; // no notifications tab yet
     return pathname.includes(name);
   };
 
@@ -117,8 +135,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             size={20}
             color={active ? colors.accent : colors.textMuted}
           />
-          {/* Gold dot badge for notifications */}
-          {item.name === 'notifications' && (
+          {/* Gold dot badge for notifications — hidden until we have real unread count */}
+          {false && item.name === 'notifications' && (
             <View
               style={{
                 position: 'absolute',
@@ -190,15 +208,30 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               </Pressable>
             ) : (
               <>
-                <Pressable onPress={() => router.push('/(tabs)')}>
-                  <Text
-                    variant="h2"
-                    color={colors.accent}
-                    style={{ fontSize: 18, letterSpacing: 4, fontWeight: '300' }}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <Pressable onPress={() => router.push('/(tabs)')}>
+                    <Text
+                      variant="h2"
+                      color={colors.accent}
+                      style={{ fontSize: 18, letterSpacing: 4, fontWeight: '300' }}
+                    >
+                      minds
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      // Theme toggle placeholder — visual only for now
+                    }}
+                    hitSlop={8}
+                    style={({ pressed }) => ({
+                      opacity: pressed ? 0.5 : 0.7,
+                      padding: 4,
+                      borderRadius: 4,
+                    })}
                   >
-                    minds
-                  </Text>
-                </Pressable>
+                    <Ionicons name="sunny-outline" size={14} color={colors.textMuted} />
+                  </Pressable>
+                </View>
                 <Pressable
                   onPress={onToggle}
                   hitSlop={8}
@@ -257,6 +290,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                       key={`${item.type}-${item.id}`}
                       onPress={() => {
                         if (item.type === 'dm') {
+                          setUnreadConvos(prev => { const next = new Set(prev); next.delete(item.id); return next; });
                           router.push({ pathname: '/(tabs)/chat', params: { id: item.id } } as any);
                         } else {
                           router.push(`/(tabs)/community/${item.id}` as any);
@@ -292,6 +326,16 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                           </Text>
                         ) : null}
                       </View>
+                      {item.type === 'dm' && unreadConvos.has(item.id) && (
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: colors.accent,
+                          }}
+                        />
+                      )}
                     </Pressable>
                   ))
                 )}
