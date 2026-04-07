@@ -397,13 +397,18 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         if (newMsgs.length > 0) {
           newMsgs.forEach((m: any) => messageIdsRef.current.add(m.id));
           setMessages(prev => {
-            // Remove any optimistic messages that match new server messages
-            const filtered = prev.filter(m => !m.id.startsWith('temp-') && !m.id.startsWith('agent-'));
-            // Merge and deduplicate
+            // Build set of new message contents for matching against optimistic
+            const newContents = new Set(newMsgs.map((m: any) => m.content?.trim()));
+            // Remove optimistic messages that now have a real server version
+            const filtered = prev.filter(m => {
+              if (m.id.startsWith('temp-') && newContents.has(m.content?.trim())) return false;
+              if (m.id.startsWith('agent-') && newContents.has(m.content?.trim())) return false;
+              return true;
+            });
+            // Merge and deduplicate by ID
             const byId = new Map<string, any>();
             for (const m of filtered) byId.set(m.id, m);
             for (const m of newMsgs) byId.set(m.id, m);
-            // Sort chronologically
             return Array.from(byId.values()).sort(
               (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             );
