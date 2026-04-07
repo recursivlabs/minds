@@ -16,6 +16,7 @@ import { Text, Button, Input } from '../../components';
 import { Container } from '../../components/Container';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
+import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
@@ -40,6 +41,9 @@ export default function CreateScreen() {
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState('');
   const [mediaUri, setMediaUri] = React.useState<string | null>(null);
+  const [selectedCommunity, setSelectedCommunity] = React.useState<any>(null);
+  const [showCommunityPicker, setShowCommunityPicker] = React.useState(false);
+  const { communities } = useCommunities(30);
 
   // Agent state
   const [agentName, setAgentName] = React.useState('');
@@ -152,6 +156,7 @@ export default function CreateScreen() {
         await sdk.posts.create({
           content: content.trim() || ' ',
           organization_id: ORG_ID || undefined,
+          community_id: selectedCommunity?.id || undefined,
           media_urls: mediaUrls,
         } as any);
         router.back();
@@ -279,6 +284,71 @@ export default function CreateScreen() {
       {/* Content area */}
       {mode === 'post' ? (
         <View style={{ flex: 1, padding: spacing.xl }}>
+          {/* Community picker */}
+          <View style={{ marginBottom: spacing.md, position: 'relative' }}>
+            <Pressable
+              onPress={() => setShowCommunityPicker(!showCommunityPicker)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+                paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+                backgroundColor: selectedCommunity ? colors.accentSubtle : colors.surface,
+                borderRadius: radius.full, alignSelf: 'flex-start',
+                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : colors.glassBorder,
+              }}
+            >
+              <Ionicons name={selectedCommunity ? 'people' : 'globe-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
+              <Text variant="caption" color={selectedCommunity ? colors.accent : colors.textMuted} style={{ fontSize: 13 }}>
+                {selectedCommunity ? selectedCommunity.name : 'Global'}
+              </Text>
+              <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
+            </Pressable>
+
+            {showCommunityPicker && (
+              <>
+                <Pressable
+                  onPress={() => setShowCommunityPicker(false)}
+                  style={{ position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998 }}
+                />
+                <View style={{
+                  position: 'absolute', top: '100%', left: 0, marginTop: spacing.xs,
+                  backgroundColor: '#1a1a1e', borderRadius: radius.md, borderWidth: 1,
+                  borderColor: colors.border, zIndex: 99999, minWidth: 220, maxHeight: 280,
+                  ...(Platform.OS === 'web' ? { boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'auto' } as any : {}),
+                }}>
+                  <Pressable
+                    onPress={() => { setSelectedCommunity(null); setShowCommunityPicker(false); }}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+                      paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+                      backgroundColor: !selectedCommunity ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
+                      borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.04)',
+                    })}
+                  >
+                    <Ionicons name="globe-outline" size={16} color={!selectedCommunity ? colors.accent : colors.textMuted} />
+                    <Text variant="body" color={!selectedCommunity ? colors.accent : colors.text} style={{ fontSize: 14 }}>Global</Text>
+                    {!selectedCommunity && <Ionicons name="checkmark" size={16} color={colors.accent} style={{ marginLeft: 'auto' } as any} />}
+                  </Pressable>
+                  {(communities || []).map((c: any) => (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => { setSelectedCommunity(c); setShowCommunityPicker(false); }}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+                        paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+                        backgroundColor: selectedCommunity?.id === c.id ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
+                        borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.04)',
+                      })}
+                    >
+                      <Avatar uri={c.image || c.avatar} name={c.name} size="xs" />
+                      <Text variant="body" color={selectedCommunity?.id === c.id ? colors.accent : colors.text} style={{ fontSize: 14, flex: 1 }} numberOfLines={1}>{c.name}</Text>
+                      {selectedCommunity?.id === c.id && <Ionicons name="checkmark" size={16} color={colors.accent} />}
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+
           <View style={{ flexDirection: 'row', gap: spacing.md, flex: 1 }}>
             <Avatar uri={user?.image} name={user?.name} size="md" />
             <View style={{ flex: 1 }}>
