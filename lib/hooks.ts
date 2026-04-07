@@ -55,6 +55,9 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         });
       }
 
+      // Pre-cache individual posts so detail view is instant
+      data.forEach((p: any) => { if (p.id) setCache(`post:${p.id}`, p); });
+
       if (refresh) {
         setPosts(data);
         setCache(cacheKey, data);
@@ -105,6 +108,14 @@ export function usePost(postId: string) {
   const [post, setPost] = React.useState<any>(cached || null);
   const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
+
+  // Reset when postId changes — never flash wrong post
+  React.useEffect(() => {
+    const freshCached = getCached(`post:${postId}`);
+    setPost(freshCached || null);
+    setLoading(!freshCached);
+    setError(null);
+  }, [postId]);
 
   React.useEffect(() => {
     if (!postId) return;
@@ -209,6 +220,15 @@ export function useProfile(username: string) {
   const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
   const [isFollowing, setIsFollowing] = React.useState(false);
+
+  // Reset when username changes — never show stale profile for different user
+  React.useEffect(() => {
+    const freshCached = getCached(`profile:${username}`);
+    setProfile(freshCached || null);
+    setLoading(!freshCached);
+    setError(null);
+    setIsFollowing(false);
+  }, [username]);
 
   React.useEffect(() => {
     if (!username) return;
@@ -407,6 +427,11 @@ export function useProfiles(limit = 20) {
         if (!cancelled) {
           setProfiles(data);
           setCache(cacheKey, data);
+          // Pre-cache individual profiles so clicking is instant
+          data.forEach((p: any) => {
+            if (p.username) setCache(`profile:${p.username}`, p);
+            if (p.id) setCache(`profile:${p.id}`, p);
+          });
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load profiles');

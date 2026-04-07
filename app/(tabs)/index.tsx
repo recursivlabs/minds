@@ -67,6 +67,7 @@ export default function FeedScreen() {
           renderItem={({ item }) => (
             <PostCard
               post={item}
+              compact
               onVoteChange={(postId, newScore, newVote) => {
                 setPosts(prev =>
                   prev.map(p =>

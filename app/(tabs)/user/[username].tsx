@@ -21,6 +21,13 @@ export default function UserProfileScreen() {
 
   const isOwnProfile = user?.id === profile?.id;
 
+  // Reset local state when username changes (prevents flash of old profile's posts)
+  React.useEffect(() => {
+    setUserPosts([]);
+    setPostsLoading(true);
+    setFollowLoading(false);
+  }, [username]);
+
   React.useEffect(() => {
     if (!profile?.id || !sdk) return;
     let cancelled = false;
