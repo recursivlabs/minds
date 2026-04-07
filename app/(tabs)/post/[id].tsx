@@ -120,7 +120,7 @@ export default function PostDetailScreen() {
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <View>
-            <PostCard post={post} />
+            <PostCard key={post.id} post={post} />
             {replies.length > 0 && (
               <View
                 style={{

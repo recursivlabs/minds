@@ -47,13 +47,18 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
   const [isDeleted, setIsDeleted] = React.useState(false);
   const [linkCopied, setLinkCopied] = React.useState(false);
 
-  // Sync state if post prop changes (e.g., after refresh)
+  // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {
     const newVote = post.userReaction || post.user_reaction || post.userVote || post.user_vote || null;
     if (newVote !== undefined) setUserVote(newVote);
     const newScore = post.score ?? post.vote_count ?? post.voteCount ?? 0;
     setScore(newScore);
-  }, [post.id, post.score, post.userReaction, post.user_reaction, post.userVote, post.user_vote]);
+    setCurrentContent(post.content || post.body || '');
+    setEditContent(post.content || post.body || '');
+    setIsEditing(false);
+    setShowMenu(false);
+    setIsDeleted(false);
+  }, [post.id]);
 
   const author = post.author || post.user || {};
   const authorName = author.name || author.username || 'Anonymous';
