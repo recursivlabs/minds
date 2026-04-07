@@ -88,11 +88,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="wallet"
+        name="chat"
         options={{
-          title: 'Wallet',
+          title: 'Chat',
           tabBarIcon: ({ color }) => (
-            <Ionicons name="diamond-outline" size={22} color={color} />
+            <Ionicons name="chatbubble-outline" size={22} color={color} />
           ),
         }}
       />
@@ -105,7 +105,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="chat" options={{ href: null }} />
+      <Tabs.Screen name="wallet" options={{ href: null }} />
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />
       <Tabs.Screen name="admin" options={{ href: null }} />

@@ -2,13 +2,13 @@ import * as React from 'react';
 import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Avatar, Skeleton, ChatBubble, Button, Container } from '../../components';
+import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
+import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations, useMessages } from '../../lib/hooks';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
 export default function ChatScreen() {
-  const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
   const { conversations, loading, refresh } = useConversations();
   const [activeConvoId, setActiveConvoId] = React.useState<string | null>(null);
@@ -27,13 +27,9 @@ export default function ChatScreen() {
   const handleNewDM = async () => {
     if (!sdk || !dmUsername.trim()) return;
     try {
-      // Look up user by username first, then create DM with user_id
       const profileRes = await sdk.profiles.getByUsername(dmUsername.trim());
       const userId = profileRes.data?.id;
-      if (!userId) {
-        alert('User not found');
-        return;
-      }
+      if (!userId) { alert('User not found'); return; }
       const res = await sdk.chat.dm({ user_id: userId });
       if (res.data?.id) {
         setActiveConvoId(res.data.id);
@@ -41,7 +37,7 @@ export default function ChatScreen() {
         setDmUsername('');
       }
     } catch {
-      alert('Could not start conversation. Check the username and try again.');
+      alert('Could not start conversation.');
     }
   };
 
@@ -59,13 +55,13 @@ export default function ChatScreen() {
           borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
-        <Text variant="bodyMedium" style={{ fontSize: 14 }}>Messages</Text>
+        <Text variant="h3">Messages</Text>
         <Pressable onPress={() => setShowNewChat(!showNewChat)} hitSlop={8}>
           <Ionicons name="create-outline" size={22} color={colors.accent} />
         </Pressable>
       </View>
 
-      {/* New chat input */}
+      {/* New chat */}
       {showNewChat && (
         <View
           style={{
@@ -76,27 +72,26 @@ export default function ChatScreen() {
             borderBottomColor: 'rgba(255,255,255,0.06)',
           }}
         >
-          <View style={{ flex: 1 }}>
-            <TextInput
-              placeholder="Username to message..."
-              placeholderTextColor={colors.textMuted}
-              value={dmUsername}
-              onChangeText={setDmUsername}
-              autoCapitalize="none"
-              onSubmitEditing={handleNewDM}
-              style={{
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radius.md,
-                paddingHorizontal: spacing.lg,
-                paddingVertical: 10,
-                color: colors.text,
-                ...typography.body,
-                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
-              }}
-            />
-          </View>
+          <TextInput
+            placeholder="Username..."
+            placeholderTextColor={colors.textMuted}
+            value={dmUsername}
+            onChangeText={setDmUsername}
+            autoCapitalize="none"
+            onSubmitEditing={handleNewDM}
+            style={{
+              flex: 1,
+              backgroundColor: colors.surface,
+              borderWidth: 0.5,
+              borderColor: colors.glassBorder,
+              borderRadius: radius.md,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 10,
+              color: colors.text,
+              ...typography.body,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
           <Button onPress={handleNewDM} size="sm" disabled={!dmUsername.trim()}>
             Start
           </Button>
@@ -105,7 +100,7 @@ export default function ChatScreen() {
 
       {loading ? (
         <View style={{ padding: spacing.xl, gap: spacing.lg }}>
-          {[1, 2, 3, 4].map(i => (
+          {[1, 2, 3].map(i => (
             <View key={i} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
               <Skeleton width={48} height={48} borderRadius={24} />
               <View style={{ flex: 1, gap: spacing.xs }}>
@@ -117,17 +112,7 @@ export default function ChatScreen() {
         </View>
       ) : conversations.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-          <Ionicons name="chatbubbles-outline" size={32} color={colors.textMuted} />
-          <Text variant="h3" color={colors.textMuted}>
-            No conversations yet
-          </Text>
-          <Text
-            variant="body"
-            color={colors.textMuted}
-            align="center"
-          >
-            Find someone to chat with or start a new conversation
-          </Text>
+          <Text variant="body" color={colors.textMuted}>No conversations yet</Text>
           <Button onPress={() => setShowNewChat(true)} size="sm">
             Start a conversation
           </Button>
@@ -137,15 +122,13 @@ export default function ChatScreen() {
           data={conversations}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            const otherParticipant = item.participants?.find(
-              (p: any) => p.id !== user?.id
-            ) || item.participants?.[0];
-            const name = item.name || otherParticipant?.name || 'Conversation';
-            const avatar = otherParticipant?.image || null;
-            const lastMessage = item.lastMessage || item.last_message;
-            const lastText = lastMessage?.content || lastMessage?.text || '';
+            const other = item.participants?.find((p: any) => p.id !== user?.id) || item.participants?.[0];
+            const name = item.name || other?.name || 'Conversation';
+            const avatar = other?.image || null;
+            const lastMsg = item.lastMessage || item.last_message;
+            const lastText = lastMsg?.content || lastMsg?.text || '';
+            const time = lastMsg?.createdAt || lastMsg?.created_at || item.updatedAt || '';
             const unread = item.unreadCount || item.unread_count || 0;
-            const time = lastMessage?.createdAt || lastMessage?.created_at || item.updatedAt || '';
 
             return (
               <Pressable
@@ -162,9 +145,7 @@ export default function ChatScreen() {
                 <Avatar uri={avatar} name={name} size="lg" />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>
-                      {name}
-                    </Text>
+                    <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{name}</Text>
                     {time ? (
                       <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
                         {new Date(time).toLocaleDateString([], { month: 'short', day: 'numeric' })}
@@ -172,12 +153,7 @@ export default function ChatScreen() {
                     ) : null}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 }}>
-                    <Text
-                      variant="caption"
-                      color={colors.textMuted}
-                      numberOfLines={1}
-                      style={{ flex: 1 }}
-                    >
+                    <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
                       {lastText || 'No messages yet'}
                     </Text>
                     {unread > 0 && (
@@ -192,9 +168,7 @@ export default function ChatScreen() {
                           paddingHorizontal: 6,
                         }}
                       >
-                        <Text variant="caption" color="#fff" style={{ fontSize: 11, fontWeight: '700' }}>
-                          {unread}
-                        </Text>
+                        <Text variant="caption" color="#fff" style={{ fontSize: 11, fontWeight: '700' }}>{unread}</Text>
                       </View>
                     )}
                   </View>
@@ -217,7 +191,6 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [sending, setSending] = React.useState(false);
   const flatListRef = React.useRef<FlatList>(null);
 
-  // Mark as read when viewing the latest message
   React.useEffect(() => {
     if (sdk && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
@@ -233,7 +206,6 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     setText('');
     setSending(true);
 
-    // Optimistic insert
     const tempMsg = {
       id: 'temp-' + Date.now(),
       content: messageText,
@@ -246,7 +218,6 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       await sdk.chat.send({ conversation_id: conversationId, content: messageText });
       refresh();
     } catch {
-      // Remove optimistic message on failure
       setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
     } finally {
       setSending(false);
@@ -288,8 +259,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
             const senderId = item.sender?.id || item.senderId || item.sender_id;
-            const isOwn = senderId === user?.id;
-            return <ChatBubble message={item} isOwn={isOwn} />;
+            return <ChatBubble message={item} isOwn={senderId === user?.id} />;
           }}
           contentContainerStyle={{
             padding: spacing.xl,
@@ -299,9 +269,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <View style={{ alignItems: 'center' }}>
-              <Text variant="body" color={colors.textMuted}>
-                Start the conversation
-              </Text>
+              <Text variant="body" color={colors.textMuted}>Start the conversation</Text>
             </View>
           }
           showsVerticalScrollIndicator={false}
@@ -330,8 +298,8 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           style={{
             flex: 1,
             backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
+            borderWidth: 0.5,
+            borderColor: colors.glassBorder,
             borderRadius: radius.lg,
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,

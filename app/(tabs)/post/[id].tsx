@@ -3,7 +3,7 @@ import { View, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform } 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, PostCard, Avatar, Skeleton, Button } from '../../../components';
+import { Text, PostCard, Avatar, Skeleton } from '../../../components';
 import { useAuth } from '../../../lib/auth';
 import { usePost } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
@@ -20,13 +20,11 @@ export default function PostDetailScreen() {
   const [replyText, setReplyText] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
-  // Fetch replies
   React.useEffect(() => {
     if (!id || !sdk) return;
     let cancelled = false;
     (async () => {
       try {
-        // Replies are typically child posts; fetch posts with parentId
         const res = await sdk.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
         const postReplies = (res.data || []).filter(
           (p: any) => p.parentId === id || p.parent_id === id || p.reply_to_id === id || p.replyToId === id
@@ -63,28 +61,15 @@ export default function PostDetailScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.md,
-            paddingHorizontal: spacing.xl,
-            paddingVertical: spacing.md,
-          }}
-        >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
           <Text variant="h3">Post</Text>
         </View>
         <View style={{ padding: spacing.xl, gap: spacing.lg }}>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <Skeleton width={40} height={40} borderRadius={20} />
-            <View style={{ gap: spacing.sm, flex: 1 }}>
-              <Skeleton width={140} height={14} />
-              <Skeleton height={60} />
-            </View>
-          </View>
+          <Skeleton width={140} height={14} />
+          <Skeleton height={60} />
         </View>
       </View>
     );
@@ -93,25 +78,14 @@ export default function PostDetailScreen() {
   if (error || !post) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.md,
-            paddingHorizontal: spacing.xl,
-            paddingVertical: spacing.md,
-          }}
-        >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
           <Text variant="h3">Post</Text>
         </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['4xl'] }}>
-          <Ionicons name="alert-circle-outline" size={32} color={colors.textMuted} />
-          <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
-            {error || 'Post not found'}
-          </Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text variant="body" color={colors.textMuted}>{error || 'Post not found'}</Text>
         </View>
       </View>
     );
@@ -146,37 +120,31 @@ export default function PostDetailScreen() {
         ListHeaderComponent={
           <View>
             <PostCard post={post} />
-            <View
-              style={{
-                paddingHorizontal: spacing.xl,
-                paddingVertical: spacing.lg,
-                borderBottomWidth: 0.5,
-                borderBottomColor: 'rgba(255,255,255,0.06)',
-              }}
-            >
-              <Text variant="bodyMedium" color={colors.textSecondary}>
-                {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
-              </Text>
-            </View>
+            {replies.length > 0 && (
+              <View
+                style={{
+                  paddingHorizontal: spacing.xl,
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: 'rgba(255,255,255,0.06)',
+                }}
+              >
+                <Text variant="caption" color={colors.textSecondary}>
+                  {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+                </Text>
+              </View>
+            )}
           </View>
         }
         renderItem={({ item }) => <PostCard post={item} compact />}
         ListEmptyComponent={
           !repliesLoading ? (
-            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name="chatbubble-outline" size={32} color={colors.textMuted} />
-              <Text variant="body" color={colors.textMuted} align="center">
-                No replies yet
-              </Text>
-              <Text variant="caption" color={colors.accent}>
-                Be the first to reply
-              </Text>
+            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+              <Text variant="body" color={colors.textMuted}>No replies yet</Text>
             </View>
           ) : (
             <View style={{ padding: spacing.xl, gap: spacing.md }}>
-              {[1, 2].map(i => (
-                <Skeleton key={i} height={60} />
-              ))}
+              {[1, 2].map(i => <Skeleton key={i} height={60} />)}
             </View>
           )
         }
@@ -196,7 +164,6 @@ export default function PostDetailScreen() {
           paddingBottom: insets.bottom || spacing.md,
         }}
       >
-        <Avatar uri={user?.image} name={user?.name} size="sm" />
         <TextInput
           placeholder="Write a reply..."
           placeholderTextColor={colors.textMuted}
@@ -206,8 +173,8 @@ export default function PostDetailScreen() {
           style={{
             flex: 1,
             backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
+            borderWidth: 0.5,
+            borderColor: colors.glassBorder,
             borderRadius: radius.lg,
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,

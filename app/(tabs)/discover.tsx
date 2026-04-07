@@ -2,19 +2,18 @@ import * as React from 'react';
 import { View, FlatList, TextInput, Platform, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, CommunityCard, AgentCard, Card, Button, Skeleton, UserCard } from '../../components';
+import { Text, Avatar, Button, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
 import { useCommunities, useAgents, useProfiles } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type DiscoverTab = 'communities' | 'agents' | 'apps' | 'people';
+type DiscoverTab = 'communities' | 'agents' | 'people';
 
-const TABS: { key: DiscoverTab; label: string; icon: string }[] = [
-  { key: 'communities', label: 'Communities', icon: 'people-outline' },
-  { key: 'agents', label: 'Agents', icon: 'sparkles-outline' },
-  { key: 'apps', label: 'Apps', icon: 'apps-outline' },
-  { key: 'people', label: 'People', icon: 'person-outline' },
+const TABS: { key: DiscoverTab; label: string }[] = [
+  { key: 'communities', label: 'Communities' },
+  { key: 'agents', label: 'Agents' },
+  { key: 'people', label: 'People' },
 ];
 
 export default function DiscoverScreen() {
@@ -32,9 +31,7 @@ export default function DiscoverScreen() {
 
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
-    try {
-      await sdk.profiles.follow(userId);
-    } catch {}
+    try { await sdk.profiles.follow(userId); } catch {}
   };
 
   const filterByQuery = (items: any[], fields: string[]) => {
@@ -45,174 +42,84 @@ export default function DiscoverScreen() {
     );
   };
 
-  const renderTabContent = () => {
+  const getData = () => {
     switch (activeTab) {
-      case 'communities': {
-        const filtered = filterByQuery(communities, ['name', 'description']);
-        return commLoading ? (
-          <View style={{ padding: spacing.xl, gap: spacing.md }}>
-            {[1, 2, 3, 4].map(i => (
-              <Skeleton key={i} height={70} borderRadius={14} />
-            ))}
-          </View>
-        ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={{ paddingHorizontal: spacing.xl }}>
-                <CommunityCard community={item} variant="row" />
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="people-outline" size={32} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted} align="center">
-                  {searchQuery ? 'No communities match your search' : 'No communities yet'}
-                </Text>
-                {searchQuery ? (
-                  <Button onPress={() => setSearchQuery('')} size="sm" variant="secondary">
-                    Clear search
-                  </Button>
-                ) : (
-                  <Button onPress={() => router.push({ pathname: '/(tabs)/create' } as any)} size="sm">
-                    Create a community
-                  </Button>
-                )}
-              </View>
-            }
-            showsVerticalScrollIndicator={false}
-          />
-        );
-      }
-
-      case 'agents': {
-        const filtered = filterByQuery(agents, ['name', 'description']);
-        return agentsLoading ? (
-          <View style={{ padding: spacing.xl, gap: spacing.md }}>
-            {[1, 2, 3].map(i => (
-              <Skeleton key={i} height={100} borderRadius={14} />
-            ))}
-          </View>
-        ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.md }}>
-                <AgentCard
-                  agent={item}
-                  onChat={async () => {
-                    if (!sdk) return;
-                    try {
-                      // Create or get a DM with the agent, then navigate to chat
-                      const res = await sdk.chat.dm({ user_id: item.id });
-                      if (res.data?.id) {
-                        router.push({ pathname: '/(tabs)/chat', params: { conversation: res.data.id } });
-                      } else {
-                        router.push({ pathname: '/(tabs)/chat', params: { agent: item.id } });
-                      }
-                    } catch {
-                      // Fall back to just navigating to chat
-                      router.push({ pathname: '/(tabs)/chat', params: { agent: item.id } });
-                    }
-                  }}
-                />
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="sparkles-outline" size={32} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted} align="center">
-                  {searchQuery ? 'No agents match your search' : 'No agents available yet'}
-                </Text>
-                {searchQuery ? (
-                  <Button onPress={() => setSearchQuery('')} size="sm" variant="secondary">
-                    Clear search
-                  </Button>
-                ) : (
-                  <Button onPress={() => router.push({ pathname: '/(tabs)/create' } as any)} size="sm">
-                    Create an agent
-                  </Button>
-                )}
-              </View>
-            }
-            showsVerticalScrollIndicator={false}
-          />
-        );
-      }
-
-      case 'apps':
-        return (
-          <View style={{ alignItems: 'center', padding: spacing['4xl'] }}>
-            <Ionicons name="apps-outline" size={32} color={colors.textMuted} />
-            <Text variant="h3" color={colors.textMuted} style={{ marginTop: spacing.xl }}>
-              No apps yet
-            </Text>
-            <Text
-              variant="body"
-              color={colors.textMuted}
-              align="center"
-              style={{ marginTop: spacing.sm, maxWidth: 280 }}
-            >
-              Build apps on the Minds platform and they will show up here.
-            </Text>
-            <View style={{ marginTop: spacing.xl }}>
-              <Button onPress={() => router.push({ pathname: '/(tabs)/create' } as any)} size="md">
-                Build Your First App
-              </Button>
-            </View>
-          </View>
-        );
-
-      case 'people': {
-        const filtered = filterByQuery(profiles, ['name', 'username', 'bio']);
-        return profilesLoading ? (
-          <View style={{ padding: spacing.xl, gap: spacing.md }}>
-            {[1, 2, 3, 4].map(i => (
-              <View key={i} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-                <Skeleton width={40} height={40} borderRadius={20} />
-                <View style={{ flex: 1, gap: spacing.xs }}>
-                  <Skeleton width={140} height={14} />
-                  <Skeleton width={100} height={12} />
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={{ paddingHorizontal: spacing.sm }}>
-                <UserCard user={item} onFollow={handleFollow} />
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="person-outline" size={32} color={colors.textMuted} />
-                <Text variant="body" color={colors.textMuted} align="center">
-                  {searchQuery ? 'No people match your search' : 'No people to discover yet'}
-                </Text>
-                {searchQuery ? (
-                  <Button onPress={() => setSearchQuery('')} size="sm" variant="secondary">
-                    Clear search
-                  </Button>
-                ) : (
-                  <Button onPress={() => {
-                    const msg = 'Invite system coming soon — share your Minds link with friends';
-                    if (Platform.OS === 'web') alert(msg);
-                  }} size="sm" variant="secondary">
-                    Invite friends
-                  </Button>
-                )}
-              </View>
-            }
-            showsVerticalScrollIndicator={false}
-          />
-        );
-      }
+      case 'communities':
+        return { items: filterByQuery(communities, ['name', 'description']), loading: commLoading };
+      case 'agents':
+        return { items: filterByQuery(agents, ['name', 'description']), loading: agentsLoading };
+      case 'people':
+        return { items: filterByQuery(profiles, ['name', 'username']), loading: profilesLoading };
     }
+  };
+
+  const { items, loading } = getData();
+
+  const renderItem = ({ item }: { item: any }) => {
+    const name = item.name || 'Unknown';
+    const avatar = item.image || item.avatar;
+    const subtitle = activeTab === 'communities'
+      ? `${item.memberCount || item.member_count || 0} members`
+      : activeTab === 'agents'
+        ? item.bio?.slice(0, 50) || 'AI Agent'
+        : `@${item.username || ''}`;
+
+    const onPress = () => {
+      if (activeTab === 'communities') {
+        router.push(`/(tabs)/community/${item.slug || item.id}` as any);
+      } else if (activeTab === 'people') {
+        router.push(`/(tabs)/user/${item.username || item.id}` as any);
+      }
+    };
+
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.md,
+          paddingHorizontal: spacing.xl,
+          paddingVertical: spacing.md,
+          backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        })}
+      >
+        <Avatar uri={avatar} name={name} size="md" />
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyMedium">{name}</Text>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{subtitle}</Text>
+        </View>
+        {activeTab === 'people' && (
+          <Pressable
+            onPress={(e) => { e.stopPropagation?.(); handleFollow(item.id); }}
+            style={{
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs,
+              borderRadius: radius.full,
+              backgroundColor: colors.accentMuted,
+            }}
+          >
+            <Text variant="caption" color={colors.accent}>Follow</Text>
+          </Pressable>
+        )}
+        {activeTab === 'communities' && (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              router.push(`/(tabs)/community/${item.slug || item.id}` as any);
+            }}
+            style={{
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs,
+              borderRadius: radius.full,
+              backgroundColor: colors.accentMuted,
+            }}
+          >
+            <Text variant="caption" color={colors.accent}>Join</Text>
+          </Pressable>
+        )}
+      </Pressable>
+    );
   };
 
   return (
@@ -232,20 +139,22 @@ export default function DiscoverScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
-        <Text variant="h2" style={{ flex: 1 }}>Discover</Text>
+        <Text variant="h3" style={{ flex: 1 }}>
+          {TABS.find(t => t.key === activeTab)?.label || 'Discover'}
+        </Text>
       </View>
 
       {/* Search */}
-      <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
+      <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             backgroundColor: colors.surface,
             borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            paddingHorizontal: spacing.lg,
+            borderWidth: 0.5,
+            borderColor: colors.glassBorder,
+            paddingHorizontal: spacing.md,
             gap: spacing.sm,
           }}
         >
@@ -275,11 +184,9 @@ export default function DiscoverScreen() {
       <View
         style={{
           flexDirection: 'row',
-          paddingHorizontal: spacing.lg,
-          gap: spacing.xs,
+          paddingHorizontal: spacing.xl,
           borderBottomWidth: 0.5,
           borderBottomColor: 'rgba(255,255,255,0.06)',
-          paddingBottom: spacing.sm,
         }}
       >
         {TABS.map((tab) => (
@@ -288,7 +195,7 @@ export default function DiscoverScreen() {
             onPress={() => { setActiveTab(tab.key); setSearchQuery(''); }}
             style={{
               flex: 1,
-              paddingVertical: spacing.sm,
+              paddingVertical: spacing.md,
               alignItems: 'center',
               borderBottomWidth: 2,
               borderBottomColor: activeTab === tab.key ? colors.accent : 'transparent',
@@ -297,7 +204,6 @@ export default function DiscoverScreen() {
             <Text
               variant="label"
               color={activeTab === tab.key ? colors.accent : colors.textMuted}
-              style={{ fontSize: 12 }}
             >
               {tab.label}
             </Text>
@@ -305,10 +211,34 @@ export default function DiscoverScreen() {
         ))}
       </View>
 
-      {/* Content */}
-      <View style={{ flex: 1 }}>
-        {renderTabContent()}
-      </View>
+      {/* List */}
+      {loading ? (
+        <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+          {[1, 2, 3, 4].map(i => (
+            <View key={i} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+              <Skeleton width={40} height={40} borderRadius={20} />
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                <Skeleton width={140} height={14} />
+                <Skeleton width={100} height={12} />
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+              <Text variant="body" color={colors.textMuted}>
+                {searchQuery ? 'No results found' : 'Nothing here yet'}
+              </Text>
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </Container>
   );
 }

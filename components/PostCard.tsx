@@ -5,10 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { VoteButtons } from './VoteButtons';
-import { BoostBadge } from './BoostBadge';
 import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
-import { TipModal } from './TipModal';
 import { useAuth } from '../lib/auth';
 import { BASE_ORIGIN } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
@@ -42,7 +40,6 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
   const [score, setScore] = React.useState(post.score || 0);
   const [showMenu, setShowMenu] = React.useState(false);
   const [showReport, setShowReport] = React.useState(false);
-  const [showTip, setShowTip] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(post.content || post.body || '');
   const [editSaving, setEditSaving] = React.useState(false);
@@ -57,11 +54,11 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
   const rawMedia = post.media;
   const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || post.image || post.thumbnail || null;
   const replyCount = post.replyCount || post.reply_count || post.comments_count || 0;
-  const isBoosted = post.boosted || post.is_boosted || false;
   const isNsfw = (post.tags || []).some((t: any) =>
     typeof t === 'string' ? t.toLowerCase() === 'nsfw' : t?.name?.toLowerCase() === 'nsfw'
   );
   const createdAt = post.createdAt || post.created_at || new Date().toISOString();
+  const isOwnPost = user?.id && (author.id === user.id);
 
   const handleVote = async (type: 'upvote' | 'downvote') => {
     if (!sdk) return;
@@ -69,7 +66,6 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
     const prevVote = userVote;
     const prevScore = score;
 
-    // Optimistic update
     let newScore = score;
     let newVote: 'upvote' | 'downvote' | null;
 
@@ -93,13 +89,10 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
       if (wasVoted) {
         await sdk.posts.unreact(post.id);
       } else {
-        if (prevVote) {
-          await sdk.posts.unreact(post.id);
-        }
+        if (prevVote) await sdk.posts.unreact(post.id);
         await sdk.posts.react(post.id, type as any);
       }
     } catch {
-      // Rollback
       setUserVote(prevVote);
       setScore(prevScore);
       onVoteChange?.(post.id, prevScore, prevVote);
@@ -122,21 +115,8 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
           details,
         }),
       });
-    } catch {
-      // Optimistic UX — report appears submitted even if endpoint doesn't exist yet
-    }
+    } catch {}
   };
-
-  const handleTip = async (_amount: number, _message: string) => {
-    const msg = 'Tipping coming soon — this feature will use MINDS tokens';
-    if (Platform.OS === 'web') {
-      alert(msg);
-    } else {
-      Alert.alert('Coming Soon', msg);
-    }
-  };
-
-  const isOwnPost = user?.id && (author.id === user.id);
 
   const handleDelete = async () => {
     if (!sdk) return;
@@ -146,18 +126,16 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         setIsDeleted(true);
         onPostDeleted?.(post.id);
       } catch {
-        const errMsg = 'Failed to delete post. Please try again.';
+        const errMsg = 'Failed to delete post.';
         if (Platform.OS === 'web') alert(errMsg);
         else Alert.alert('Error', errMsg);
       }
     };
 
     if (Platform.OS === 'web') {
-      if (confirm('Delete this post? This cannot be undone.')) {
-        await doDelete();
-      }
+      if (confirm('Delete this post?')) await doDelete();
     } else {
-      Alert.alert('Delete Post', 'Delete this post? This cannot be undone.', [
+      Alert.alert('Delete Post', 'Delete this post?', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: doDelete },
       ]);
@@ -172,7 +150,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
       setCurrentContent(editContent.trim());
       setIsEditing(false);
     } catch {
-      const errMsg = 'Failed to update post. Please try again.';
+      const errMsg = 'Failed to update post.';
       if (Platform.OS === 'web') alert(errMsg);
       else Alert.alert('Error', errMsg);
     } finally {
@@ -185,7 +163,6 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
 
     if (Platform.OS === 'web') {
       const html = renderMarkdownToHtml(compact ? content.slice(0, 300) : content);
-      // Use createElement to avoid TSX type issues with <div> in React Native
       const WebDiv = 'div' as any;
       return (
         <WebDiv
@@ -201,7 +178,6 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
       );
     }
 
-    // Native: parse segments
     const segments = parseMarkdownSegments(compact ? content.slice(0, 300) : content);
     return (
       <Text variant="body" style={{ marginBottom: media ? spacing.md : 0 }}>
@@ -213,24 +189,13 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
               return <Text key={i} variant="body" style={{ fontStyle: 'italic' }}>{seg.text}</Text>;
             case 'code':
               return (
-                <Text
-                  key={i}
-                  variant="mono"
-                  color={colors.textSecondary}
-                  style={{ backgroundColor: colors.surfaceRaised }}
-                >
+                <Text key={i} variant="mono" color={colors.textSecondary} style={{ backgroundColor: colors.surfaceRaised }}>
                   {seg.text}
                 </Text>
               );
             case 'link':
               return (
-                <Text
-                  key={i}
-                  variant="body"
-                  color={colors.accent}
-                  onPress={() => Linking.openURL(seg.url)}
-                  style={{ textDecorationLine: 'underline' }}
-                >
+                <Text key={i} variant="body" color={colors.accent} onPress={() => Linking.openURL(seg.url)} style={{ textDecorationLine: 'underline' }}>
                   {seg.text}
                 </Text>
               );
@@ -247,24 +212,6 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
     );
   };
 
-  const renderContent = () => (
-    <View>
-      {renderMarkdownContent()}
-      {media ? (
-        <Image
-          source={{ uri: typeof media === 'string' ? media : media.url }}
-          style={{
-            width: '100%',
-            height: 200,
-            borderRadius: radius.md,
-            backgroundColor: colors.surfaceHover,
-          }}
-          resizeMode="cover"
-        />
-      ) : null}
-    </View>
-  );
-
   if (isDeleted) return null;
 
   return (
@@ -278,39 +225,18 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         paddingVertical: spacing.md,
       })}
     >
-      {/* Boost badge */}
-      {isBoosted && (
-        <View style={{ marginBottom: spacing.sm }}>
-          <BoostBadge />
-        </View>
-      )}
-
       {/* Author row */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-          marginBottom: spacing.md,
-        }}
-      >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
         <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
           <Avatar uri={authorAvatar} name={authorName} size="sm" />
         </Pressable>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
-              <Text variant="caption" numberOfLines={1} style={{ fontWeight: '400' }}>
-                {authorName}
-              </Text>
-            </Pressable>
-            <Text variant="caption" color={colors.textMuted}>
-              @{authorUsername}
-            </Text>
-            <Text variant="caption" color={colors.textMuted}>
-              {timeAgo(createdAt)}
-            </Text>
-          </View>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
+            <Text variant="caption" style={{ fontWeight: '400' }}>{authorName}</Text>
+          </Pressable>
+          <Text variant="caption" color={colors.textMuted}>
+            {timeAgo(createdAt)}
+          </Text>
         </View>
       </View>
 
@@ -338,37 +264,46 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
           <View style={{ flexDirection: 'row', gap: spacing.sm, justifyContent: 'flex-end' }}>
             <Pressable
               onPress={() => setIsEditing(false)}
-              style={{
-                paddingHorizontal: spacing.lg,
-                paddingVertical: spacing.sm,
-                borderRadius: radius.md,
-                backgroundColor: colors.surfaceHover,
-              }}
+              style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
             >
               <Text variant="label" color={colors.textSecondary}>Cancel</Text>
             </Pressable>
             <Pressable
               onPress={handleEditSave}
               disabled={editSaving || !editContent.trim()}
-              style={{
-                paddingHorizontal: spacing.lg,
-                paddingVertical: spacing.sm,
-                borderRadius: radius.md,
-                backgroundColor: colors.accent,
-                opacity: editSaving ? 0.6 : 1,
-              }}
+              style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.accent, opacity: editSaving ? 0.6 : 1 }}
             >
               <Text variant="label" color="#fff">{editSaving ? 'Saving...' : 'Save'}</Text>
             </Pressable>
           </View>
         </View>
       ) : isNsfw ? (
-        <NSFWOverlay>{renderContent()}</NSFWOverlay>
+        <NSFWOverlay>
+          <View>
+            {renderMarkdownContent()}
+            {media ? (
+              <Image
+                source={{ uri: typeof media === 'string' ? media : media.url }}
+                style={{ width: '100%', height: 200, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
+                resizeMode="cover"
+              />
+            ) : null}
+          </View>
+        </NSFWOverlay>
       ) : (
-        renderContent()
+        <View>
+          {renderMarkdownContent()}
+          {media ? (
+            <Image
+              source={{ uri: typeof media === 'string' ? media : media.url }}
+              style={{ width: '100%', height: 200, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
+              resizeMode="cover"
+            />
+          ) : null}
+        </View>
       )}
 
-      {/* Action bar */}
+      {/* Action bar: vote, comment, more */}
       <View
         style={{
           flexDirection: 'row',
@@ -391,28 +326,10 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
           hitSlop={8}
         >
           <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>
-            {replyCount}
-          </Text>
+          <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
         </Pressable>
 
-        <Pressable hitSlop={8} style={{ padding: 2 }}>
-          <Ionicons name="repeat-outline" size={18} color={colors.textMuted} />
-        </Pressable>
-
-        <Pressable
-          onPress={() => setShowTip(true)}
-          hitSlop={8}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
-        >
-          <Ionicons name="gift-outline" size={16} color={colors.textMuted} />
-        </Pressable>
-
-        <Pressable
-          onPress={() => setShowMenu(!showMenu)}
-          hitSlop={8}
-          style={{ padding: 2 }}
-        >
+        <Pressable onPress={() => setShowMenu(!showMenu)} hitSlop={8} style={{ padding: 2 }}>
           <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
         </Pressable>
       </View>
@@ -435,11 +352,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         >
           {isOwnPost && (
             <Pressable
-              onPress={() => {
-                setShowMenu(false);
-                setEditContent(content);
-                setIsEditing(true);
-              }}
+              onPress={() => { setShowMenu(false); setEditContent(content); setIsEditing(true); }}
               style={{ padding: spacing.md }}
             >
               <Text variant="body">Edit</Text>
@@ -481,14 +394,6 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         visible={showReport}
         onClose={() => setShowReport(false)}
         onSubmit={handleReport}
-      />
-
-      <TipModal
-        visible={showTip}
-        onClose={() => setShowTip(false)}
-        recipientName={authorName}
-        recipientAvatar={authorAvatar}
-        onSend={handleTip}
       />
     </Pressable>
   );

@@ -63,9 +63,7 @@ export default function FeedScreen() {
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
-          ListHeaderComponent={
-            <ComposePost onPost={handleCreatePost} showTitle={false} />
-          }
+          ListHeaderComponent={null}
           renderItem={({ item }) => (
             <PostCard
               post={item}
