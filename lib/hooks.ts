@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useAuth } from './auth';
 import { getSdk, ORG_ID } from './recursiv';
+import { getCached, setCache, isFresh, invalidatePrefix } from './cache';
 
 /**
  * Fetch posts from the feed.
@@ -8,8 +9,10 @@ import { getSdk, ORG_ID } from './recursiv';
  */
 export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limit = 20) {
   const { sdk, user } = useAuth();
-  const [posts, setPosts] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `posts:${sort}:${limit}`;
+  const cached = getCached(cacheKey);
+  const [posts, setPosts] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(true);
@@ -25,7 +28,6 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         offsetRef.current = 0;
       }
 
-      // For "following" tab, fetch the user's following list to filter by
       if (sort === 'following' && user?.id && !followingIdsRef.current) {
         try {
           const followingRes = await s.profiles.following(user.id, { limit: 500 });
@@ -55,8 +57,13 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
 
       if (refresh) {
         setPosts(data);
+        setCache(cacheKey, data);
       } else {
-        setPosts(prev => [...prev, ...data]);
+        setPosts(prev => {
+          const merged = [...prev, ...data];
+          setCache(cacheKey, merged);
+          return merged;
+        });
       }
       setHasMore(res.meta?.has_more ?? data.length >= limit);
       offsetRef.current = (refresh ? 0 : offsetRef.current) + data.length;
@@ -66,11 +73,15 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
       setLoading(false);
       setRefreshing(false);
     }
-  }, [sdk, sort, limit, user?.id]);
+  }, [sdk, sort, limit, user?.id, cacheKey]);
 
   React.useEffect(() => {
-    setLoading(true);
-    setPosts([]);
+    if (isFresh(cacheKey) && cached) {
+      setLoading(false);
+      return;
+    }
+    if (!cached) setLoading(true);
+    setPosts(cached || []);
     offsetRef.current = 0;
     followingIdsRef.current = null;
     fetchPosts(true);
@@ -89,18 +100,24 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
  */
 export function usePost(postId: string) {
   const { sdk } = useAuth();
-  const [post, setPost] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `post:${postId}`;
+  const cached = getCached(cacheKey);
+  const [post, setPost] = React.useState<any>(cached || null);
+  const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!postId) return;
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
         const s = sdk || getSdk();
         const res = await s.posts.get(postId);
-        if (!cancelled) setPost(res.data);
+        if (!cancelled) {
+          setPost(res.data);
+          setCache(cacheKey, res.data);
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load post');
       } finally {
@@ -118,23 +135,30 @@ export function usePost(postId: string) {
  */
 export function useCommunities(limit = 20) {
   const { sdk } = useAuth();
-  const [communities, setCommunities] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `communities:${limit}`;
+  const cached = getCached(cacheKey);
+  const [communities, setCommunities] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetch = React.useCallback(async () => {
     try {
       const s = sdk || getSdk();
       const res = await s.communities.list({ limit, organization_id: ORG_ID || undefined });
-      setCommunities(res.data || []);
+      const data = res.data || [];
+      setCommunities(data);
+      setCache(cacheKey, data);
     } catch (err: any) {
       setError(err.message || 'Failed to load communities');
     } finally {
       setLoading(false);
     }
-  }, [sdk, limit]);
+  }, [sdk, limit, cacheKey]);
 
-  React.useEffect(() => { fetch(); }, [fetch]);
+  React.useEffect(() => {
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    fetch();
+  }, [fetch]);
 
   return { communities, loading, error, refresh: fetch };
 }
@@ -144,17 +168,24 @@ export function useCommunities(limit = 20) {
  */
 export function useAgents(limit = 20) {
   const { sdk } = useAuth();
-  const [agents, setAgents] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `agents:${limit}`;
+  const cached = getCached(cacheKey);
+  const [agents, setAgents] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
         const s = sdk || getSdk();
         const res = await s.agents.listDiscoverable({ limit, organization_id: ORG_ID || undefined });
-        if (!cancelled) setAgents(res.data || []);
+        if (!cancelled) {
+          const data = res.data || [];
+          setAgents(data);
+          setCache(cacheKey, data);
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load agents');
       } finally {
@@ -162,7 +193,7 @@ export function useAgents(limit = 20) {
       }
     })();
     return () => { cancelled = true; };
-  }, [sdk, limit]);
+  }, [sdk, limit, cacheKey]);
 
   return { agents, loading, error };
 }
@@ -172,27 +203,27 @@ export function useAgents(limit = 20) {
  */
 export function useProfile(username: string) {
   const { sdk } = useAuth();
-  const [profile, setProfile] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `profile:${username}`;
+  const cached = getCached(cacheKey);
+  const [profile, setProfile] = React.useState<any>(cached || null);
+  const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
   const [isFollowing, setIsFollowing] = React.useState(false);
 
   React.useEffect(() => {
     if (!username) return;
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
         const s = sdk || getSdk();
         let res;
-        // Try by username first
         try {
           res = await s.profiles.getByUsername(username);
         } catch {
-          // Fallback: try as user ID
           try {
             res = await s.profiles.get(username);
           } catch {
-            // Fallback: try as agent username
             try {
               const agentRes = await (s as any).agents.listDiscoverable({ limit: 200, organization_id: ORG_ID || undefined });
               const agents = agentRes.data || [];
@@ -206,6 +237,7 @@ export function useProfile(username: string) {
         }
         if (!cancelled && res?.data) {
           setProfile(res.data);
+          setCache(cacheKey, res.data);
           if (!res.data.isAgent) {
             try {
               const followRes = await s.profiles.isFollowing(res.data.id);
@@ -230,19 +262,25 @@ export function useProfile(username: string) {
  */
 export function useMyProfile() {
   const { sdk } = useAuth();
-  const [profile, setProfile] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = 'myprofile';
+  const cached = getCached(cacheKey);
+  const [profile, setProfile] = React.useState<any>(cached || null);
+  const [loading, setLoading] = React.useState(!cached);
 
   const fetch = React.useCallback(async () => {
     if (!sdk) return;
     try {
       const res = await sdk.profiles.me();
       setProfile(res.data);
+      setCache(cacheKey, res.data);
     } catch {}
     finally { setLoading(false); }
   }, [sdk]);
 
-  React.useEffect(() => { fetch(); }, [fetch]);
+  React.useEffect(() => {
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    fetch();
+  }, [fetch]);
 
   return { profile, loading, refresh: fetch };
 }
@@ -252,15 +290,19 @@ export function useMyProfile() {
  */
 export function useConversations() {
   const { sdk } = useAuth();
-  const [conversations, setConversations] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = 'conversations';
+  const cached = getCached(cacheKey);
+  const [conversations, setConversations] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetch = React.useCallback(async () => {
     if (!sdk) return;
     try {
       const res = await sdk.chat.conversations({ limit: 50 });
-      setConversations(res.data || []);
+      const data = res.data || [];
+      setConversations(data);
+      setCache(cacheKey, data);
     } catch (err: any) {
       setError(err.message || 'Failed to load conversations');
     } finally {
@@ -268,7 +310,10 @@ export function useConversations() {
     }
   }, [sdk]);
 
-  React.useEffect(() => { fetch(); }, [fetch]);
+  React.useEffect(() => {
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    fetch();
+  }, [fetch]);
 
   return { conversations, loading, error, refresh: fetch };
 }
@@ -278,19 +323,26 @@ export function useConversations() {
  */
 export function useMessages(conversationId: string) {
   const { sdk } = useAuth();
-  const [messages, setMessages] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `messages:${conversationId}`;
+  const cached = getCached(cacheKey);
+  const [messages, setMessages] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
 
   const fetch = React.useCallback(async () => {
     if (!sdk || !conversationId) return;
     try {
       const res = await sdk.chat.messages(conversationId, { limit: 50 });
-      setMessages(res.data || []);
+      const data = res.data || [];
+      setMessages(data);
+      setCache(cacheKey, data);
     } catch {}
     finally { setLoading(false); }
-  }, [sdk, conversationId]);
+  }, [sdk, conversationId, cacheKey]);
 
-  React.useEffect(() => { fetch(); }, [fetch]);
+  React.useEffect(() => {
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    fetch();
+  }, [fetch]);
 
   return { messages, setMessages, loading, refresh: fetch };
 }
@@ -300,21 +352,28 @@ export function useMessages(conversationId: string) {
  */
 export function useTags(limit = 50) {
   const { sdk } = useAuth();
-  const [tags, setTags] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `tags:${limit}`;
+  const cached = getCached(cacheKey);
+  const [tags, setTags] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
 
   React.useEffect(() => {
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
         const s = sdk || getSdk();
         const res = await s.tags.list({ limit });
-        if (!cancelled) setTags(res.data || []);
+        if (!cancelled) {
+          const data = res.data || [];
+          setTags(data);
+          setCache(cacheKey, data);
+        }
       } catch {}
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [sdk, limit]);
+  }, [sdk, limit, cacheKey]);
 
   return { tags, loading };
 }
@@ -324,23 +383,29 @@ export function useTags(limit = 50) {
  */
 export function useProfiles(limit = 20) {
   const { sdk } = useAuth();
-  const [profiles, setProfiles] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `profiles:${limit}`;
+  const cached = getCached(cacheKey);
+  const [profiles, setProfiles] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
         const s = sdk || getSdk();
+        let data: any[];
         if (ORG_ID) {
-          // Fetch org members to get org-scoped users
           const res = await s.organizations.members(ORG_ID, { limit } as any);
-          const members = (res.data || []).map((m: any) => m.user || m);
-          if (!cancelled) setProfiles(members);
+          data = (res.data || []).map((m: any) => m.user || m);
         } else {
           const res = await s.profiles.list({ limit } as any);
-          if (!cancelled) setProfiles(res.data || []);
+          data = res.data || [];
+        }
+        if (!cancelled) {
+          setProfiles(data);
+          setCache(cacheKey, data);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load profiles');
@@ -349,7 +414,7 @@ export function useProfiles(limit = 20) {
       }
     })();
     return () => { cancelled = true; };
-  }, [sdk, limit]);
+  }, [sdk, limit, cacheKey]);
 
   return { profiles, loading, error };
 }

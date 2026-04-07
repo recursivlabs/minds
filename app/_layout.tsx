@@ -7,6 +7,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { ProjectProvider } from '../lib/project';
 import { AuthProvider } from '../lib/auth';
+import { ThemeProvider } from '../lib/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,12 +31,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        <ProjectProvider>
-          <AuthProvider>
-            <StatusBar style="light" />
-            <Slot />
-          </AuthProvider>
-        </ProjectProvider>
+        <ThemeProvider>
+          <ProjectProvider>
+            <AuthProvider>
+              <StatusBar style="light" />
+              <Slot />
+            </AuthProvider>
+          </ProjectProvider>
+        </ThemeProvider>
       </View>
     </SafeAreaProvider>
   );

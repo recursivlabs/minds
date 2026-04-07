@@ -5,8 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
+import { useTheme } from '../lib/theme';
 import { useConversations, useCommunities } from '../lib/hooks';
-import { colors, spacing, radius } from '../constants/theme';
+import { colors as defaultColors, spacing, radius } from '../constants/theme';
 
 const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 240;
@@ -73,6 +74,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, sdk } = useAuth();
+  const { mode, toggle: toggleTheme, colors } = useTheme();
   const { conversations } = useConversations();
   const { communities } = useCommunities(5);
   const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
@@ -234,9 +236,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                     </Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => {
-                      // Theme toggle placeholder — visual only for now
-                    }}
+                    onPress={toggleTheme}
                     hitSlop={8}
                     style={({ pressed }) => ({
                       opacity: pressed ? 0.5 : 0.7,
@@ -244,7 +244,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                       borderRadius: 4,
                     })}
                   >
-                    <Ionicons name="sunny-outline" size={14} color={colors.textMuted} />
+                    <Ionicons name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={14} color={colors.textMuted} />
                   </Pressable>
                 </View>
                 <Pressable
