@@ -29,6 +29,7 @@ export default function TabLayout() {
             <Tabs.Screen name="boost" options={{ href: null }} />
             <Tabs.Screen name="discover" options={{ href: null }} />
             <Tabs.Screen name="admin" options={{ href: null }} />
+            <Tabs.Screen name="notifications" options={{ href: null }} />
             <Tabs.Screen name="post/[id]" options={{ href: null }} />
             <Tabs.Screen name="user/[username]" options={{ href: null }} />
             <Tabs.Screen name="community/[id]" options={{ href: null }} />
@@ -109,6 +110,7 @@ export default function TabLayout() {
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />
       <Tabs.Screen name="admin" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="post/[id]" options={{ href: null }} />
       <Tabs.Screen name="user/[username]" options={{ href: null }} />
       <Tabs.Screen name="community/[id]" options={{ href: null }} />

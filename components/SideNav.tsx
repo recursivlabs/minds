@@ -91,16 +91,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
 
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.name);
-    const isNotifications = item.name === 'notifications';
     return (
       <Pressable
         key={item.name}
         onPress={() => {
-          if (isNotifications) {
-            // No notifications page yet — show coming soon
-            if (Platform.OS === 'web') alert('Notifications coming soon');
-            return;
-          }
           router.push(item.name === 'index' ? '/(tabs)' : `/(tabs)/${item.name}` as any);
         }}
         style={({ pressed }) => ({
