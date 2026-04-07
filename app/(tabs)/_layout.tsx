@@ -118,9 +118,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="wallet"
         options={{
-          title: 'Tokens',
+          title: 'Wallet',
           tabBarIcon: ({ color }) => (
-            <Ionicons name="bulb-outline" size={22} color={color} />
+            <Ionicons name="wallet-outline" size={22} color={color} />
           ),
         }}
       />

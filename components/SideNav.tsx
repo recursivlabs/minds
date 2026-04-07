@@ -20,7 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'index', label: 'Feed', icon: 'newspaper-outline', activeIcon: 'newspaper' },
   { name: 'explore', label: 'Leaderboard', icon: 'trophy-outline', activeIcon: 'trophy' },
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
-  { name: 'wallet', label: 'Tokens', icon: 'bulb-outline', activeIcon: 'bulb' },
+  { name: 'wallet', label: 'Wallet', icon: 'wallet-outline', activeIcon: 'wallet' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
 ];
 

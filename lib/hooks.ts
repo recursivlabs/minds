@@ -149,10 +149,11 @@ export function useCommunities(limit = 20) {
   const cacheKey = `communities:${limit}`;
   const cached = getCached(cacheKey);
   const [communities, setCommunities] = React.useState<any[]>(cached || []);
-  const [loading, setLoading] = React.useState(!cached);
+  const [loading, setLoading] = React.useState(!cached && limit > 0);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetch = React.useCallback(async () => {
+    if (limit === 0) return;
     try {
       const s = sdk || getSdk();
       const res = await s.communities.list({ limit, organization_id: ORG_ID || undefined });
@@ -182,10 +183,11 @@ export function useAgents(limit = 20) {
   const cacheKey = `agents:${limit}`;
   const cached = getCached(cacheKey);
   const [agents, setAgents] = React.useState<any[]>(cached || []);
-  const [loading, setLoading] = React.useState(!cached);
+  const [loading, setLoading] = React.useState(!cached && limit > 0);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (limit === 0) { setLoading(false); return; }
     if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
@@ -407,10 +409,11 @@ export function useProfiles(limit = 20) {
   const cacheKey = `profiles:${limit}`;
   const cached = getCached(cacheKey);
   const [profiles, setProfiles] = React.useState<any[]>(cached || []);
-  const [loading, setLoading] = React.useState(!cached);
+  const [loading, setLoading] = React.useState(!cached && limit > 0);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (limit === 0) { setLoading(false); return; }
     if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {

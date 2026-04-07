@@ -8,10 +8,10 @@ export default function WalletScreen() {
   return (
     <Container safeTop centered>
       <View style={{ alignItems: 'center', gap: spacing['2xl'], padding: spacing['3xl'] }}>
-        <Ionicons name="bulb-outline" size={40} color={colors.accent} />
+        <Ionicons name="wallet-outline" size={40} color={colors.accent} />
 
         <Text variant="h2" color={colors.text} align="center">
-          Tokens
+          Wallet
         </Text>
 
         <Text

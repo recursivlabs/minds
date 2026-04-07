@@ -243,7 +243,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
         </Pressable>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
-            <Text variant="caption" style={{ fontWeight: '400' }}>{authorName}</Text>
+            <Text variant="label">{authorName}</Text>
           </Pressable>
           <Text variant="caption" color={colors.textMuted}>
             {timeAgo(createdAt)}

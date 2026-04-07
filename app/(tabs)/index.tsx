@@ -26,7 +26,7 @@ function FollowButton({ onFollow }: { onFollow: () => void }) {
         borderColor: colors.glassBorder,
       }}
     >
-      <Text variant="caption" color={followed ? colors.textSecondary : colors.accent} style={{ fontWeight: '500' }}>
+      <Text variant="caption" color={followed ? colors.textSecondary : colors.accent} style={{ fontFamily: 'Geist-Regular' }}>
         {followed ? 'Following' : 'Follow'}
       </Text>
     </Pressable>
@@ -42,11 +42,15 @@ export default function FeedScreen() {
   const sortMap = { foryou: 'score', latest: 'latest', following: 'following', trending: 'score' } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
-  // Extra data for For You tab (suggestions)
-  const { profiles } = useProfiles(10);
-  const { communities } = useCommunities(10);
-  const { agents } = useAgents(10);
-  const visibleAgents = (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id));
+  // Extra data for For You tab only — don't fetch on other tabs
+  const isForYou = activeTab === 'foryou';
+  const { profiles } = useProfiles(isForYou ? 10 : 0);
+  const { communities } = useCommunities(isForYou ? 10 : 0);
+  const { agents } = useAgents(isForYou ? 10 : 0);
+  const visibleAgents = React.useMemo(
+    () => (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id)),
+    [agents]
+  );
 
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
@@ -106,7 +110,7 @@ export default function FeedScreen() {
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <Ionicons name="sparkles" size={14} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontWeight: '500', fontSize: 12 }}>
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>
               People to follow
             </Text>
           </View>
@@ -152,7 +156,7 @@ export default function FeedScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
             <Ionicons name="people" size={14} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontWeight: '500', fontSize: 12 }}>Community</Text>
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Community</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
             <Avatar uri={c.image || c.avatar} name={c.name} size="lg" />
@@ -184,7 +188,7 @@ export default function FeedScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
             <Ionicons name="hardware-chip" size={14} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontWeight: '500', fontSize: 12 }}>Agent</Text>
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Agent</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
             <Avatar uri={a.image || a.avatar} name={a.name} size="lg" />
@@ -232,7 +236,6 @@ export default function FeedScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && windowWidth > 1024;
 
-  const isForYou = activeTab === 'foryou';
   const isPostFeed = activeTab === 'latest' || activeTab === 'following' || activeTab === 'trending';
 
   const feedContent = (
