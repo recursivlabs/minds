@@ -3,6 +3,7 @@ import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimens
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header, FeedTabs, PostCard, Skeleton, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
+import { OnboardingFlow, useOnboarding } from '../../components/Onboarding';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts, useProfiles, useCommunities, useAgents } from '../../lib/hooks';
@@ -36,6 +37,7 @@ function FollowButton({ onFollow }: { onFollow: () => void }) {
 export default function FeedScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const { showOnboarding, completeOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = React.useState<FeedTab>('foryou');
 
   // Posts for all tabs — trending sorts by score (same data, different presentation)
@@ -321,6 +323,10 @@ export default function FeedScreen() {
       )}
     </>
   );
+
+  if (showOnboarding) {
+    return <OnboardingFlow onComplete={completeOnboarding} />;
+  }
 
   return (
     <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>

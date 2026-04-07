@@ -1,0 +1,21 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx expo export --platform web
+        env:
+          EXPO_PUBLIC_RECURSIV_API_URL: https://api.recursiv.io/api/v1
+          EXPO_PUBLIC_RECURSIV_ORG_ID: 019d517b-bb87-744d-92db-b3801dc15927

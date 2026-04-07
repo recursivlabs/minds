@@ -9,6 +9,7 @@ import { ProjectProvider } from '../lib/project';
 import { AuthProvider } from '../lib/auth';
 import { ThemeProvider } from '../lib/theme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ToastProvider } from '../components/Toast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,8 +37,10 @@ export default function RootLayout() {
           <ThemeProvider>
             <ProjectProvider>
               <AuthProvider>
-                <StatusBar style="light" />
-                <Slot />
+                <ToastProvider>
+                  <StatusBar style="light" />
+                  <Slot />
+                </ToastProvider>
               </AuthProvider>
             </ProjectProvider>
           </ThemeProvider>
