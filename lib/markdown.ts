@@ -27,6 +27,8 @@ export function renderMarkdownToHtml(text: string): string {
     .replace(/^### (.+)$/gm, '<h3 style="font-size:18px;font-weight:600;margin:12px 0 4px">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 style="font-size:22px;font-weight:600;margin:12px 0 4px">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 style="font-size:28px;font-weight:700;margin:12px 0 4px">$1</h1>')
+    // Hashtags
+    .replace(/(^|\s)#([a-zA-Z0-9_]+)/g, '$1<a href="/(tabs)/discover?tab=posts&q=%23$2" style="color:#d4a844">#$2</a>')
     // Line breaks
     .replace(/\n/g, '<br />');
 
@@ -43,13 +45,14 @@ export type MarkdownSegment =
   | { type: 'italic'; text: string }
   | { type: 'code'; text: string }
   | { type: 'link'; text: string; url: string }
+  | { type: 'hashtag'; text: string; tag: string }
   | { type: 'break' };
 
 export function parseMarkdownSegments(text: string): MarkdownSegment[] {
   if (!text) return [];
   const segments: MarkdownSegment[] = [];
   // Simple regex-based tokenizer
-  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(\n)/g;
+  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(?:^|\s)(#([a-zA-Z0-9_]+))|(\n)/g;
   let lastIndex = 0;
   let match;
 

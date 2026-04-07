@@ -78,23 +78,33 @@ export default function FeedScreen() {
     const agts = visibleAgents;
 
     let pi = 0, ui = 0, ci = 0, ai = 0;
+    let suggestionRound = 0;
 
-    while (pi < allPosts.length || ui < people.length || ci < comms.length || ai < agts.length) {
-      // 3 posts
+    // Safety: max 200 items to prevent infinite loops
+    while (items.length < 200 && (pi < allPosts.length || ui < people.length || ci < comms.length || ai < agts.length)) {
+      // Add up to 3 posts
+      let addedPosts = false;
       for (let i = 0; i < 3 && pi < allPosts.length; i++) {
         items.push({ type: 'post', data: allPosts[pi], id: `post-${allPosts[pi].id}` });
         pi++;
+        addedPosts = true;
       }
-      // Rotate suggestions
-      const round = items.filter(i => i.type !== 'post').length % 3;
+
+      // Add one suggestion, rotating type
+      const round = suggestionRound % 3;
+      let addedSuggestion = false;
       if (round === 0 && ui < people.length) {
         const batch = people.slice(ui, ui + 3);
-        if (batch.length) { items.push({ type: 'people', data: batch, id: `people-${ui}` }); ui += batch.length; }
+        if (batch.length) { items.push({ type: 'people', data: batch, id: `people-${ui}` }); ui += batch.length; addedSuggestion = true; }
       } else if (round === 1 && ci < comms.length) {
-        items.push({ type: 'community', data: comms[ci], id: `comm-${comms[ci].id}` }); ci++;
+        items.push({ type: 'community', data: comms[ci], id: `comm-${comms[ci].id}` }); ci++; addedSuggestion = true;
       } else if (round === 2 && ai < agts.length) {
-        items.push({ type: 'agent', data: agts[ai], id: `agent-${agts[ai].id}` }); ai++;
+        items.push({ type: 'agent', data: agts[ai], id: `agent-${agts[ai].id}` }); ai++; addedSuggestion = true;
       }
+      suggestionRound++;
+
+      // If we couldn't add posts or suggestions, we're done
+      if (!addedPosts && !addedSuggestion) break;
     }
     return items;
   }, [activeTab, posts, profiles, communities, visibleAgents]);
@@ -320,9 +330,10 @@ export default function FeedScreen() {
     </>
   );
 
-  if (showOnboarding) {
-    return <OnboardingFlow onComplete={completeOnboarding} />;
-  }
+  // Onboarding disabled temporarily — investigating freeze
+  // if (showOnboarding) {
+  //   return <OnboardingFlow onComplete={completeOnboarding} />;
+  // }
 
   return (
     <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>
