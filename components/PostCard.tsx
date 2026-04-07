@@ -381,7 +381,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             position: 'absolute',
             right: spacing.xl,
             bottom: spacing['5xl'],
-            backgroundColor: '#1a1a1e',
+            backgroundColor: colors.bg,
             borderRadius: radius.md,
             borderWidth: 1,
             borderColor: colors.border,

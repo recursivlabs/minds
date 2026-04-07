@@ -333,10 +333,9 @@ export default function FeedScreen() {
     </>
   );
 
-  // Onboarding disabled temporarily — investigating freeze
-  // if (showOnboarding) {
-  //   return <OnboardingFlow onComplete={completeOnboarding} />;
-  // }
+  if (showOnboarding) {
+    return <OnboardingFlow onComplete={completeOnboarding} />;
+  }
 
   return (
     <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>

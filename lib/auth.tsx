@@ -10,7 +10,7 @@ const KEYS = {
   version: 'minds:auth_version',
 };
 
-const AUTH_VERSION = '4';
+const AUTH_VERSION = '5'; // bumped: added uploads:read/write scope
 
 const API_KEY_SCOPES = [
   'posts:read', 'posts:write',

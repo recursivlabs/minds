@@ -321,7 +321,7 @@ export default function CreateScreen() {
                 />
                 <View style={{
                   position: 'absolute', top: '100%', left: 0, marginTop: spacing.xs,
-                  backgroundColor: '#111114', borderRadius: radius.md, borderWidth: 1,
+                  backgroundColor: colors.bg, borderRadius: radius.md, borderWidth: 1,
                   borderColor: colors.border, zIndex: 999999, minWidth: 260, maxHeight: 320,
                   ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)', overflow: 'auto' } as any : {}),
                 }}>
@@ -482,7 +482,7 @@ export default function CreateScreen() {
                         left: 0,
                         right: 0,
                         marginTop: spacing.xs,
-                        backgroundColor: '#1a1a1e',
+                        backgroundColor: colors.bg,
                         borderRadius: radius.md,
                         borderWidth: 1,
                         borderColor: colors.border,

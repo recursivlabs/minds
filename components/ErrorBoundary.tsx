@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { View, Pressable } from 'react-native';
 import { Text } from './Text';
+import { captureException } from '../lib/sentry';
 import { colors, spacing } from '../constants/theme';
 
 interface Props {
@@ -22,6 +23,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary]', error.message, info.componentStack);
+    captureException(error, { componentStack: info.componentStack });
   }
 
   render() {

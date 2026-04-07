@@ -10,6 +10,9 @@ import { AuthProvider } from '../lib/auth';
 import { ThemeProvider } from '../lib/theme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/Toast';
+import { initSentry } from '../lib/sentry';
+
+initSentry();
 
 SplashScreen.preventAutoHideAsync();
 

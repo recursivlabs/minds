@@ -15,6 +15,7 @@
     "@expo/vector-icons": "^14.0.0",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@recursiv/sdk": "^0.3.0",
+    "@sentry/react-native": "^8.7.0",
     "expo": "~52.0.0",
     "expo-font": "~13.0.0",
     "expo-router": "~4.0.0",

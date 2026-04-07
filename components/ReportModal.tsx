@@ -62,7 +62,7 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
         <Pressable
           onPress={(e) => e.stopPropagation()}
           style={{
-            backgroundColor: '#1a1a1e',
+            backgroundColor: colors.bg,
             borderRadius: radius.xl,
             padding: spacing['2xl'],
             width: '100%',

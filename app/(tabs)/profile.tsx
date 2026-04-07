@@ -383,7 +383,7 @@ export default function ProfileScreen() {
           <Pressable
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: '#111',
+              backgroundColor: colors.bg,
               borderRadius: radius.xl,
               padding: spacing['2xl'],
               width: '100%',
@@ -418,7 +418,7 @@ export default function ProfileScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 2,
-                  borderColor: '#111',
+                  borderColor: colors.bg,
                 }}
               >
                 <Ionicons name="camera" size={14} color="#fff" />
