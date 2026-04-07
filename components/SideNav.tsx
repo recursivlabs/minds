@@ -18,7 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'index', label: 'Feed', icon: 'newspaper-outline', activeIcon: 'newspaper' },
   { name: 'explore', label: 'Explore', icon: 'compass-outline', activeIcon: 'compass' },
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
-  { name: 'wallet', label: 'Wallet', icon: 'flash-outline', activeIcon: 'flash' },
+  { name: 'wallet', label: 'Wallet', icon: 'bulb-outline', activeIcon: 'bulb' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
 ];
 

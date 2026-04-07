@@ -1,33 +1,231 @@
 import * as React from 'react';
-import { View, FlatList, TextInput, Platform, Pressable } from 'react-native';
+import { View, FlatList, TextInput, Platform, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
-import { useCommunities, useAgents, useProfiles } from '../../lib/hooks';
+import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type DiscoverTab = 'communities' | 'agents' | 'people';
+type DiscoverTab = 'all' | 'posts' | 'people' | 'communities' | 'agents';
 
 const TABS: { key: DiscoverTab; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'posts', label: 'Posts' },
+  { key: 'people', label: 'People' },
   { key: 'communities', label: 'Communities' },
   { key: 'agents', label: 'Agents' },
-  { key: 'people', label: 'People' },
 ];
+
+function PostCardFull({ post, onPress }: { post: any; onPress: () => void }) {
+  const author = post.author?.name || 'Anonymous';
+  const authorAvatar = post.author?.image || post.author?.avatar;
+  const authorUsername = post.author?.username;
+  const content = post.content || '';
+  const title = post.title;
+  const score = (post.upvoteCount || 0) - (post.downvoteCount || 0);
+  const replyCount = post.replyCount || post.reply_count || 0;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(255,255,255,0.04)',
+      })}
+    >
+      {/* Author row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
+        <Avatar uri={authorAvatar} name={author} size="sm" />
+        <Text variant="bodyMedium" style={{ fontSize: 13 }}>{author}</Text>
+        {authorUsername && (
+          <Text variant="caption" color={colors.textMuted}>@{authorUsername}</Text>
+        )}
+      </View>
+      {/* Title */}
+      {title && (
+        <Text variant="bodyMedium" numberOfLines={2} style={{ marginBottom: spacing.xs }}>
+          {title}
+        </Text>
+      )}
+      {/* Content preview */}
+      <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ lineHeight: 22 }}>
+        {content.slice(0, 280)}
+      </Text>
+      {/* Engagement row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl, marginTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <Ionicons name="arrow-up-outline" size={14} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{score}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <Ionicons name="chatbubble-outline" size={13} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function PersonCard({ person, onPress, onFollow }: { person: any; onPress: () => void; onFollow: () => void }) {
+  const name = person.name || 'Unknown';
+  const username = person.username;
+  const bio = person.bio || person.description || '';
+  const avatar = person.image || person.avatar;
+  const followerCount = person.followerCount || person.follower_count || 0;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.md,
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(255,255,255,0.04)',
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyMedium">{name}</Text>
+            {username && <Text variant="caption" color={colors.textMuted}>@{username}</Text>}
+          </View>
+          <Pressable
+            onPress={(e) => { e.stopPropagation?.(); onFollow(); }}
+            style={{
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.xs + 2,
+              borderRadius: radius.full,
+              backgroundColor: colors.accentMuted,
+            }}
+          >
+            <Text variant="caption" color={colors.accent} style={{ fontWeight: '500' }}>Follow</Text>
+          </Pressable>
+        </View>
+        {bio ? (
+          <Text variant="body" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+            {bio}
+          </Text>
+        ) : null}
+        {followerCount > 0 && (
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
+            {followerCount} follower{followerCount !== 1 ? 's' : ''}
+          </Text>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+function CommunityCard({ community, onPress }: { community: any; onPress: () => void }) {
+  const name = community.name || 'Unnamed';
+  const description = community.description || community.bio || '';
+  const avatar = community.image || community.avatar;
+  const memberCount = community.memberCount || community.member_count || 0;
+  const privacy = community.privacy;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.md,
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(255,255,255,0.04)',
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{name}</Text>
+          {privacy === 'private' && (
+            <Ionicons name="lock-closed" size={12} color={colors.textMuted} />
+          )}
+        </View>
+        {description ? (
+          <Text variant="body" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+            {description}
+          </Text>
+        ) : null}
+        <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
+          {memberCount} member{memberCount !== 1 ? 's' : ''}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
+  const name = agent.name || 'Agent';
+  const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
+  const avatar = agent.image || agent.avatar;
+  const model = agent.model?.split('/').pop() || '';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.md,
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(255,255,255,0.04)',
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{name}</Text>
+          <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
+          </View>
+        </View>
+        {bio ? (
+          <Text variant="body" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+            {bio}
+          </Text>
+        ) : null}
+        {model ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs }}>
+            <Ionicons name="hardware-chip-outline" size={12} color={colors.textMuted} />
+            <Text variant="caption" color={colors.textMuted}>{model}</Text>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
 
 export default function DiscoverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { sdk } = useAuth();
   const [activeTab, setActiveTab] = React.useState<DiscoverTab>(
-    (params.tab as DiscoverTab) || 'communities'
+    (params.tab as DiscoverTab) || 'all'
   );
   const [searchQuery, setSearchQuery] = React.useState('');
 
+  const { posts, loading: postsLoading } = usePosts('score', 30);
   const { communities, loading: commLoading } = useCommunities(50);
   const { agents, loading: agentsLoading } = useAgents(50);
   const { profiles, loading: profilesLoading } = useProfiles(50);
+  const { results: searchResults, loading: searchLoading } = useSearchPosts(searchQuery);
 
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
@@ -42,86 +240,90 @@ export default function DiscoverScreen() {
     );
   };
 
-  const getData = () => {
-    switch (activeTab) {
-      case 'communities':
-        return { items: filterByQuery(communities || [], ['name', 'description']), loading: commLoading };
-      case 'agents':
-        return { items: filterByQuery(agents || [], ['name', 'description']), loading: agentsLoading };
-      case 'people':
-        return { items: filterByQuery(profiles || [], ['name', 'username']), loading: profilesLoading };
-      default:
-        return { items: [], loading: false };
+  const isSearching = searchQuery.trim().length > 0;
+
+  // Build unified "all" feed: interleave content types
+  const buildAllItems = () => {
+    const items: { type: string; data: any; key: string }[] = [];
+    const filteredPosts = filterByQuery(posts || [], ['content', 'title']);
+    const filteredPeople = filterByQuery(profiles || [], ['name', 'username', 'bio']);
+    const filteredCommunities = filterByQuery(communities || [], ['name', 'description']);
+    const filteredAgents = filterByQuery(agents || [], ['name', 'bio', 'description']);
+
+    // Interleave: 2 posts, 1 person, 1 community, 1 agent, repeat
+    let pi = 0, ui = 0, ci = 0, ai = 0;
+    while (pi < filteredPosts.length || ui < filteredPeople.length || ci < filteredCommunities.length || ai < filteredAgents.length) {
+      if (pi < filteredPosts.length) items.push({ type: 'post', data: filteredPosts[pi++], key: `p-${pi}` });
+      if (pi < filteredPosts.length) items.push({ type: 'post', data: filteredPosts[pi++], key: `p-${pi}` });
+      if (ui < filteredPeople.length) items.push({ type: 'person', data: filteredPeople[ui++], key: `u-${ui}` });
+      if (ci < filteredCommunities.length) items.push({ type: 'community', data: filteredCommunities[ci++], key: `c-${ci}` });
+      if (ai < filteredAgents.length) items.push({ type: 'agent', data: filteredAgents[ai++], key: `a-${ai}` });
     }
+    return items;
   };
 
-  const { items = [], loading = false } = getData() || {};
+  const getData = (): { type: string; data: any; key: string }[] => {
+    if (activeTab === 'all') return buildAllItems();
+    if (activeTab === 'posts') {
+      const filtered = isSearching ? searchResults : filterByQuery(posts || [], ['content', 'title']);
+      return filtered.map((p: any, i: number) => ({ type: 'post', data: p, key: `p-${p.id || i}` }));
+    }
+    if (activeTab === 'people') {
+      return filterByQuery(profiles || [], ['name', 'username', 'bio']).map((p: any, i: number) => ({ type: 'person', data: p, key: `u-${p.id || i}` }));
+    }
+    if (activeTab === 'communities') {
+      return filterByQuery(communities || [], ['name', 'description']).map((c: any, i: number) => ({ type: 'community', data: c, key: `c-${c.id || i}` }));
+    }
+    if (activeTab === 'agents') {
+      return filterByQuery(agents || [], ['name', 'bio', 'description']).map((a: any, i: number) => ({ type: 'agent', data: a, key: `a-${a.id || i}` }));
+    }
+    return [];
+  };
 
-  const renderItem = ({ item }: { item: any }) => {
-    const name = item.name || 'Unknown';
-    const avatar = item.image || item.avatar;
-    const subtitle = activeTab === 'communities'
-      ? `${item.memberCount || item.member_count || 0} members`
-      : activeTab === 'agents'
-        ? item.bio?.slice(0, 50) || 'AI Agent'
-        : `@${item.username || ''}`;
+  const loading = activeTab === 'all'
+    ? postsLoading || profilesLoading || commLoading || agentsLoading
+    : activeTab === 'posts' ? (isSearching ? searchLoading : postsLoading)
+    : activeTab === 'people' ? profilesLoading
+    : activeTab === 'communities' ? commLoading
+    : agentsLoading;
 
-    const onPress = () => {
-      if (activeTab === 'communities') {
-        router.push(`/(tabs)/community/${item.slug || item.id}` as any);
-      } else if (activeTab === 'people') {
-        router.push(`/(tabs)/user/${item.username || item.id}` as any);
-      }
-    };
+  const items = getData();
 
-    return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.md,
-          backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-        })}
-      >
-        <Avatar uri={avatar} name={name} size="md" />
-        <View style={{ flex: 1 }}>
-          <Text variant="bodyMedium">{name}</Text>
-          <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{subtitle}</Text>
-        </View>
-        {activeTab === 'people' && (
-          <Pressable
-            onPress={(e) => { e.stopPropagation?.(); handleFollow(item.id); }}
-            style={{
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.xs,
-              borderRadius: radius.full,
-              backgroundColor: colors.accentMuted,
-            }}
-          >
-            <Text variant="caption" color={colors.accent}>Follow</Text>
-          </Pressable>
-        )}
-        {activeTab === 'communities' && (
-          <Pressable
-            onPress={(e) => {
-              e.stopPropagation?.();
-              router.push(`/(tabs)/community/${item.slug || item.id}` as any);
-            }}
-            style={{
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.xs,
-              borderRadius: radius.full,
-              backgroundColor: colors.accentMuted,
-            }}
-          >
-            <Text variant="caption" color={colors.accent}>Join</Text>
-          </Pressable>
-        )}
-      </Pressable>
-    );
+  const renderItem = ({ item }: { item: { type: string; data: any; key: string } }) => {
+    if (item.type === 'post') {
+      return (
+        <PostCardFull
+          post={item.data}
+          onPress={() => router.push(`/(tabs)/post/${item.data.id}` as any)}
+        />
+      );
+    }
+    if (item.type === 'person') {
+      return (
+        <PersonCard
+          person={item.data}
+          onPress={() => router.push(`/(tabs)/user/${item.data.username || item.data.id}` as any)}
+          onFollow={() => handleFollow(item.data.id)}
+        />
+      );
+    }
+    if (item.type === 'community') {
+      return (
+        <CommunityCard
+          community={item.data}
+          onPress={() => router.push(`/(tabs)/community/${item.data.slug || item.data.id}` as any)}
+        />
+      );
+    }
+    if (item.type === 'agent') {
+      return (
+        <AgentCard
+          agent={item.data}
+          onPress={() => router.push(`/(tabs)/user/${item.data.username || item.data.id}` as any)}
+        />
+      );
+    }
+    return null;
   };
 
   return (
@@ -141,9 +343,7 @@ export default function DiscoverScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
-        <Text variant="h3" style={{ flex: 1 }}>
-          {TABS.find(t => t.key === activeTab)?.label || 'Discover'}
-        </Text>
+        <Text variant="h3" style={{ flex: 1 }}>Discover</Text>
       </View>
 
       {/* Search */}
@@ -162,7 +362,7 @@ export default function DiscoverScreen() {
         >
           <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
-            placeholder={`Search ${activeTab}...`}
+            placeholder="Search..."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -183,22 +383,26 @@ export default function DiscoverScreen() {
       </View>
 
       {/* Tabs */}
-      <View
-        style={{
-          flexDirection: 'row',
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
           paddingHorizontal: spacing.xl,
+          gap: spacing.xs,
+        }}
+        style={{
           borderBottomWidth: 0.5,
           borderBottomColor: 'rgba(255,255,255,0.06)',
+          flexGrow: 0,
         }}
       >
         {TABS.map((tab) => (
           <Pressable
             key={tab.key}
-            onPress={() => { setActiveTab(tab.key); setSearchQuery(''); }}
+            onPress={() => { setActiveTab(tab.key); }}
             style={{
-              flex: 1,
               paddingVertical: spacing.md,
-              alignItems: 'center',
+              paddingHorizontal: spacing.md,
               borderBottomWidth: 2,
               borderBottomColor: activeTab === tab.key ? colors.accent : 'transparent',
             }}
@@ -211,37 +415,50 @@ export default function DiscoverScreen() {
             </Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
 
       {/* List */}
       {loading ? (
-        <View style={{ padding: spacing.xl, gap: spacing.lg }}>
-          {[1, 2, 3, 4].map(i => (
-            <View key={i} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-              <Skeleton width={40} height={40} borderRadius={20} />
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <Skeleton width={140} height={14} />
-                <Skeleton width={100} height={12} />
+        <View style={{ padding: spacing.xl, gap: spacing.xl }}>
+          {[1, 2, 3, 4, 5].map(i => (
+            <View key={i} style={{ gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+                <Skeleton width={44} height={44} borderRadius={22} />
+                <View style={{ flex: 1, gap: spacing.xs }}>
+                  <Skeleton width={160} height={14} />
+                  <Skeleton width={100} height={12} />
+                </View>
               </View>
+              <Skeleton width="100%" height={40} />
             </View>
           ))}
         </View>
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.key}
           renderItem={renderItem}
           ListEmptyComponent={
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name={activeTab === 'communities' ? 'people-outline' : activeTab === 'agents' ? 'hardware-chip-outline' : 'person-outline'} size={32} color={colors.textMuted} />
-              <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-                {searchQuery ? 'No results found' : `No ${activeTab} yet`}
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+              <Ionicons
+                name={
+                  activeTab === 'communities' ? 'people-outline'
+                  : activeTab === 'agents' ? 'hardware-chip-outline'
+                  : activeTab === 'people' ? 'person-outline'
+                  : activeTab === 'posts' ? 'newspaper-outline'
+                  : 'compass-outline'
+                }
+                size={40}
+                color={colors.accent}
+              />
+              <Text variant="h2" color={colors.text} align="center">
+                {searchQuery ? 'No Results' : `Discover ${activeTab === 'all' ? 'Content' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
               </Text>
-              <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>
-                {searchQuery ? 'Try a different search term.' : `Be the first to create one.`}
+              <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
+                {searchQuery ? 'Try a different search term.' : 'Be the first to create something.'}
               </Text>
               {!searchQuery && (
-                <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create</Button>
+                <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create</Button>
               )}
             </View>
           }

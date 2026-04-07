@@ -141,7 +141,7 @@ export default function UserProfileScreen() {
           </View>
 
           {!isOwnProfile && (
-            <View style={{ marginTop: spacing.xl }}>
+            <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
               <Button
                 onPress={handleToggleFollow}
                 loading={followLoading}
@@ -149,6 +149,23 @@ export default function UserProfileScreen() {
                 size="sm"
               >
                 {isFollowing ? 'Following' : 'Follow'}
+              </Button>
+              <Button
+                onPress={async () => {
+                  if (!sdk || !profile?.id) return;
+                  try {
+                    const res = await sdk.chat.dm({ user_id: profile.id });
+                    if (res.data?.id) {
+                      router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
+                    }
+                  } catch {
+                    if (Platform.OS === 'web') alert('Could not start chat');
+                  }
+                }}
+                variant="secondary"
+                size="sm"
+              >
+                Message
               </Button>
             </View>
           )}

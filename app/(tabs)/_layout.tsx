@@ -6,7 +6,7 @@ import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
   const { width } = useWindowDimensions();
-  const isDesktop = Platform.OS === 'web' && width > 1024;
+  const isDesktop = Platform.OS === 'web';
   const sidebar = useSidebarState();
 
   if (isDesktop) {
@@ -115,7 +115,15 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="wallet" options={{ href: null }} />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          title: 'Wallet',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="bulb-outline" size={22} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />
       <Tabs.Screen name="admin" options={{ href: null }} />

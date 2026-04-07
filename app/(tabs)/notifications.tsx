@@ -144,13 +144,16 @@ export default function NotificationsScreen() {
             </Pressable>
           )}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', padding: spacing['5xl'], gap: spacing.lg }}>
-              <Ionicons name="notifications-outline" size={36} color={colors.textMuted} />
-              <Text variant="body" color={colors.textMuted} align="center">
-                No notifications yet
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+              <Ionicons name="notifications-outline" size={40} color={colors.accent} />
+              <Text variant="h2" color={colors.text} align="center">
+                Notifications
               </Text>
-              <Text variant="caption" color={colors.textMuted} align="center" style={{ maxWidth: 240 }}>
-                When people interact with your posts, you'll see it here
+              <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 300, lineHeight: 24 }}>
+                When people interact with your posts, you'll see it here.
+              </Text>
+              <Text variant="caption" color={colors.textMuted}>
+                Likes, replies, follows, and mentions
               </Text>
             </View>
           }

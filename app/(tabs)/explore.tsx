@@ -251,10 +251,12 @@ export default function ExploreScreen() {
           }
           ListEmptyComponent={
             !searchLoading ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="search-outline" size={32} color={colors.textMuted} />
-                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>No results found</Text>
-                <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+                <Ionicons name="search-outline" size={40} color={colors.accent} />
+                <Text variant="h2" color={colors.text} align="center">
+                  No Results
+                </Text>
+                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
                   Try searching for something else.
                 </Text>
               </View>

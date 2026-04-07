@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
-import { useConversations, useMessages } from '../../lib/hooks';
+import { useConversations } from '../../lib/hooks';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
 export default function ChatScreen() {
@@ -141,13 +141,18 @@ export default function ChatScreen() {
           ))}
         </View>
       ) : conversations.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-          <Ionicons name="chatbubbles-outline" size={32} color={colors.textMuted} />
-          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>No conversations yet</Text>
-          <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+          <Ionicons name="chatbubbles-outline" size={40} color={colors.accent} />
+          <Text variant="h2" color={colors.text} align="center">
+            Messages
+          </Text>
+          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
             Start a conversation with someone or chat with an agent.
           </Text>
-          <Button onPress={() => setShowNewChat(true)} size="sm">
+          <Text variant="caption" color={colors.textMuted}>
+            Direct messages and group chats
+          </Text>
+          <Button onPress={() => setShowNewChat(true)} size="sm" style={{ marginTop: spacing.md }}>
             Start a conversation
           </Button>
         </View>
@@ -217,20 +222,101 @@ export default function ChatScreen() {
   );
 }
 
+/**
+ * Call AI agent via SSE streaming endpoint (same pattern as KEMPT).
+ * Works around React Native's lack of ReadableStream by reading
+ * the full response as text, then parsing SSE events.
+ */
+async function callAgentSSE(
+  sdk: any,
+  agentId: string,
+  message: string,
+  conversationId?: string
+): Promise<{ content: string; conversationId: string }> {
+  const client = (sdk.agents as any).client;
+  const baseUrl: string = client.baseUrl;
+  const apiKey: string = client.apiKey;
+
+  const url = `${baseUrl}/agents/${agentId}/chat/stream`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({
+        message,
+        ...(conversationId ? { conversation_id: conversationId } : {}),
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Agent request failed: HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    let fullText = '';
+    let returnedConversationId = conversationId || '';
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'text_delta' && parsed.delta) {
+            fullText += parsed.delta;
+          } else if (parsed.type === 'message_start' && parsed.conversation_id) {
+            returnedConversationId = parsed.conversation_id;
+          } else if (parsed.type === 'error') {
+            throw new Error(parsed.error || 'AI error');
+          }
+          if (parsed.conversation_id && !returnedConversationId) {
+            returnedConversationId = parsed.conversation_id;
+          }
+        } catch (e: any) {
+          if (e.message && !e.message.startsWith('Unexpected') && !e.message.startsWith('JSON')) throw e;
+        }
+      }
+    }
+
+    return { content: fullText, conversationId: returnedConversationId };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function ConversationView({ conversationId, onBack }: { conversationId: string; onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
-  const { messages, setMessages, loading, refresh } = useMessages(conversationId);
+  const [messages, setMessages] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  const [agentTyping, setAgentTyping] = React.useState(false);
   const flatListRef = React.useRef<FlatList>(null);
   const [partnerName, setPartnerName] = React.useState<string>('Conversation');
+  const [partnerInfo, setPartnerInfo] = React.useState<any>(null);
+  const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const messageIdsRef = React.useRef<Set<string>>(new Set());
 
-  // Fetch partner name
+  // Load conversation info + initial messages
   React.useEffect(() => {
     if (!sdk) return;
+    let cancelled = false;
+
     (async () => {
       try {
+        // Fetch conversation details for partner info
         const convoRes = await sdk.chat.conversation(conversationId);
         const convo = convoRes.data as any;
         const participants = convo?.participants || convo?.members || [];
@@ -238,43 +324,78 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           const pId = p.id || p.user?.id || p.userId;
           return pId !== user?.id;
         });
-        const name = other?.name || other?.user?.name || convo?.name;
-        if (name) setPartnerName(name);
-      } catch {}
-    })();
-  }, [conversationId, sdk, user?.id]);
 
-  // Real-time WebSocket for live messages
-  React.useEffect(() => {
-    if (!sdk) return;
-    let unsub: (() => void) | undefined;
-    (async () => {
-      try {
-        await sdk.realtime.connect();
-        sdk.realtime.joinConversation(conversationId);
-        unsub = sdk.realtime.onMessage((msg: any) => {
-          if (msg.conversationId === conversationId) {
-            setMessages(prev => {
-              // Avoid duplicates
-              if (prev.some(m => m.id === msg.id)) return prev;
-              return [...prev, {
-                id: msg.id,
-                content: msg.text || msg.content,
-                sender: msg.sender || { id: msg.senderId, name: msg.senderName },
-                createdAt: msg.createdAt || new Date().toISOString(),
-              }];
-            });
-          }
-        });
+        if (!cancelled) {
+          const name = other?.name || other?.user?.name || convo?.name || 'Conversation';
+          setPartnerName(name);
+          setPartnerInfo(other);
+        }
+
+        // Fetch message history (API returns newest first)
+        const msgRes = await sdk.chat.messages(conversationId, { limit: 50 });
+        const rawMessages = msgRes.data || [];
+
+        // Reverse to get chronological order (oldest first)
+        const sorted = [...rawMessages].reverse().map((m: any) => ({
+          id: m.id,
+          content: m.content || m.text || '',
+          sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
+          createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+        }));
+
+        if (!cancelled) {
+          setMessages(sorted);
+          messageIdsRef.current = new Set(sorted.map((m: any) => m.id));
+          setLoading(false);
+        }
       } catch {
-        // WebSocket failed — fall back to polling
+        if (!cancelled) setLoading(false);
       }
     })();
+
+    return () => { cancelled = true; };
+  }, [conversationId, sdk, user?.id]);
+
+  // Poll for new messages every 3s (WebSocket token endpoint 404s via API keys)
+  React.useEffect(() => {
+    if (!sdk || loading) return;
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const msgRes = await sdk.chat.messages(conversationId, { limit: 20 });
+        const rawMessages = msgRes.data || [];
+        const newMsgs = rawMessages
+          .filter((m: any) => !messageIdsRef.current.has(m.id))
+          .reverse()
+          .map((m: any) => ({
+            id: m.id,
+            content: m.content || m.text || '',
+            sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
+            createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+          }));
+
+        if (newMsgs.length > 0) {
+          newMsgs.forEach((m: any) => messageIdsRef.current.add(m.id));
+          setMessages(prev => {
+            // Remove any optimistic messages that match new server messages
+            const filtered = prev.filter(m => !m.id.startsWith('temp-') && !m.id.startsWith('agent-'));
+            // Merge and deduplicate
+            const byId = new Map<string, any>();
+            for (const m of filtered) byId.set(m.id, m);
+            for (const m of newMsgs) byId.set(m.id, m);
+            // Sort chronologically
+            return Array.from(byId.values()).sort(
+              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            );
+          });
+        }
+      } catch {}
+    }, 3000);
+
     return () => {
-      unsub?.();
-      sdk.realtime.leaveConversation(conversationId);
+      if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [conversationId, sdk]);
+  }, [conversationId, sdk, loading]);
 
   // Mark as read
   React.useEffect(() => {
@@ -292,8 +413,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     setText('');
     setSending(true);
 
+    // Optimistic user message
+    const tempId = 'temp-' + Date.now();
     const tempMsg = {
-      id: 'temp-' + Date.now(),
+      id: tempId,
       content: messageText,
       sender: { id: user?.id, name: user?.name },
       createdAt: new Date().toISOString(),
@@ -301,37 +424,31 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     setMessages(prev => [...prev, tempMsg]);
 
     try {
+      // Send via SDK
       await sdk.chat.send({ conversation_id: conversationId, content: messageText });
-      // Check if conversation partner is an agent and trigger auto-response
-      try {
-        const convoRes = await sdk.chat.conversation(conversationId);
-        const convo = convoRes.data as any;
-        // Try multiple ways to find the other participant
-        const participants = convo?.participants || convo?.members || [];
-        const other = participants.find((p: any) => {
-          const pId = p.id || p.user?.id || p.userId;
-          return pId !== user?.id;
-        });
-        const otherId = other?.id || other?.user?.id || other?.userId;
-        const otherName = other?.name || other?.user?.name || 'Agent';
-        // Check if other participant is an agent: isAi flag, or isAgent, or type === 'agent'
-        const isAgent = other?.isAi || other?.is_ai || other?.user?.isAi || other?.user?.is_ai
-          || other?.type === 'agent' || other?.user?.type === 'agent'
-          || convo?.type === 'agent' || convo?.is_agent;
-        if (isAgent && otherId) {
-          const agentRes = await (sdk as any).agents.chat(otherId, { message: messageText });
-          const agentData = agentRes?.data || agentRes;
-          const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
-          if (reply) {
-            setMessages(prev => [...prev, {
+
+      // Check if partner is an AI agent — try SSE streaming
+      const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
+      const otherName = partnerInfo?.name || partnerInfo?.user?.name || 'Agent';
+      const isAgent = partnerInfo?.isAi || partnerInfo?.is_ai
+        || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
+        || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
+
+      if (isAgent && otherId) {
+        setAgentTyping(true);
+        try {
+          const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
+          if (result.content) {
+            const agentMsg = {
               id: 'agent-' + Date.now(),
-              content: reply,
+              content: result.content,
               sender: { id: otherId, name: otherName },
               createdAt: new Date().toISOString(),
-            }]);
+            };
+            setMessages(prev => [...prev, agentMsg]);
           }
-        } else if (otherId) {
-          // Fallback: try agents.chat anyway — if it fails silently, it wasn't an agent
+        } catch {
+          // SSE failed — try sdk.agents.chat() as fallback
           try {
             const agentRes = await (sdk as any).agents.chat(otherId, { message: messageText });
             const agentData = agentRes?.data || agentRes;
@@ -344,14 +461,30 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
                 createdAt: new Date().toISOString(),
               }]);
             }
-          } catch {
-            // Not an agent, that's fine
-          }
+          } catch {}
         }
-      } catch {}
-      refresh();
+        setAgentTyping(false);
+      } else if (otherId) {
+        // Not flagged as agent, but try anyway (some agents don't have the flag)
+        try {
+          setAgentTyping(true);
+          const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
+          if (result.content) {
+            setMessages(prev => [...prev, {
+              id: 'agent-' + Date.now(),
+              content: result.content,
+              sender: { id: otherId, name: otherName },
+              createdAt: new Date().toISOString(),
+            }]);
+          }
+        } catch {
+          // Not an agent — that's fine, human will respond via polling
+        }
+        setAgentTyping(false);
+      }
     } catch {
-      setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
+      // Remove optimistic message on failure
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
       setSending(false);
     }
@@ -400,6 +533,12 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             justifyContent: messages.length === 0 ? 'center' : 'flex-end',
           }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListFooterComponent={agentTyping ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.xs }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent, opacity: 0.6 }} />
+              <Text variant="caption" color={colors.textMuted}>Thinking...</Text>
+            </View>
+          ) : null}
           ListEmptyComponent={
             <View style={{ alignItems: 'center' }}>
               <Text variant="body" color={colors.textMuted}>Start the conversation</Text>

@@ -49,6 +49,7 @@ export default function ProfileScreen() {
   const [showEditProfile, setShowEditProfile] = React.useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = React.useState(false);
   const [editName, setEditName] = React.useState('');
+  const [editUsername, setEditUsername] = React.useState('');
   const [editBio, setEditBio] = React.useState('');
   const [editSaving, setEditSaving] = React.useState(false);
   const [editAvatarUri, setEditAvatarUri] = React.useState<string | null>(null);
@@ -108,6 +109,7 @@ export default function ProfileScreen() {
               <Button
                 onPress={() => {
                   setEditName(displayProfile?.name || '');
+                  setEditUsername(displayProfile?.username || user?.username || '');
                   setEditBio(displayProfile?.bio || profile?.bio || '');
                   setEditAvatarUri(null);
                   setShowEditProfile(true);
@@ -251,11 +253,11 @@ export default function ProfileScreen() {
                 ))}
               </View>
             ) : myPosts.length === 0 ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="newspaper-outline" size={32} color={colors.textMuted} />
-                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>You haven't posted yet</Text>
-                <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>Share your thoughts with the network.</Text>
-                <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create a post</Button>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+                <Ionicons name="newspaper-outline" size={40} color={colors.accent} />
+                <Text variant="h2" color={colors.text} align="center">Posts</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>Share your thoughts with the network.</Text>
+                <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create a post</Button>
               </View>
             ) : (
               myPosts.map((post: any) => (
@@ -272,11 +274,11 @@ export default function ProfileScreen() {
                 {[1, 2, 3].map(i => <Skeleton key={i} height={50} />)}
               </View>
             ) : communities.length === 0 ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="people-outline" size={32} color={colors.textMuted} />
-                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>No communities yet</Text>
-                <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>Join a community to connect with like-minded people.</Text>
-                <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })} size="sm">Explore</Button>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+                <Ionicons name="people-outline" size={40} color={colors.accent} />
+                <Text variant="h2" color={colors.text} align="center">Communities</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>Join a community to connect with like-minded people.</Text>
+                <Button onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })} size="sm" style={{ marginTop: spacing.md }}>Explore</Button>
               </View>
             ) : (
               <View style={{ padding: spacing.xl, gap: spacing.md }}>
@@ -315,11 +317,11 @@ export default function ProfileScreen() {
                 {[1, 2, 3].map(i => <Skeleton key={i} height={50} />)}
               </View>
             ) : agents.length === 0 ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-                <Ionicons name="hardware-chip-outline" size={32} color={colors.textMuted} />
-                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>No agents yet</Text>
-                <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>Create an AI agent to automate tasks or engage with your audience.</Text>
-                <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create</Button>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+                <Ionicons name="hardware-chip-outline" size={40} color={colors.accent} />
+                <Text variant="h2" color={colors.text} align="center">Agents</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>Create an AI agent to automate tasks or engage with your audience.</Text>
+                <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create</Button>
               </View>
             ) : (
               <View style={{ padding: spacing.xl, gap: spacing.md }}>
@@ -352,11 +354,11 @@ export default function ProfileScreen() {
         )}
 
         {activeTab === 'apps' && (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-            <Ionicons name="cube-outline" size={32} color={colors.textMuted} />
-            <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>No apps yet</Text>
-            <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', maxWidth: 280 }}>Build and deploy apps powered by the Minds network.</Text>
-            <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create</Button>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+            <Ionicons name="cube-outline" size={40} color={colors.accent} />
+            <Text variant="h2" color={colors.text} align="center">Apps</Text>
+            <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>Build and deploy apps powered by the Minds network.</Text>
+            <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create</Button>
           </View>
         )}
 
@@ -440,6 +442,27 @@ export default function ProfileScreen() {
               }}
             />
 
+            <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>Username</Text>
+            <TextInput
+              value={editUsername}
+              onChangeText={(t) => setEditUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              placeholder="username"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              style={{
+                backgroundColor: colors.bg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: 10,
+                color: colors.text,
+                ...typography.body,
+                marginBottom: spacing.lg,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+              }}
+            />
+
             <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>Bio</Text>
             <TextInput
               value={editBio}
@@ -477,7 +500,7 @@ export default function ProfileScreen() {
                     if (!sdk) return;
                     setEditSaving(true);
                     try {
-                      await sdk.profiles.update({ name: editName.trim(), bio: editBio.trim() });
+                      await sdk.profiles.update({ name: editName.trim(), username: editUsername.trim() || undefined, bio: editBio.trim() });
                       await refreshProfile();
                       setShowEditProfile(false);
                     } catch {

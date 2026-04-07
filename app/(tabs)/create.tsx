@@ -46,7 +46,16 @@ export default function CreateScreen() {
   const [agentBio, setAgentBio] = React.useState('');
   const [agentPrompt, setAgentPrompt] = React.useState('');
   const [agentModelIdx, setAgentModelIdx] = React.useState(0);
-  const MODELS = ['google/gemini-3.1-pro-preview', 'anthropic/claude-sonnet-4.6', 'openai/gpt-5.4', 'google/gemini-3-flash-preview'];
+  const [showModelMenu, setShowModelMenu] = React.useState(false);
+  const MODELS = [
+    { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+    { id: 'anthropic/claude-opus-4.6', label: 'Claude Opus 4.6', provider: 'Anthropic' },
+    { id: 'anthropic/claude-haiku-4.5', label: 'Claude Haiku 4.5', provider: 'Anthropic' },
+    { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', provider: 'Google' },
+    { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash', provider: 'Google' },
+    { id: 'openai/gpt-5.4', label: 'GPT-5.4', provider: 'OpenAI' },
+    { id: 'openai/o3', label: 'o3', provider: 'OpenAI' },
+  ];
 
   // App state
   const [appName, setAppName] = React.useState('');
@@ -154,7 +163,7 @@ export default function CreateScreen() {
           username,
           bio: agentBio.trim() || undefined,
           system_prompt: agentPrompt.trim() || undefined,
-          model: MODELS[agentModelIdx],
+          model: MODELS[agentModelIdx].id,
           organization_id: ORG_ID || undefined,
           social_mode: 'chat_only',
           tool_mode: 'chat_only',
@@ -195,9 +204,9 @@ export default function CreateScreen() {
   };
 
   const canSubmit = mode === 'post' ? (content.trim().length > 0 || !!mediaUri)
-    : mode === 'agent' ? agentName.trim().length > 0
-    : mode === 'app' ? appName.trim().length > 0
-    : communityName.trim().length > 0;
+    : mode === 'agent' ? (agentName.trim().length > 0 && agentBio.trim().length > 0)
+    : mode === 'app' ? (appName.trim().length > 0 && appDesc.trim().length > 0)
+    : (communityName.trim().length > 0 && communityDesc.trim().length > 0);
 
   const submitLabel = mode === 'post' ? 'Post'
     : mode === 'agent' ? 'Create Agent'
@@ -369,25 +378,79 @@ export default function CreateScreen() {
             <>
               <TextInput placeholder="Agent name" placeholderTextColor={colors.textMuted} value={agentName} onChangeText={setAgentName} autoFocus
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
-              <TextInput placeholder="Short bio (optional)" placeholderTextColor={colors.textMuted} value={agentBio} onChangeText={setAgentBio}
+              <TextInput placeholder="Short bio *" placeholderTextColor={colors.textMuted} value={agentBio} onChangeText={setAgentBio}
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
               <TextInput placeholder="What should this agent do?" placeholderTextColor={colors.textMuted} value={agentPrompt} onChangeText={setAgentPrompt} multiline
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, minHeight: 100, textAlignVertical: 'top', ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
-              <Pressable
-                onPress={() => setAgentModelIdx((agentModelIdx + 1) % MODELS.length)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 0.5, borderColor: colors.glassBorder }}
-              >
-                <Ionicons name="hardware-chip-outline" size={18} color={colors.accent} />
-                <Text variant="caption" color={colors.textSecondary}>{MODELS[agentModelIdx].split('/')[1]}</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-              </Pressable>
+              <View style={{ position: 'relative' }}>
+                <Pressable
+                  onPress={() => setShowModelMenu(!showModelMenu)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 0.5, borderColor: showModelMenu ? colors.accent : colors.glassBorder }}
+                >
+                  <Ionicons name="hardware-chip-outline" size={18} color={colors.accent} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="body" color={colors.text} style={{ fontSize: 14 }}>{MODELS[agentModelIdx].label}</Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{MODELS[agentModelIdx].provider}</Text>
+                  </View>
+                  <Ionicons name={showModelMenu ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+                </Pressable>
+                {showModelMenu && (
+                  <>
+                    <Pressable
+                      onPress={() => setShowModelMenu(false)}
+                      style={{ position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998 }}
+                    />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: spacing.xs,
+                        backgroundColor: '#1a1a1e',
+                        borderRadius: radius.md,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        zIndex: 99999,
+                        overflow: 'hidden',
+                        ...(Platform.OS === 'web' ? { boxShadow: '0 8px 32px rgba(0,0,0,0.6)' } as any : {}),
+                      }}
+                    >
+                      {MODELS.map((model, idx) => (
+                        <Pressable
+                          key={model.id}
+                          onPress={() => { setAgentModelIdx(idx); setShowModelMenu(false); }}
+                          style={({ pressed }) => ({
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: spacing.sm,
+                            paddingHorizontal: spacing.lg,
+                            paddingVertical: spacing.md,
+                            backgroundColor: idx === agentModelIdx ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
+                            borderBottomWidth: idx < MODELS.length - 1 ? 0.5 : 0,
+                            borderBottomColor: 'rgba(255,255,255,0.04)',
+                          })}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text variant="body" color={idx === agentModelIdx ? colors.accent : colors.text} style={{ fontSize: 14 }}>{model.label}</Text>
+                            <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{model.provider}</Text>
+                          </View>
+                          {idx === agentModelIdx && (
+                            <Ionicons name="checkmark" size={18} color={colors.accent} />
+                          )}
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
             </>
           )}
           {mode === 'app' && (
             <>
               <TextInput placeholder="App name" placeholderTextColor={colors.textMuted} value={appName} onChangeText={setAppName} autoFocus
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
-              <TextInput placeholder="Description (optional)" placeholderTextColor={colors.textMuted} value={appDesc} onChangeText={setAppDesc} multiline
+              <TextInput placeholder="Description *" placeholderTextColor={colors.textMuted} value={appDesc} onChangeText={setAppDesc} multiline
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, minHeight: 80, textAlignVertical: 'top', ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
             </>
           )}
@@ -395,7 +458,7 @@ export default function CreateScreen() {
             <>
               <TextInput placeholder="Community name" placeholderTextColor={colors.textMuted} value={communityName} onChangeText={setCommunityName} autoFocus
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
-              <TextInput placeholder="Description (optional)" placeholderTextColor={colors.textMuted} value={communityDesc} onChangeText={setCommunityDesc} multiline
+              <TextInput placeholder="Description *" placeholderTextColor={colors.textMuted} value={communityDesc} onChangeText={setCommunityDesc} multiline
                 style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 13, color: colors.text, minHeight: 80, textAlignVertical: 'top', ...typography.body, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) }} />
               <Pressable onPress={() => setCommunityPrivate(!communityPrivate)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <Ionicons name={communityPrivate ? 'lock-closed' : 'lock-open-outline'} size={20} color={communityPrivate ? colors.accent : colors.textMuted} />
