@@ -144,7 +144,7 @@ export default function NotificationsScreen() {
             </Pressable>
           )}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], padding: spacing['3xl'], gap: spacing['2xl'] }}>
               <Ionicons name="notifications-outline" size={40} color={colors.accent} />
               <Text variant="h2" color={colors.text} align="center">
                 Notifications

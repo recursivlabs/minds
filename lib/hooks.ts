@@ -261,11 +261,12 @@ export function useProfile(username: string) {
  * Fetch the current user's profile.
  */
 export function useMyProfile() {
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
   const cacheKey = 'myprofile';
   const cached = getCached(cacheKey);
-  const [profile, setProfile] = React.useState<any>(cached || null);
-  const [loading, setLoading] = React.useState(!cached);
+  // Never start as null — use cached or auth user as initial value
+  const [profile, setProfile] = React.useState<any>(cached || user || null);
+  const [loading, setLoading] = React.useState(!cached && !user);
 
   const fetch = React.useCallback(async () => {
     if (!sdk) return;
@@ -437,13 +438,79 @@ export function useSearchPosts(query: string) {
     const timer = setTimeout(async () => {
       try {
         const s = sdk || getSdk();
+        // Search posts
         const res = await s.posts.search({ q: query, limit: 20, organization_id: ORG_ID || undefined });
         if (!cancelled) setResults(res.data || []);
-      } catch {}
+      } catch {
+        // If posts.search fails, fall back to listing and client-side filtering
+        if (!cancelled) {
+          try {
+            const s = sdk || getSdk();
+            const res = await s.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
+            const q = query.toLowerCase();
+            const filtered = (res.data || []).filter((p: any) =>
+              (p.content || '').toLowerCase().includes(q) ||
+              (p.title || '').toLowerCase().includes(q) ||
+              (p.author?.name || '').toLowerCase().includes(q)
+            );
+            if (!cancelled) setResults(filtered);
+          } catch {}
+        }
+      }
       finally { if (!cancelled) setLoading(false); }
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query, sdk]);
 
   return { results, loading };
+}
+
+/**
+ * Unified search across posts, profiles, and communities.
+ */
+export function useSearch(query: string) {
+  const { sdk } = useAuth();
+  const [posts, setPosts] = React.useState<any[]>([]);
+  const [people, setPeople] = React.useState<any[]>([]);
+  const [communities, setCommunities] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!query.trim()) {
+      setPosts([]);
+      setPeople([]);
+      setCommunities([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const s = sdk || getSdk();
+        const q = query.toLowerCase();
+
+        // Search in parallel
+        const [postRes, profileRes, commRes] = await Promise.allSettled([
+          s.posts.search({ q: query, limit: 10, organization_id: ORG_ID || undefined }),
+          s.profiles.search ? s.profiles.search({ query, limit: 10 }) : Promise.reject('no search'),
+          s.communities.list({ limit: 50, organization_id: ORG_ID || undefined }),
+        ]);
+
+        if (!cancelled) {
+          setPosts(postRes.status === 'fulfilled' ? postRes.value.data || [] : []);
+          setPeople(profileRes.status === 'fulfilled' ? profileRes.value.data || [] : []);
+          // Client-side filter communities since there's no search endpoint
+          const allComm = commRes.status === 'fulfilled' ? commRes.value.data || [] : [];
+          setCommunities(allComm.filter((c: any) =>
+            (c.name || '').toLowerCase().includes(q) ||
+            (c.description || '').toLowerCase().includes(q)
+          ));
+        }
+      } catch {}
+      finally { if (!cancelled) setLoading(false); }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [query, sdk]);
+
+  return { posts, people, communities, loading };
 }

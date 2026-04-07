@@ -94,17 +94,8 @@ export default function ProfileScreen() {
     { key: 'apps' as const, label: 'Apps' },
   ];
 
-  if (profileLoading && !user) {
-    return (
-      <Container safeTop>
-        <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl, gap: spacing.lg }}>
-          <Skeleton width={80} height={80} borderRadius={40} />
-          <Skeleton width={160} height={20} />
-          <Skeleton width={120} height={14} />
-        </View>
-      </Container>
-    );
-  }
+  // Don't flash blank profile — use user from auth as fallback while profile loads
+  // but never show a blank "User" with yellow ? avatar
 
   return (
     <Container safeTop padded={false}>
@@ -512,7 +503,29 @@ export default function ProfileScreen() {
                     if (!sdk) return;
                     setEditSaving(true);
                     try {
-                      await sdk.profiles.update({ name: editName.trim(), username: editUsername.trim() || undefined, bio: editBio.trim() });
+                      // Upload avatar if user picked a new one
+                      let avatarUrl: string | undefined;
+                      if (editAvatarUri) {
+                        try {
+                          const uploadRes = await (sdk as any).uploads.getMediaUploadUrl({
+                            content_type: 'image/jpeg',
+                            content_length: 0,
+                          });
+                          const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+                          if (uploadUrl) {
+                            const response = await fetch(editAvatarUri);
+                            const blob = await response.blob();
+                            await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+                            avatarUrl = uploadRes.data?.public_url || uploadUrl.split('?')[0];
+                          }
+                        } catch { /* Avatar upload failed, save other fields */ }
+                      }
+                      await sdk.profiles.update({
+                        name: editName.trim(),
+                        username: editUsername.trim() || undefined,
+                        bio: editBio.trim(),
+                        ...(avatarUrl ? { image: avatarUrl } : {}),
+                      });
                       await refreshProfile();
                       setShowEditProfile(false);
                     } catch {
