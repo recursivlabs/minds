@@ -68,7 +68,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Actions */}
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, flexWrap: 'wrap' }}>
             <Button
               onPress={() => {
                 setEditName(displayProfile?.name || '');
@@ -79,6 +79,27 @@ export default function ProfileScreen() {
               size="sm"
             >
               Edit Profile
+            </Button>
+            <Button
+              onPress={() => router.push('/(tabs)/settings')}
+              variant="secondary"
+              size="sm"
+            >
+              Settings
+            </Button>
+            <Button
+              onPress={() => router.push('/(tabs)/billing')}
+              variant="secondary"
+              size="sm"
+            >
+              Billing
+            </Button>
+            <Button
+              onPress={() => router.push('/(tabs)/invites')}
+              variant="secondary"
+              size="sm"
+            >
+              Invites
             </Button>
             <Button
               onPress={async () => {

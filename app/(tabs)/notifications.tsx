@@ -5,8 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton } from '../../components';
 import { useAuth } from '../../lib/auth';
-import { BASE_ORIGIN } from '../../lib/recursiv';
-import { getItem } from '../../lib/storage';
 import { colors, spacing } from '../../constants/theme';
 
 function timeAgo(dateStr: string): string {
@@ -26,16 +24,10 @@ export default function NotificationsScreen() {
 
   React.useEffect(() => {
     (async () => {
+      if (!sdk) { setLoading(false); return; }
       try {
-        const apiKey = await getItem('minds:api_key');
-        if (!apiKey) return;
-        const res = await fetch(`${BASE_ORIGIN}/api/v1/notifications?limit=30`, {
-          headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setNotifications(data.data || []);
-        }
+        const res = await (sdk as any).notifications.list({ limit: 30 });
+        setNotifications(res.data || []);
       } catch {}
       finally { setLoading(false); }
     })();

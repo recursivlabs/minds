@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Recursiv } from '@recursiv/sdk';
-import { BASE_ORIGIN, ORG_ID, createAuthedSdk } from './recursiv';
+import { BASE_URL, BASE_ORIGIN, ORG_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
 
 const KEYS = {
@@ -10,8 +10,23 @@ const KEYS = {
   version: 'minds:auth_version',
 };
 
-// Bump this when scopes change to force re-auth
-const AUTH_VERSION = '3';
+const AUTH_VERSION = '4';
+
+const API_KEY_SCOPES = [
+  'posts:read', 'posts:write',
+  'users:read', 'users:write',
+  'communities:read', 'communities:write',
+  'chat:read', 'chat:write',
+  'agents:read', 'agents:write',
+  'organizations:read', 'organizations:write',
+  'memory:read', 'memory:write',
+  'tags:read', 'tags:write',
+  'databases:read', 'databases:write',
+  'storage:read', 'storage:write',
+  'settings:read', 'settings:write',
+  'billing:read', 'billing:write',
+  'notifications:read', 'notifications:write',
+] as const;
 
 interface User {
   id: string;
@@ -35,49 +50,8 @@ interface AuthContextValue {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-/**
- * Create a per-user API key scoped to the Minds org.
- * Uses session token from sign-up/sign-in (not cookies — cookies don't persist on mobile).
- */
-async function createApiKeyWithSession(sessionToken: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE_ORIGIN}/api/v1/api-keys`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionToken}`,
-      },
-      body: JSON.stringify({
-        name: 'minds-' + Date.now(),
-        organizationId: ORG_ID,
-        scopes: [
-          'posts:read', 'posts:write',
-          'users:read', 'users:write',
-          'communities:read', 'communities:write',
-          'chat:read', 'chat:write',
-          'agents:read', 'agents:write',
-          'organizations:read', 'organizations:write',
-          'memory:read', 'memory:write',
-          'tags:read', 'tags:write',
-          'databases:read', 'databases:write',
-          'storage:read', 'storage:write',
-          'settings:read',
-          'notifications:read', 'notifications:write',
-        ],
-      }),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      console.error('[Auth] createApiKey failed:', res.status, errText.slice(0, 500));
-      return null;
-    }
-    const data = await res.json();
-    return data.data?.key || data.key || null;
-  } catch (err) {
-    console.error('[Auth] createApiKey error:', err);
-    return null;
-  }
-}
+// Anonymous SDK for auth operations (no API key needed)
+const anonSdk = new Recursiv({ baseUrl: BASE_URL, timeout: 30_000 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
@@ -85,7 +59,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [orgId, setOrgId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  // Restore session on mount
   React.useEffect(() => {
     (async () => {
       try {
@@ -130,96 +103,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ]).catch(() => {});
   }
 
-  const signUp = React.useCallback(async (name: string, email: string, password: string) => {
-    const res = await fetch(`${BASE_ORIGIN}/api/auth/sign-up/email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': BASE_ORIGIN },
-      body: JSON.stringify({ name, email, password }),
-      credentials: 'include',
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      let parsed: any = {};
-      try { parsed = JSON.parse(text); } catch {}
-      throw new Error(parsed.message || `Sign up failed (${res.status})`);
-    }
-
-    const body = await res.json();
-
-    // Extract session token (cookies don't persist on mobile/cross-origin)
-    const sessionToken = body?.session?.token || body?.token;
-    if (!sessionToken) throw new Error('No session token returned');
-
-    const apiKey = await createApiKeyWithSession(sessionToken);
-    if (!apiKey) throw new Error('Failed to create session key');
-
+  async function persistSession(apiKey: string, authUser: User) {
     const sdk = createAuthedSdk(apiKey);
-    const authUser: User = {
-      id: body.user?.id || body.id,
-      name: body.user?.name || name,
-      email: body.user?.email || email,
-      username: body.user?.username || email.split('@')[0],
-      image: body.user?.image ?? null,
-      bio: body.user?.bio || '',
-    };
-
     await Promise.all([
       storage.setItem(KEYS.apiKey, apiKey),
       storage.setItem(KEYS.user, JSON.stringify(authUser)),
       storage.setItem(KEYS.orgId, ORG_ID),
       storage.setItem(KEYS.version, AUTH_VERSION),
     ]);
-
     setAuthedSdk(sdk);
     setUser(authUser);
     setOrgId(ORG_ID);
+  }
+
+  const signUp = React.useCallback(async (name: string, email: string, password: string) => {
+    const result = await anonSdk.auth.signUpAndCreateKey(
+      { name, email, password },
+      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], organizationId: ORG_ID },
+    );
+
+    await persistSession(result.apiKey, {
+      id: result.user?.id || '',
+      name: result.user?.name || name,
+      email: result.user?.email || email,
+      username: result.user?.username || email.split('@')[0],
+      image: result.user?.image ?? null,
+      bio: '',
+    });
   }, []);
 
   const signIn = React.useCallback(async (email: string, password: string) => {
-    const res = await fetch(`${BASE_ORIGIN}/api/auth/sign-in/email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': BASE_ORIGIN },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include',
+    const result = await anonSdk.auth.signInAndCreateKey(
+      { email, password },
+      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], organizationId: ORG_ID },
+    );
+
+    await persistSession(result.apiKey, {
+      id: result.user?.id || '',
+      name: result.user?.name || '',
+      email: result.user?.email || email,
+      username: result.user?.username || email.split('@')[0],
+      image: result.user?.image ?? null,
+      bio: '',
     });
-
-    if (!res.ok) {
-      const text = await res.text();
-      let parsed: any = {};
-      try { parsed = JSON.parse(text); } catch {}
-      throw new Error(parsed.message || `Sign in failed (${res.status})`);
-    }
-
-    const body = await res.json();
-
-    // Extract session token
-    const sessionToken = body?.session?.token || body?.token;
-    if (!sessionToken) throw new Error('No session token returned');
-
-    const apiKey = await createApiKeyWithSession(sessionToken);
-    if (!apiKey) throw new Error('Failed to create session key');
-
-    const sdk = createAuthedSdk(apiKey);
-    const authUser: User = {
-      id: body.user?.id || body.id,
-      name: body.user?.name || '',
-      email: body.user?.email || email,
-      username: body.user?.username || email.split('@')[0],
-      image: body.user?.image ?? null,
-      bio: body.user?.bio || '',
-    };
-
-    await Promise.all([
-      storage.setItem(KEYS.apiKey, apiKey),
-      storage.setItem(KEYS.user, JSON.stringify(authUser)),
-      storage.setItem(KEYS.orgId, ORG_ID),
-      storage.setItem(KEYS.version, AUTH_VERSION),
-    ]);
-
-    setAuthedSdk(sdk);
-    setUser(authUser);
-    setOrgId(ORG_ID);
   }, []);
 
   const signOut = React.useCallback(async () => {

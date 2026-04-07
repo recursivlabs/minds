@@ -191,10 +191,43 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [sending, setSending] = React.useState(false);
   const flatListRef = React.useRef<FlatList>(null);
 
+  // Real-time WebSocket for live messages
+  React.useEffect(() => {
+    if (!sdk) return;
+    let unsub: (() => void) | undefined;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        sdk.realtime.joinConversation(conversationId);
+        unsub = sdk.realtime.onMessage((msg: any) => {
+          if (msg.conversationId === conversationId) {
+            setMessages(prev => {
+              // Avoid duplicates
+              if (prev.some(m => m.id === msg.id)) return prev;
+              return [...prev, {
+                id: msg.id,
+                content: msg.text || msg.content,
+                sender: msg.sender || { id: msg.senderId, name: msg.senderName },
+                createdAt: msg.createdAt || new Date().toISOString(),
+              }];
+            });
+          }
+        });
+      } catch {
+        // WebSocket failed — fall back to polling
+      }
+    })();
+    return () => {
+      unsub?.();
+      sdk.realtime.leaveConversation(conversationId);
+    };
+  }, [conversationId, sdk]);
+
+  // Mark as read
   React.useEffect(() => {
     if (sdk && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
-      if (lastMsg?.id && !lastMsg.id.startsWith('temp-')) {
+      if (lastMsg?.id && !lastMsg.id.startsWith('temp-') && !lastMsg.id.startsWith('agent-')) {
         sdk.chat.markAsRead(conversationId, { message_id: lastMsg.id }).catch(() => {});
       }
     }
