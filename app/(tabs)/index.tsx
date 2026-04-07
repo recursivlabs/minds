@@ -42,11 +42,11 @@ export default function FeedScreen() {
   const sortMap = { foryou: 'score', latest: 'latest', following: 'following', trending: 'score' } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
-  // Extra data for For You tab only — don't fetch on other tabs
+  // Extra data for For You tab — always use same limit to avoid hook churn
   const isForYou = activeTab === 'foryou';
-  const { profiles } = useProfiles(isForYou ? 10 : 0);
-  const { communities } = useCommunities(isForYou ? 10 : 0);
-  const { agents } = useAgents(isForYou ? 10 : 0);
+  const { profiles } = useProfiles(10);
+  const { communities } = useCommunities(10);
+  const { agents } = useAgents(10);
   const visibleAgents = React.useMemo(
     () => (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id)),
     [agents]
@@ -88,7 +88,7 @@ export default function FeedScreen() {
     return items;
   }, [activeTab, posts, profiles, communities, visibleAgents]);
 
-  const renderForYouItem = ({ item }: { item: { type: string; data: any; id: string } }) => {
+  const renderForYouItem = React.useCallback(({ item }: { item: { type: string; data: any; id: string } }) => {
     if (item.type === 'post') {
       return (
         <PostCard
@@ -216,7 +216,7 @@ export default function FeedScreen() {
       );
     }
     return null;
-  };
+  }, [router, setPosts, handleFollow]);
 
   const renderPostSkeleton = () => (
     <View style={{ padding: spacing.xl, gap: spacing.md }}>
@@ -251,6 +251,10 @@ export default function FeedScreen() {
           refreshing={refreshing}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS !== 'web'}
           ListEmptyComponent={
             !postsLoading ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], gap: spacing['2xl'] }}>
@@ -269,6 +273,9 @@ export default function FeedScreen() {
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
+          initialNumToRender={8}
+          maxToRenderPerBatch={5}
+          windowSize={7}
           renderItem={({ item }) => (
             <PostCard
               post={item}
