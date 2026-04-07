@@ -103,8 +103,8 @@ function SuggestedList() {
               <View style={{ flex: 1 }}>
                 <Text variant="body" numberOfLines={1} style={{ fontSize: 13 }}>{name}</Text>
                 {username ? <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>@{username}</Text> : null}
+                {(u.bio || u.description) ? <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ fontSize: 11, marginTop: 2, lineHeight: 15 }}>{u.bio || u.description}</Text> : null}
               </View>
-              <Ionicons name="person-outline" size={12} color={colors.textMuted} />
             </Pressable>
           );
         }
@@ -126,8 +126,8 @@ function SuggestedList() {
               <View style={{ flex: 1 }}>
                 <Text variant="body" numberOfLines={1} style={{ fontSize: 13 }}>{c.name}</Text>
                 <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{c.memberCount || c.member_count || 0} members</Text>
+                {(c.description || c.bio) ? <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ fontSize: 11, marginTop: 2, lineHeight: 15 }}>{c.description || c.bio}</Text> : null}
               </View>
-              <Ionicons name="people-outline" size={12} color={colors.textMuted} />
             </Pressable>
           );
         }
@@ -147,11 +147,13 @@ function SuggestedList() {
             >
               <Avatar uri={a.image || a.avatar} name={a.name} size="sm" />
               <View style={{ flex: 1 }}>
-                <Text variant="body" numberOfLines={1} style={{ fontSize: 13 }}>{a.name}</Text>
-                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{a.model?.split('/').pop() || 'Agent'}</Text>
-              </View>
-              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: radius.sm }}>
-                <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>AI</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <Text variant="body" numberOfLines={1} style={{ fontSize: 13, flex: 1 }}>{a.name}</Text>
+                  <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: radius.sm }}>
+                    <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>AI</Text>
+                  </View>
+                </View>
+                {(a.bio || a.description) ? <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ fontSize: 11, marginTop: 2, lineHeight: 15 }}>{a.bio || a.description}</Text> : null}
               </View>
             </Pressable>
           );
