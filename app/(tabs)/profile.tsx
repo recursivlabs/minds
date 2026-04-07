@@ -94,6 +94,18 @@ export default function ProfileScreen() {
     { key: 'apps' as const, label: 'Apps' },
   ];
 
+  if (profileLoading && !user) {
+    return (
+      <Container safeTop>
+        <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl, gap: spacing.lg }}>
+          <Skeleton width={80} height={80} borderRadius={40} />
+          <Skeleton width={160} height={20} />
+          <Skeleton width={120} height={14} />
+        </View>
+      </Container>
+    );
+  }
+
   return (
     <Container safeTop padded={false}>
       <ScrollView showsVerticalScrollIndicator={false}>

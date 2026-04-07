@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { View, ScrollView, FlatList, TextInput, Platform, Pressable } from 'react-native';
+import { View, ScrollView, FlatList, TextInput, Platform, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Avatar, Skeleton } from '../../components';
+import { Text, Avatar, Skeleton, Button } from '../../components';
 import { Container } from '../../components/Container';
 import { usePosts, useCommunities, useAgents, useSearchPosts, useProfiles } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
@@ -10,16 +10,8 @@ import { colors, spacing, radius, typography } from '../../constants/theme';
 
 function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: spacing.md,
-        marginTop: spacing.xl,
-      }}
-    >
-      <Text variant="bodyMedium" color={colors.textSecondary}>{title}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg, marginTop: spacing['2xl'] }}>
+      <Text variant="h3" style={{ fontSize: 18, fontWeight: '600' }}>{title}</Text>
       {onSeeAll && (
         <Pressable onPress={onSeeAll} hitSlop={8}>
           <Text variant="caption" color={colors.accent}>See all</Text>
@@ -29,140 +21,176 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
   );
 }
 
-function SmallItem({ name, avatar, onPress }: { name: string; avatar?: string | null; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{ alignItems: 'center', width: 72, marginRight: spacing.md }}
-    >
-      <Avatar uri={avatar} name={name} size="lg" />
-      <Text
-        variant="caption"
-        color={colors.textSecondary}
-        numberOfLines={1}
-        align="center"
-        style={{ marginTop: spacing.xs, width: 72 }}
-      >
-        {name}
-      </Text>
-    </Pressable>
-  );
-}
+/** Featured post — large card with content preview */
+function FeaturedPost({ post, onPress }: { post: any; onPress: () => void }) {
+  const author = post.author?.name || 'Anonymous';
+  const authorAvatar = post.author?.image || post.author?.avatar;
+  const content = post.content || '';
+  const title = post.title;
+  const score = (post.upvoteCount || 0) - (post.downvoteCount || 0);
+  const replyCount = post.replyCount || post.reply_count || 0;
 
-function DescriptiveItem({ name, avatar, description, onPress }: { name: string; avatar?: string | null; description?: string; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-        width: 220,
-        marginRight: spacing.md,
-        backgroundColor: colors.surface,
-        borderRadius: radius.md,
-        padding: spacing.md,
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
         borderWidth: 0.5,
         borderColor: colors.glassBorder,
-      }}
+        padding: spacing.xl,
+        marginBottom: spacing.md,
+      })}
     >
-      <Avatar uri={avatar} name={name} size="md" />
-      <View style={{ flex: 1 }}>
-        <Text variant="bodyMedium" numberOfLines={1} style={{ fontSize: 13 }}>{name}</Text>
-        {description ? (
-          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ marginTop: 2 }}>
-            {description}
-          </Text>
-        ) : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+        <Avatar uri={authorAvatar} name={author} size="sm" />
+        <Text variant="bodyMedium" style={{ fontSize: 13 }}>{author}</Text>
+      </View>
+      {title && <Text variant="h3" numberOfLines={2} style={{ marginBottom: spacing.sm }}>{title}</Text>}
+      <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ lineHeight: 22 }}>
+        {content.slice(0, 300)}
+      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl, marginTop: spacing.lg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <Ionicons name="arrow-up-outline" size={14} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{score}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <Ionicons name="chatbubble-outline" size={13} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
+        </View>
       </View>
     </Pressable>
   );
 }
 
-function TrendingItem({ post, onPress }: { post: any; onPress: () => void }) {
-  const title = post.title || post.content?.slice(0, 60) || 'Untitled';
-  const author = post.author?.name || 'Anonymous';
+/** Person card — horizontal, shows bio */
+function PersonCard({ person, onPress, onFollow }: { person: any; onPress: () => void; onFollow: () => void }) {
+  const name = person.name || 'Unknown';
+  const username = person.username;
+  const bio = person.bio || person.description || '';
+  const avatar = person.image || person.avatar;
 
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        width: 180,
-        marginRight: spacing.md,
-        backgroundColor: colors.surface,
-        borderRadius: radius.md,
-        padding: spacing.md,
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
         borderWidth: 0.5,
         borderColor: colors.glassBorder,
-      }}
+        padding: spacing.lg,
+        width: 260,
+        marginRight: spacing.md,
+      })}
     >
-      <Text variant="bodyMedium" numberOfLines={2} style={{ fontSize: 13 }}>
-        {title}
-      </Text>
-      <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ marginTop: spacing.xs }}>
-        {author}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+        <Avatar uri={avatar} name={name} size="md" />
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
+          {username && <Text variant="caption" color={colors.textMuted}>@{username}</Text>}
+        </View>
+      </View>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 18, marginBottom: spacing.sm }}>
+          {bio}
+        </Text>
+      ) : null}
+      <Pressable
+        onPress={(e) => { e.stopPropagation?.(); onFollow(); }}
+        style={{
+          alignSelf: 'flex-start',
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.xs + 2,
+          borderRadius: radius.full,
+          backgroundColor: colors.accentMuted,
+        }}
+      >
+        <Text variant="caption" color={colors.accent} style={{ fontWeight: '500' }}>Follow</Text>
+      </Pressable>
     </Pressable>
   );
 }
 
-function FederatedSection({ sdk }: { sdk: any }) {
-  const [items, setItems] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    if (!sdk) { setLoading(false); return; }
-    (async () => {
-      try {
-        const res = await (sdk as any).protocols.search({ query: '', limit: 10 });
-        setItems(Array.isArray(res) ? res : res?.results || []);
-      } catch {}
-      setLoading(false);
-    })();
-  }, [sdk]);
-
-  if (!loading && items.length === 0) return null;
+/** Community card — horizontal, shows description + member count */
+function CommunityCard({ community, onPress }: { community: any; onPress: () => void }) {
+  const name = community.name || 'Unnamed';
+  const description = community.description || community.bio || '';
+  const avatar = community.image || community.avatar;
+  const memberCount = community.memberCount || community.member_count || 0;
 
   return (
-    <>
-      <SectionHeader title="Federated" />
-      {loading ? (
-        <View style={{ flexDirection: 'row' }}>
-          {[1, 2, 3].map(i => <Skeleton key={i} width={200} height={80} borderRadius={radius.md} style={{ marginRight: spacing.md }} />)}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 0.5,
+        borderColor: colors.glassBorder,
+        padding: spacing.lg,
+        width: 280,
+        marginRight: spacing.md,
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+        <Avatar uri={avatar} name={name} size="md" />
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
+          <Text variant="caption" color={colors.textMuted}>{memberCount} member{memberCount !== 1 ? 's' : ''}</Text>
         </View>
-      ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {items.map((item: any, i: number) => (
-            <View
-              key={item.id || i}
-              style={{
-                width: 200,
-                marginRight: spacing.md,
-                backgroundColor: colors.surface,
-                borderRadius: radius.md,
-                padding: spacing.md,
-                borderWidth: 0.5,
-                borderColor: colors.glassBorder,
-              }}
-            >
-              <Text variant="bodyMedium" numberOfLines={2} style={{ fontSize: 13 }}>
-                {item.title || item.content?.slice(0, 80) || 'Untitled'}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm }}>
-                {item.protocol && (
-                  <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs, paddingVertical: 1, borderRadius: 4 }}>
-                    <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>{item.protocol}</Text>
-                  </View>
-                )}
-                <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
-                  {item.author || item.source || 'Unknown'}
-                </Text>
-              </View>
+      </View>
+      {description ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 18 }}>
+          {description}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** Agent card — horizontal, shows bio + model */
+function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
+  const name = agent.name || 'Agent';
+  const bio = agent.bio || agent.description || '';
+  const avatar = agent.image || agent.avatar;
+  const model = agent.model?.split('/').pop() || '';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 0.5,
+        borderColor: colors.glassBorder,
+        padding: spacing.lg,
+        width: 260,
+        marginRight: spacing.md,
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+        <Avatar uri={avatar} name={name} size="md" />
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{name}</Text>
+            <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
+              <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
             </View>
-          ))}
-        </ScrollView>
-      )}
-    </>
+          </View>
+          {model ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Ionicons name="hardware-chip-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{model}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 18 }}>
+          {bio}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -183,6 +211,10 @@ export default function ExploreScreen() {
     if (!sdk) return;
     try { await sdk.profiles.follow(userId); } catch {}
   };
+
+  // Filter out business AI agent from explore
+  const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
+  const visibleAgents = (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id));
 
   return (
     <Container safeTop padded={false}>
@@ -230,18 +262,26 @@ export default function ExploreScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => router.push(`/(tabs)/post/${item.id}` as any)}
-              style={{
-                paddingVertical: spacing.md,
+              style={({ pressed }) => ({
+                paddingVertical: spacing.lg,
+                paddingHorizontal: spacing.md,
                 borderBottomWidth: 0.5,
                 borderBottomColor: 'rgba(255,255,255,0.06)',
-              }}
+                backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+              })}
             >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
+                <Avatar uri={item.author?.image} name={item.author?.name} size="xs" />
+                <Text variant="caption" color={colors.textMuted}>{item.author?.name || 'Anonymous'}</Text>
+              </View>
               <Text variant="bodyMedium" numberOfLines={2}>
-                {item.title || item.content?.slice(0, 100) || 'Untitled'}
+                {item.title || item.content?.slice(0, 120) || 'Untitled'}
               </Text>
-              <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-                {item.author?.name || 'Anonymous'}
-              </Text>
+              {!item.title && item.content && (
+                <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ marginTop: spacing.xs }}>
+                  {item.content.slice(0, 100)}
+                </Text>
+              )}
             </Pressable>
           )}
           ListHeaderComponent={
@@ -253,9 +293,7 @@ export default function ExploreScreen() {
             !searchLoading ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
                 <Ionicons name="search-outline" size={40} color={colors.accent} />
-                <Text variant="h2" color={colors.text} align="center">
-                  No Results
-                </Text>
+                <Text variant="h2" color={colors.text} align="center">No Results</Text>
                 <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
                   Try searching for something else.
                 </Text>
@@ -269,97 +307,114 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: spacing['4xl'] }}
         >
-          {/* Trending */}
+          {/* Featured Posts — large cards, not tiny horizontal */}
           <SectionHeader
             title="Trending"
             onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts' } })}
           />
           {postsLoading ? (
-            <View style={{ flexDirection: 'row' }}>
-              {[1, 2, 3].map(i => <Skeleton key={i} width={180} height={70} borderRadius={radius.md} style={{ marginRight: spacing.md }} />)}
+            <View style={{ gap: spacing.md }}>
+              {[1, 2].map(i => <Skeleton key={i} height={140} borderRadius={radius.lg} />)}
+            </View>
+          ) : posts.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+              <Ionicons name="newspaper-outline" size={40} color={colors.accent} />
+              <Text variant="h2" color={colors.text} align="center">Trending</Text>
+              <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 300, lineHeight: 24 }}>
+                Be the first to post and start the conversation.
+              </Text>
+              <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create a post</Button>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {posts.slice(0, 8).map((post: any) => (
-                <TrendingItem
-                  key={post.id}
-                  post={post}
-                  onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
-                />
-              ))}
-            </ScrollView>
+            posts.slice(0, 5).map((post: any) => (
+              <FeaturedPost
+                key={post.id}
+                post={post}
+                onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
+              />
+            ))
           )}
 
-          {/* People */}
+          {/* People — rich cards with bio */}
           <SectionHeader
-            title="People"
+            title="People to Follow"
             onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'people' } })}
           />
           {profilesLoading ? (
             <View style={{ flexDirection: 'row' }}>
-              {[1, 2, 3].map(i => <Skeleton key={i} width={56} height={56} borderRadius={28} style={{ marginRight: spacing.md }} />)}
+              {[1, 2].map(i => <Skeleton key={i} width={260} height={120} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
+            </View>
+          ) : profiles.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+              <Ionicons name="person-outline" size={40} color={colors.accent} />
+              <Text variant="body" color={colors.textSecondary} align="center">No people to discover yet</Text>
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {profiles.slice(0, 10).map((u: any) => (
-                <SmallItem
+                <PersonCard
                   key={u.id}
-                  name={u.name || 'User'}
-                  avatar={u.image || u.avatar}
+                  person={u}
                   onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
+                  onFollow={() => handleFollow(u.id)}
                 />
               ))}
             </ScrollView>
           )}
 
-          {/* Communities */}
+          {/* Communities — rich cards with descriptions */}
           <SectionHeader
             title="Communities"
             onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'communities' } })}
           />
           {commLoading ? (
             <View style={{ flexDirection: 'row' }}>
-              {[1, 2, 3].map(i => <Skeleton key={i} width={220} height={60} borderRadius={radius.md} style={{ marginRight: spacing.md }} />)}
+              {[1, 2].map(i => <Skeleton key={i} width={280} height={100} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
+            </View>
+          ) : communities.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+              <Ionicons name="people-outline" size={40} color={colors.accent} />
+              <Text variant="body" color={colors.textSecondary} align="center">No communities yet</Text>
+              <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create one</Button>
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {communities.slice(0, 10).map((c: any) => (
-                <DescriptiveItem
+                <CommunityCard
                   key={c.id}
-                  name={c.name}
-                  avatar={c.image || c.avatar}
-                  description={c.description || c.bio || undefined}
+                  community={c}
                   onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
                 />
               ))}
             </ScrollView>
           )}
 
-          {/* Agents */}
+          {/* Agents — rich cards with bio + model */}
           <SectionHeader
-            title="Agents"
+            title="AI Agents"
             onSeeAll={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'agents' } })}
           />
           {agentsLoading ? (
             <View style={{ flexDirection: 'row' }}>
-              {[1, 2, 3].map(i => <Skeleton key={i} width={220} height={60} borderRadius={radius.md} style={{ marginRight: spacing.md }} />)}
+              {[1, 2].map(i => <Skeleton key={i} width={260} height={100} borderRadius={radius.lg} style={{ marginRight: spacing.md }} />)}
+            </View>
+          ) : visibleAgents.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.lg }}>
+              <Ionicons name="hardware-chip-outline" size={40} color={colors.accent} />
+              <Text variant="body" color={colors.textSecondary} align="center">No agents yet</Text>
+              <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create one</Button>
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {agents.slice(0, 10).map((a: any) => (
-                <DescriptiveItem
+              {visibleAgents.slice(0, 10).map((a: any) => (
+                <AgentCard
                   key={a.id}
-                  name={a.name}
-                  avatar={a.image || a.avatar}
-                  description={a.bio || a.description || a.system_prompt?.slice(0, 60) || undefined}
+                  agent={a}
                   onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
                 />
               ))}
             </ScrollView>
           )}
-
-          {/* Federated Content */}
-          <FederatedSection sdk={sdk} />
         </ScrollView>
       )}
     </Container>

@@ -11,7 +11,7 @@ export default function WalletScreen() {
         <Ionicons name="bulb-outline" size={40} color={colors.accent} />
 
         <Text variant="h2" color={colors.text} align="center">
-          MINDS Tokens
+          Tokens
         </Text>
 
         <Text

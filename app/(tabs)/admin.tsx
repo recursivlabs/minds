@@ -8,7 +8,7 @@ import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type Tab = 'ai' | 'dashboard' | 'users' | 'content' | 'invites' | 'network';
+type Tab = 'dashboard' | 'users' | 'content' | 'invites' | 'network';
 
 const BUSINESS_AI_AGENT_ID = '411ac3a9-dfbc-4463-8963-2e26a645211e';
 
@@ -515,7 +515,7 @@ function NetworkTab({ sdk }: { sdk: any }) {
 export default function AdminScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
-  const [tab, setTab] = React.useState<Tab>('ai');
+  const [tab, setTab] = React.useState<Tab>('dashboard');
 
   if (!sdk) {
     return (
@@ -535,13 +535,12 @@ export default function AdminScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.sm }}>
-        {(['ai', 'dashboard', 'users', 'content', 'invites', 'network'] as Tab[]).map(t => (
-          <TabButton key={t} label={t === 'ai' ? 'AI' : t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onPress={() => setTab(t)} />
+        {(['dashboard', 'users', 'content', 'invites', 'network'] as Tab[]).map(t => (
+          <TabButton key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onPress={() => setTab(t)} />
         ))}
       </ScrollView>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['5xl'], flex: tab === 'ai' ? 1 : undefined }}>
-        {tab === 'ai' && <AITab sdk={sdk} />}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['5xl'] }}>
         {tab === 'dashboard' && <DashboardTab sdk={sdk} />}
         {tab === 'users' && <UsersTab sdk={sdk} />}
         {tab === 'content' && <ContentTab sdk={sdk} />}

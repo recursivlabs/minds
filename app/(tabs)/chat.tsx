@@ -390,7 +390,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           });
         }
       } catch {}
-    }, 3000);
+    }, 5000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);

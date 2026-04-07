@@ -57,7 +57,7 @@ export function PostCard({ post, onVoteChange, onPostDeleted, compact = false }:
 
   const author = post.author || post.user || {};
   const authorName = author.name || author.username || 'Anonymous';
-  const authorUsername = author.username || author.name || 'anonymous';
+  const authorUsername = author.username || author.id || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
   const content = currentContent || '';
   const rawMedia = post.media;

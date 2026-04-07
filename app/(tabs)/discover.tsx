@@ -8,10 +8,9 @@ import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from
 import { useAuth } from '../../lib/auth';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type DiscoverTab = 'all' | 'posts' | 'people' | 'communities' | 'agents';
+type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents';
 
 const TABS: { key: DiscoverTab; label: string }[] = [
-  { key: 'all', label: 'All' },
   { key: 'posts', label: 'Posts' },
   { key: 'people', label: 'People' },
   { key: 'communities', label: 'Communities' },
@@ -217,7 +216,7 @@ export default function DiscoverScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const { sdk } = useAuth();
   const [activeTab, setActiveTab] = React.useState<DiscoverTab>(
-    (params.tab as DiscoverTab) || 'all'
+    (params.tab as DiscoverTab) || 'posts'
   );
   const [searchQuery, setSearchQuery] = React.useState('');
 
@@ -242,28 +241,7 @@ export default function DiscoverScreen() {
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // Build unified "all" feed: interleave content types
-  const buildAllItems = () => {
-    const items: { type: string; data: any; key: string }[] = [];
-    const filteredPosts = filterByQuery(posts || [], ['content', 'title']);
-    const filteredPeople = filterByQuery(profiles || [], ['name', 'username', 'bio']);
-    const filteredCommunities = filterByQuery(communities || [], ['name', 'description']);
-    const filteredAgents = filterByQuery(agents || [], ['name', 'bio', 'description']);
-
-    // Interleave: 2 posts, 1 person, 1 community, 1 agent, repeat
-    let pi = 0, ui = 0, ci = 0, ai = 0;
-    while (pi < filteredPosts.length || ui < filteredPeople.length || ci < filteredCommunities.length || ai < filteredAgents.length) {
-      if (pi < filteredPosts.length) items.push({ type: 'post', data: filteredPosts[pi++], key: `p-${pi}` });
-      if (pi < filteredPosts.length) items.push({ type: 'post', data: filteredPosts[pi++], key: `p-${pi}` });
-      if (ui < filteredPeople.length) items.push({ type: 'person', data: filteredPeople[ui++], key: `u-${ui}` });
-      if (ci < filteredCommunities.length) items.push({ type: 'community', data: filteredCommunities[ci++], key: `c-${ci}` });
-      if (ai < filteredAgents.length) items.push({ type: 'agent', data: filteredAgents[ai++], key: `a-${ai}` });
-    }
-    return items;
-  };
-
   const getData = (): { type: string; data: any; key: string }[] => {
-    if (activeTab === 'all') return buildAllItems();
     if (activeTab === 'posts') {
       const filtered = isSearching ? searchResults : filterByQuery(posts || [], ['content', 'title']);
       return filtered.map((p: any, i: number) => ({ type: 'post', data: p, key: `p-${p.id || i}` }));
@@ -280,9 +258,7 @@ export default function DiscoverScreen() {
     return [];
   };
 
-  const loading = activeTab === 'all'
-    ? postsLoading || profilesLoading || commLoading || agentsLoading
-    : activeTab === 'posts' ? (isSearching ? searchLoading : postsLoading)
+  const loading = activeTab === 'posts' ? (isSearching ? searchLoading : postsLoading)
     : activeTab === 'people' ? profilesLoading
     : activeTab === 'communities' ? commLoading
     : agentsLoading;
@@ -452,7 +428,7 @@ export default function DiscoverScreen() {
                 color={colors.accent}
               />
               <Text variant="h2" color={colors.text} align="center">
-                {searchQuery ? 'No Results' : `Discover ${activeTab === 'all' ? 'Content' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
+                {searchQuery ? 'No Results' : `Discover ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
               </Text>
               <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
                 {searchQuery ? 'Try a different search term.' : 'Be the first to create something.'}

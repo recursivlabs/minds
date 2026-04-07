@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Pressable, Platform, ScrollView } from 'react-native';
+import { View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -11,6 +11,7 @@ import { colors, spacing, radius } from '../constants/theme';
 const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 240;
 const COLLAPSE_KEY = 'minds:sidebar:collapsed';
+const AUTO_COLLAPSE_WIDTH = 1024;
 
 type NavItem = { name: string; label: string; icon: string; activeIcon: string };
 
@@ -18,7 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'index', label: 'Feed', icon: 'newspaper-outline', activeIcon: 'newspaper' },
   { name: 'explore', label: 'Explore', icon: 'compass-outline', activeIcon: 'compass' },
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
-  { name: 'wallet', label: 'Wallet', icon: 'bulb-outline', activeIcon: 'bulb' },
+  { name: 'wallet', label: 'Tokens', icon: 'bulb-outline', activeIcon: 'bulb' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
 ];
 
@@ -27,24 +28,38 @@ const BOTTOM_ITEMS: NavItem[] = [
 ];
 
 export function useSidebarState() {
-  const [collapsed, setCollapsed] = React.useState(false);
+  const { width: windowWidth } = useWindowDimensions();
+  const [manualCollapsed, setManualCollapsed] = React.useState<boolean | null>(null);
 
   React.useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const saved = window.localStorage.getItem(COLLAPSE_KEY);
-      if (saved === 'true') setCollapsed(true);
+      if (saved !== null) setManualCollapsed(saved === 'true');
     }
   }, []);
 
+  // Auto-collapse below breakpoint, but respect manual override
+  const autoCollapsed = windowWidth < AUTO_COLLAPSE_WIDTH;
+  const collapsed = manualCollapsed !== null ? manualCollapsed : autoCollapsed;
+
   const toggle = React.useCallback(() => {
-    setCollapsed(prev => {
-      const next = !prev;
+    setManualCollapsed(prev => {
+      const current = prev !== null ? prev : windowWidth < AUTO_COLLAPSE_WIDTH;
+      const next = !current;
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.localStorage.setItem(COLLAPSE_KEY, String(next));
       }
       return next;
     });
-  }, []);
+  }, [windowWidth]);
+
+  // Reset manual override when crossing the breakpoint
+  React.useEffect(() => {
+    setManualCollapsed(null);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.localStorage.removeItem(COLLAPSE_KEY);
+    }
+  }, [autoCollapsed]);
 
   return { collapsed, toggle, width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH };
 }
