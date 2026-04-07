@@ -123,17 +123,10 @@ export default function FeedScreen() {
     }
     if (item.type === 'people') {
       return (
-        <View style={{
-          marginHorizontal: spacing.lg, marginVertical: spacing.sm,
-          backgroundColor: colors.surface, borderRadius: radius.lg,
-          borderWidth: 0.5, borderColor: colors.glassBorder,
-          padding: spacing.lg, gap: spacing.md,
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Ionicons name="sparkles" size={14} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>
-              People to follow
-            </Text>
+        <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+            <Ionicons name="sparkles" size={13} color={colors.accent} />
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Suggested for you</Text>
           </View>
           {(item.data as any[]).map((person: any, idx: number) => (
             <Pressable
@@ -141,11 +134,9 @@ export default function FeedScreen() {
               onPress={() => router.push(`/(tabs)/user/${person.username || person.id}` as any)}
               style={({ pressed }) => ({
                 flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                paddingVertical: spacing.sm, paddingHorizontal: spacing.sm,
-                borderRadius: radius.md,
+                paddingVertical: spacing.sm + 2,
                 backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-                borderTopWidth: idx > 0 ? 0.5 : 0,
-                borderTopColor: 'rgba(255,255,255,0.04)',
+                borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.04)',
               })}
             >
               <Avatar uri={person.image || person.avatar} name={person.name} size="md" />
@@ -169,25 +160,22 @@ export default function FeedScreen() {
         <Pressable
           onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
           style={({ pressed }) => ({
-            marginHorizontal: spacing.lg, marginVertical: spacing.sm,
-            backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-            borderRadius: radius.lg, borderWidth: 0.5, borderColor: colors.glassBorder,
-            padding: spacing.lg,
+            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+            borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
           })}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-            <Ionicons name="people" size={14} color={colors.accent} />
+            <Ionicons name="people" size={13} color={colors.accent} />
             <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Community</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-            <Avatar uri={c.image || c.avatar} name={c.name} size="lg" />
+            <Avatar uri={c.image || c.avatar} name={c.name} size="md" />
             <View style={{ flex: 1 }}>
-              <Text variant="bodyMedium" style={{ fontSize: 15 }}>{c.name}</Text>
+              <Text variant="bodyMedium">{c.name}</Text>
               <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>{memberCount} member{memberCount !== 1 ? 's' : ''}</Text>
               {(c.description || c.bio) ? (
-                <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.sm, lineHeight: 20 }}>
-                  {c.description || c.bio}
-                </Text>
+                <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{c.description || c.bio}</Text>
               ) : null}
             </View>
           </View>
@@ -201,21 +189,20 @@ export default function FeedScreen() {
         <Pressable
           onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
           style={({ pressed }) => ({
-            marginHorizontal: spacing.lg, marginVertical: spacing.sm,
-            backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-            borderRadius: radius.lg, borderWidth: 0.5, borderColor: colors.glassBorder,
-            padding: spacing.lg,
+            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+            borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
           })}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-            <Ionicons name="hardware-chip" size={14} color={colors.accent} />
+            <Ionicons name="hardware-chip" size={13} color={colors.accent} />
             <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>Agent</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-            <Avatar uri={a.image || a.avatar} name={a.name} size="lg" />
+            <Avatar uri={a.image || a.avatar} name={a.name} size="md" />
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <Text variant="bodyMedium" style={{ flex: 1, fontSize: 15 }}>{a.name}</Text>
+                <Text variant="bodyMedium" style={{ flex: 1 }}>{a.name}</Text>
                 <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
                   <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
                 </View>
@@ -227,9 +214,7 @@ export default function FeedScreen() {
                 </View>
               ) : null}
               {(a.bio || a.description) ? (
-                <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.sm, lineHeight: 20 }}>
-                  {a.bio || a.description}
-                </Text>
+                <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{a.bio || a.description}</Text>
               ) : null}
             </View>
           </View>

@@ -1,211 +1,322 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, FlatList, TextInput, Platform, Pressable, ScrollView } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Avatar, Skeleton, Button } from '../../components';
+import { Text, Avatar, Skeleton, Button, PostCard } from '../../components';
 import { Container } from '../../components/Container';
-import { usePosts, useProfiles, useAgents } from '../../lib/hooks';
+import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
-import { colors, spacing, radius } from '../../constants/theme';
+import { useToast } from '../../components/Toast';
+import { colors, spacing, radius, typography } from '../../constants/theme';
 
 const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
 
-function RankBadge({ rank }: { rank: number }) {
-  const bg = rank === 1 ? '#d4a844' : rank === 2 ? '#a0a0a8' : rank === 3 ? '#cd7f32' : colors.surface;
-  const textColor = rank <= 3 ? '#06060a' : colors.textMuted;
+type Category = 'posts' | 'people' | 'communities' | 'agents';
+type SubTab = 'trending' | 'suggested' | 'new';
+
+const CATEGORIES: { key: Category; label: string; icon: string }[] = [
+  { key: 'posts', label: 'Posts', icon: 'newspaper-outline' },
+  { key: 'people', label: 'People', icon: 'person-outline' },
+  { key: 'communities', label: 'Communities', icon: 'people-outline' },
+  { key: 'agents', label: 'Agents', icon: 'hardware-chip-outline' },
+];
+
+const SUB_TABS: { key: SubTab; label: string }[] = [
+  { key: 'trending', label: 'Trending' },
+  { key: 'suggested', label: 'Suggested' },
+  { key: 'new', label: 'New' },
+];
+
+function FollowButton({ onFollow }: { onFollow: () => void }) {
+  const [followed, setFollowed] = React.useState(false);
   return (
-    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-      <Text variant="caption" color={textColor} style={{ fontWeight: '700', fontSize: 12 }}>{rank}</Text>
-    </View>
+    <Pressable
+      onPress={() => { if (!followed) { setFollowed(true); onFollow(); } }}
+      style={{
+        paddingHorizontal: spacing.lg, paddingVertical: spacing.xs + 2,
+        borderRadius: radius.full,
+        backgroundColor: followed ? colors.surface : colors.accentMuted,
+        borderWidth: followed ? 0.5 : 0, borderColor: colors.glassBorder,
+      }}
+    >
+      <Text variant="caption" color={followed ? colors.textSecondary : colors.accent} style={{ fontFamily: 'Geist-Regular' }}>
+        {followed ? 'Following' : 'Follow'}
+      </Text>
+    </Pressable>
   );
 }
 
-function LeaderboardSection({ title, icon, items, renderItem, loading }: {
-  title: string;
-  icon: string;
-  items: any[];
-  renderItem: (item: any, index: number) => React.ReactNode;
-  loading: boolean;
-}) {
+export default function DiscoverScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const { sdk } = useAuth();
+  const toast = useToast();
+  const [category, setCategory] = React.useState<Category>((params.tab as Category) || 'posts');
+  const [subTab, setSubTab] = React.useState<SubTab>('trending');
+  const [query, setQuery] = React.useState('');
+
+  const { posts: trendingPosts, loading: postsLoading } = usePosts('score', 30);
+  const { posts: latestPosts, loading: latestLoading } = usePosts('latest', 30);
+  const { communities, loading: commLoading } = useCommunities(50);
+  const { agents, loading: agentsLoading } = useAgents(50);
+  const { profiles, loading: profilesLoading } = useProfiles(50);
+  const { results: searchResults, loading: searchLoading } = useSearchPosts(query);
+
+  const visibleAgents = React.useMemo(
+    () => (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id)),
+    [agents]
+  );
+
+  const isSearching = query.trim().length > 0;
+
+  const handleFollow = async (userId: string) => {
+    if (!sdk) return;
+    try { await sdk.profiles.follow(userId); toast.show('Followed'); } catch {}
+  };
+
+  const getData = (): any[] => {
+    if (isSearching) {
+      if (category === 'posts') return searchResults;
+      if (category === 'people') {
+        const q = query.toLowerCase();
+        return (profiles || []).filter((p: any) => (p.name || '').toLowerCase().includes(q) || (p.username || '').toLowerCase().includes(q));
+      }
+      if (category === 'communities') {
+        const q = query.toLowerCase();
+        return (communities || []).filter((c: any) => (c.name || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
+      }
+      if (category === 'agents') {
+        const q = query.toLowerCase();
+        return visibleAgents.filter((a: any) => (a.name || '').toLowerCase().includes(q) || (a.bio || '').toLowerCase().includes(q));
+      }
+    }
+
+    if (category === 'posts') {
+      if (subTab === 'trending') return trendingPosts || [];
+      if (subTab === 'new') return latestPosts || [];
+      return trendingPosts || []; // suggested = trending for now
+    }
+    if (category === 'people') {
+      const all = profiles || [];
+      if (subTab === 'trending') return [...all].sort((a: any, b: any) => (b.followerCount || b.follower_count || 0) - (a.followerCount || a.follower_count || 0));
+      if (subTab === 'new') return [...all].sort((a: any, b: any) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime());
+      return all;
+    }
+    if (category === 'communities') {
+      const all = communities || [];
+      if (subTab === 'trending') return [...all].sort((a: any, b: any) => (b.memberCount || b.member_count || 0) - (a.memberCount || a.member_count || 0));
+      if (subTab === 'new') return [...all].sort((a: any, b: any) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime());
+      return all;
+    }
+    if (category === 'agents') {
+      return visibleAgents;
+    }
+    return [];
+  };
+
+  const loading = category === 'posts' ? (isSearching ? searchLoading : postsLoading)
+    : category === 'people' ? profilesLoading
+    : category === 'communities' ? commLoading
+    : agentsLoading;
+
+  const data = getData();
+
+  const renderItem = ({ item }: { item: any }) => {
+    if (category === 'posts') {
+      return <PostCard post={item} compact />;
+    }
+    if (category === 'people') {
+      return (
+        <Pressable
+          onPress={() => router.push(`/(tabs)/user/${item.username || item.id}` as any)}
+          style={({ pressed }) => ({
+            flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+            borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
+          })}
+        >
+          <Avatar uri={item.image || item.avatar} name={item.name} size="md" />
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyMedium" numberOfLines={1}>{item.name || 'Unknown'}</Text>
+            {item.username && <Text variant="caption" color={colors.textMuted}>@{item.username}</Text>}
+            {(item.bio || item.description) && (
+              <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: 2, lineHeight: 17 }}>{item.bio || item.description}</Text>
+            )}
+            {(item.followerCount || item.follower_count) ? (
+              <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>{item.followerCount || item.follower_count} followers</Text>
+            ) : null}
+          </View>
+          <FollowButton onFollow={() => handleFollow(item.id)} />
+        </Pressable>
+      );
+    }
+    if (category === 'communities') {
+      return (
+        <Pressable
+          onPress={() => router.push(`/(tabs)/community/${item.slug || item.id}` as any)}
+          style={({ pressed }) => ({
+            flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+            borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
+          })}
+        >
+          <Avatar uri={item.image || item.avatar} name={item.name} size="md" />
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyMedium" numberOfLines={1}>{item.name}</Text>
+            <Text variant="caption" color={colors.textMuted}>{item.memberCount || item.member_count || 0} members</Text>
+            {(item.description || item.bio) && (
+              <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{item.description || item.bio}</Text>
+            )}
+          </View>
+        </Pressable>
+      );
+    }
+    if (category === 'agents') {
+      return (
+        <Pressable
+          onPress={() => router.push(`/(tabs)/user/${item.username || item.id}` as any)}
+          style={({ pressed }) => ({
+            flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+            borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
+          })}
+        >
+          <Avatar uri={item.image || item.avatar} name={item.name} size="md" />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{item.name}</Text>
+              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
+                <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
+              </View>
+            </View>
+            {item.model && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 }}>
+                <Ionicons name="hardware-chip-outline" size={11} color={colors.textMuted} />
+                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{item.model.split('/').pop()}</Text>
+              </View>
+            )}
+            {(item.bio || item.description) && (
+              <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{item.bio || item.description}</Text>
+            )}
+          </View>
+        </Pressable>
+      );
+    }
+    return null;
+  };
+
   return (
-    <View style={{ marginBottom: spacing['2xl'] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg }}>
-        <Ionicons name={icon as any} size={18} color={colors.accent} />
-        <Text variant="h3" style={{ fontSize: 16 }}>{title}</Text>
+    <Container safeTop padded={false}>
+      {/* Search */}
+      <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.sm }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center',
+          backgroundColor: colors.surface, borderRadius: radius.md,
+          borderWidth: 0.5, borderColor: colors.glassBorder,
+          paddingHorizontal: spacing.md, gap: spacing.sm,
+        }}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            placeholder="Search..."
+            placeholderTextColor={colors.textMuted}
+            value={query}
+            onChangeText={setQuery}
+            style={{
+              flex: 1, color: colors.text, ...typography.body, paddingVertical: 12,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </Pressable>
+          )}
+        </View>
       </View>
+
+      {/* Category tabs */}
+      <ScrollView
+        horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.xs }}
+        style={{ flexGrow: 0, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)' }}
+      >
+        {CATEGORIES.map(cat => (
+          <Pressable
+            key={cat.key}
+            onPress={() => setCategory(cat.key)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+              paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+              borderBottomWidth: 2, borderBottomColor: category === cat.key ? colors.accent : 'transparent',
+            }}
+          >
+            <Ionicons name={cat.icon as any} size={15} color={category === cat.key ? colors.accent : colors.textMuted} />
+            <Text variant="label" color={category === cat.key ? colors.accent : colors.textMuted}>{cat.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* Sub-tabs */}
+      {!isSearching && (
+        <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xl, gap: spacing.md, paddingVertical: spacing.sm }}>
+          {SUB_TABS.map(st => (
+            <Pressable
+              key={st.key}
+              onPress={() => setSubTab(st.key)}
+              style={{
+                paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+                borderRadius: radius.full,
+                backgroundColor: subTab === st.key ? colors.accentSubtle : 'transparent',
+              }}
+            >
+              <Text variant="caption" color={subTab === st.key ? colors.accent : colors.textMuted} style={{ fontSize: 12 }}>
+                {st.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Results */}
       {loading ? (
-        <View style={{ gap: spacing.md }}>
-          {[1, 2, 3].map(i => (
+        <View style={{ padding: spacing.xl, gap: spacing.xl }}>
+          {[1, 2, 3, 4, 5].map(i => (
             <View key={i} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-              <Skeleton width={28} height={28} borderRadius={14} />
               <Skeleton width={40} height={40} borderRadius={20} />
               <View style={{ flex: 1, gap: spacing.xs }}>
-                <Skeleton width={120} height={14} />
-                <Skeleton width={80} height={12} />
+                <Skeleton width={160} height={14} />
+                <Skeleton width={100} height={12} />
               </View>
             </View>
           ))}
         </View>
-      ) : items.length === 0 ? (
-        <Text variant="caption" color={colors.textMuted}>No data yet</Text>
       ) : (
-        <View style={{ gap: spacing.xs }}>
-          {items.map((item, index) => renderItem(item, index))}
-        </View>
+        <FlatList
+          data={data}
+          keyExtractor={(item, i) => item.id || `${i}`}
+          renderItem={renderItem}
+          initialNumToRender={10}
+          maxToRenderPerBatch={5}
+          ListEmptyComponent={
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], gap: spacing['2xl'] }}>
+              <Ionicons name={CATEGORIES.find(c => c.key === category)?.icon as any || 'search-outline'} size={40} color={colors.accent} />
+              <Text variant="h2" color={colors.text} align="center">
+                {isSearching ? 'No Results' : `No ${category}`}
+              </Text>
+              <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
+                {isSearching ? 'Try a different search.' : `Be the first to contribute.`}
+              </Text>
+              {!isSearching && (
+                <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create</Button>
+              )}
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+        />
       )}
-    </View>
-  );
-}
-
-export default function LeaderboardScreen() {
-  const router = useRouter();
-  const { sdk } = useAuth();
-
-  const { posts, loading: postsLoading } = usePosts('score', 20);
-  const { profiles, loading: profilesLoading } = useProfiles(20);
-  const { agents, loading: agentsLoading } = useAgents(20);
-
-  const visibleAgents = (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id));
-
-  // Top posts by score
-  const topPosts = React.useMemo(() =>
-    [...(posts || [])].sort((a: any, b: any) => (b.score || 0) - (a.score || 0)).slice(0, 10),
-    [posts]
-  );
-
-  // Top people by follower count
-  const topPeople = React.useMemo(() =>
-    [...(profiles || [])].sort((a: any, b: any) =>
-      (b.followerCount || b.follower_count || 0) - (a.followerCount || a.follower_count || 0)
-    ).slice(0, 10),
-    [profiles]
-  );
-
-  // Top agents (just list them — they're all interesting)
-  const topAgents = visibleAgents.slice(0, 10);
-
-  return (
-    <Container safeTop padded={false}>
-      <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
-        <Text variant="h3">Leaderboard</Text>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['4xl'] }}
-      >
-        {/* Top Posts */}
-        <LeaderboardSection
-          title="Top Posts"
-          icon="flame-outline"
-          items={topPosts}
-          loading={postsLoading}
-          renderItem={(post, index) => {
-            const author = post.author?.name || 'Anonymous';
-            const score = post.score || 0;
-            return (
-              <Pressable
-                key={post.id}
-                onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                  paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.sm,
-                  borderRadius: radius.md,
-                  backgroundColor: pressed ? colors.surfaceHover : index < 3 ? 'rgba(212,168,68,0.03)' : 'transparent',
-                })}
-              >
-                <RankBadge rank={index + 1} />
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodyMedium" numberOfLines={1} style={{ fontSize: 14 }}>
-                    {post.title || post.content?.slice(0, 60) || 'Untitled'}
-                  </Text>
-                  <Text variant="caption" color={colors.textMuted}>{author}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <Ionicons name="arrow-up" size={14} color={colors.accent} />
-                  <Text variant="bodyMedium" color={colors.accent} style={{ fontSize: 13 }}>{score}</Text>
-                </View>
-              </Pressable>
-            );
-          }}
-        />
-
-        {/* Top People */}
-        <LeaderboardSection
-          title="Top People"
-          icon="trophy-outline"
-          items={topPeople}
-          loading={profilesLoading}
-          renderItem={(person, index) => {
-            const name = person.name || 'Unknown';
-            const username = person.username;
-            const followers = person.followerCount || person.follower_count || 0;
-            return (
-              <Pressable
-                key={person.id}
-                onPress={() => router.push(`/(tabs)/user/${username || person.id}` as any)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                  paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.sm,
-                  borderRadius: radius.md,
-                  backgroundColor: pressed ? colors.surfaceHover : index < 3 ? 'rgba(212,168,68,0.03)' : 'transparent',
-                })}
-              >
-                <RankBadge rank={index + 1} />
-                <Avatar uri={person.image || person.avatar} name={name} size="md" />
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
-                  {username && <Text variant="caption" color={colors.textMuted}>@{username}</Text>}
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text variant="bodyMedium" color={colors.accent} style={{ fontSize: 13 }}>{followers}</Text>
-                  <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>followers</Text>
-                </View>
-              </Pressable>
-            );
-          }}
-        />
-
-        {/* Top Agents */}
-        <LeaderboardSection
-          title="Top Agents"
-          icon="hardware-chip-outline"
-          items={topAgents}
-          loading={agentsLoading}
-          renderItem={(agent, index) => {
-            const name = agent.name || 'Agent';
-            const bio = agent.bio || agent.description || '';
-            const model = agent.model?.split('/').pop() || '';
-            return (
-              <Pressable
-                key={agent.id}
-                onPress={() => router.push(`/(tabs)/user/${agent.username || agent.id}` as any)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                  paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.sm,
-                  borderRadius: radius.md,
-                  backgroundColor: pressed ? colors.surfaceHover : index < 3 ? 'rgba(212,168,68,0.03)' : 'transparent',
-                })}
-              >
-                <RankBadge rank={index + 1} />
-                <Avatar uri={agent.image || agent.avatar} name={name} size="md" />
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                    <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{name}</Text>
-                    <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
-                      <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
-                    </View>
-                  </View>
-                  {bio ? <Text variant="caption" color={colors.textSecondary} numberOfLines={1}>{bio}</Text> : null}
-                </View>
-                {model ? (
-                  <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{model}</Text>
-                ) : null}
-              </Pressable>
-            );
-          }}
-        />
-      </ScrollView>
     </Container>
   );
 }

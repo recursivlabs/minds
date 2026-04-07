@@ -263,17 +263,27 @@ export default function CreateScreen() {
           flexDirection: 'row',
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.sm,
-          gap: spacing.lg,
+          gap: spacing.sm,
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.04)',
+          borderBottomColor: 'rgba(255,255,255,0.06)',
         }}
       >
         {MODES.map((m) => (
-          <Pressable key={m.key} onPress={() => setMode(m.key)} hitSlop={4}>
+          <Pressable
+            key={m.key}
+            onPress={() => setMode(m.key)}
+            style={{
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.sm,
+              borderRadius: radius.full,
+              backgroundColor: mode === m.key ? colors.accentSubtle : 'transparent',
+              borderWidth: mode === m.key ? 0 : 0.5,
+              borderColor: colors.glassBorder,
+            }}
+          >
             <Text
-              variant="caption"
+              variant="label"
               color={mode === m.key ? colors.accent : colors.textMuted}
-              style={{ fontWeight: mode === m.key ? '500' : '300' }}
             >
               {m.label}
             </Text>
@@ -311,9 +321,9 @@ export default function CreateScreen() {
                 />
                 <View style={{
                   position: 'absolute', top: '100%', left: 0, marginTop: spacing.xs,
-                  backgroundColor: '#1a1a1e', borderRadius: radius.md, borderWidth: 1,
-                  borderColor: colors.border, zIndex: 99999, minWidth: 220, maxHeight: 280,
-                  ...(Platform.OS === 'web' ? { boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'auto' } as any : {}),
+                  backgroundColor: '#111114', borderRadius: radius.md, borderWidth: 1,
+                  borderColor: colors.border, zIndex: 999999, minWidth: 260, maxHeight: 320,
+                  ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)', overflow: 'auto' } as any : {}),
                 }}>
                   {(communities || []).length === 0 && (
                     <View style={{ padding: spacing.lg, alignItems: 'center', gap: spacing.sm }}>
