@@ -208,7 +208,7 @@ export default function CreateScreen() {
     }
   };
 
-  const canSubmit = mode === 'post' ? (content.trim().length > 0 || !!mediaUri)
+  const canSubmit = mode === 'post' ? ((content.trim().length > 0 || !!mediaUri) && !!selectedCommunity)
     : mode === 'agent' ? (agentName.trim().length > 0 && agentBio.trim().length > 0)
     : mode === 'app' ? (appName.trim().length > 0 && appDesc.trim().length > 0)
     : (communityName.trim().length > 0 && communityDesc.trim().length > 0);
@@ -296,9 +296,9 @@ export default function CreateScreen() {
                 borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : colors.glassBorder,
               }}
             >
-              <Ionicons name={selectedCommunity ? 'people' : 'globe-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
+              <Ionicons name={selectedCommunity ? 'people' : 'add-circle-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
               <Text variant="caption" color={selectedCommunity ? colors.accent : colors.textMuted} style={{ fontSize: 13 }}>
-                {selectedCommunity ? selectedCommunity.name : 'Global'}
+                {selectedCommunity ? selectedCommunity.name : 'Choose a community'}
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
             </Pressable>
@@ -315,19 +315,14 @@ export default function CreateScreen() {
                   borderColor: colors.border, zIndex: 99999, minWidth: 220, maxHeight: 280,
                   ...(Platform.OS === 'web' ? { boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'auto' } as any : {}),
                 }}>
-                  <Pressable
-                    onPress={() => { setSelectedCommunity(null); setShowCommunityPicker(false); }}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-                      paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-                      backgroundColor: !selectedCommunity ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
-                      borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.04)',
-                    })}
-                  >
-                    <Ionicons name="globe-outline" size={16} color={!selectedCommunity ? colors.accent : colors.textMuted} />
-                    <Text variant="body" color={!selectedCommunity ? colors.accent : colors.text} style={{ fontSize: 14 }}>Global</Text>
-                    {!selectedCommunity && <Ionicons name="checkmark" size={16} color={colors.accent} style={{ marginLeft: 'auto' } as any} />}
-                  </Pressable>
+                  {(communities || []).length === 0 && (
+                    <View style={{ padding: spacing.lg, alignItems: 'center', gap: spacing.sm }}>
+                      <Text variant="body" color={colors.textMuted} align="center">No communities yet</Text>
+                      <Pressable onPress={() => { setShowCommunityPicker(false); setMode('community' as any); }}>
+                        <Text variant="caption" color={colors.accent}>Create one</Text>
+                      </Pressable>
+                    </View>
+                  )}
                   {(communities || []).map((c: any) => (
                     <Pressable
                       key={c.id}
