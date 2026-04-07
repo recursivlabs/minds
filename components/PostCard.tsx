@@ -10,6 +10,8 @@ import { ReportModal } from './ReportModal';
 import { useAuth } from '../lib/auth';
 import { BASE_ORIGIN } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
+import { useToast } from './Toast';
+import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
 import { colors, spacing, radius, typography } from '../constants/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
@@ -34,6 +36,7 @@ function timeAgo(dateStr: string): string {
 export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPostDeleted, compact = false }: Props) {
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const toast = useToast();
   const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(
     post.userReaction || post.user_reaction || post.userVote || post.user_vote || null
   );
@@ -45,7 +48,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [editSaving, setEditSaving] = React.useState(false);
   const [currentContent, setCurrentContent] = React.useState(post.content || post.body || '');
   const [isDeleted, setIsDeleted] = React.useState(false);
-  const [linkCopied, setLinkCopied] = React.useState(false);
+  const [saved, setSaved] = React.useState(isBookmarked(post.id));
 
   // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {
@@ -108,6 +111,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       }
     } catch (err: any) {
       console.error('[Vote] Failed:', err?.message || err, 'postId:', post.id, 'type:', type);
+      toast.show('Vote failed', 'error');
       setUserVote(prevVote);
       setScore(prevScore);
       onVoteChange?.(post.id, prevScore, prevVote);
@@ -341,6 +345,18 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
         </Pressable>
 
+        <Pressable
+          onPress={() => {
+            const nowSaved = toggleBookmark(post.id);
+            setSaved(nowSaved);
+            toast.show(nowSaved ? 'Saved' : 'Removed from saved');
+          }}
+          hitSlop={8}
+          style={{ padding: 2 }}
+        >
+          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={saved ? colors.accent : colors.textMuted} />
+        </Pressable>
+
         <Pressable onPress={() => setShowMenu(!showMenu)} hitSlop={8} style={{ padding: 2 }}>
           <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
         </Pressable>
@@ -400,18 +416,24 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           <Pressable
             onPress={async () => {
               setShowMenu(false);
-              const url = `https://minds.on.recursiv.io/(tabs)/post/${post.id}`;
+              const url = `${BASE_ORIGIN}/post/${post.id}`;
               try {
-                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator?.clipboard) {
-                  await navigator.clipboard.writeText(url);
-                  setLinkCopied(true);
-                  setTimeout(() => setLinkCopied(false), 2000);
+                if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
+                  if (navigator.share) {
+                    await navigator.share({ title: post.title || 'Post on Minds', url });
+                  } else if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(url);
+                    toast.show('Link copied');
+                  }
+                } else {
+                  const { Share } = require('react-native');
+                  await Share.share({ message: url });
                 }
               } catch {}
             }}
             style={{ padding: spacing.md }}
           >
-            <Text variant="body">{linkCopied ? 'Copied!' : 'Copy Link'}</Text>
+            <Text variant="body">Share</Text>
           </Pressable>
         </View>
       )}

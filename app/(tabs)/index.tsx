@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Header, FeedTabs, PostCard, Skeleton, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
+import { Header, FeedTabs, PostCard, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
+import { FeedSkeletons } from '../../components/PostSkeleton';
 import { OnboardingFlow, useOnboarding } from '../../components/Onboarding';
 import { useToast } from '../../components/Toast';
 import { ORG_ID } from '../../lib/recursiv';
@@ -228,20 +229,7 @@ export default function FeedScreen() {
     return null;
   }, [router, setPosts, handleFollow]);
 
-  const renderPostSkeleton = () => (
-    <View style={{ padding: spacing.xl, gap: spacing.md }}>
-      {[1, 2, 3].map(i => (
-        <View key={i} style={{ gap: spacing.md, marginBottom: spacing.xl }}>
-          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <Skeleton width={32} height={32} borderRadius={16} />
-            <Skeleton width={120} height={14} />
-          </View>
-          <Skeleton height={60} />
-          <Skeleton width="60%" height={12} />
-        </View>
-      ))}
-    </View>
-  );
+  const renderPostSkeleton = () => <FeedSkeletons count={5} />;
 
   const { width: windowWidth } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && windowWidth > 1024;

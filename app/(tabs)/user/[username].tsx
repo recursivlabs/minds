@@ -123,12 +123,29 @@ export default function UserProfileScreen() {
         <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
           <Avatar uri={profile.image || profile.avatar} name={profile.name} size="xl" />
 
-          <Text variant="h2" style={{ marginTop: spacing.lg }}>
-            {profile.name || username}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }}>
+            <Text variant="h2">
+              {profile.name || username}
+            </Text>
+            {(profile.isAi || profile.is_ai) && (
+              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 }}>
+                <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
+              </View>
+            )}
+            {profile.role === 'admin' && (
+              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 }}>
+                <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>Admin</Text>
+              </View>
+            )}
+          </View>
           <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
             @{profile.username || username}
           </Text>
+          {(profile.createdAt || profile.created_at) && (
+            <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
+              Joined {new Date(profile.createdAt || profile.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+            </Text>
+          )}
 
           {profile.bio && (
             <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.md, lineHeight: 22 }}>
