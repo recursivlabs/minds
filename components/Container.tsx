@@ -1,6 +1,7 @@
 import { View, ViewProps, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../constants/theme';
+import { useTheme } from '../lib/theme';
+import { spacing } from '../constants/theme';
 
 interface Props extends ViewProps {
   safeTop?: boolean;
@@ -21,6 +22,7 @@ export function Container({
   ...props
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   return (
     <View
