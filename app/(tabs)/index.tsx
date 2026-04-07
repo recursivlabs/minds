@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header, FeedTabs, PostCard, Skeleton, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
 import { OnboardingFlow, useOnboarding } from '../../components/Onboarding';
+import { useToast } from '../../components/Toast';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts, useProfiles, useCommunities, useAgents } from '../../lib/hooks';
@@ -54,9 +55,16 @@ export default function FeedScreen() {
     [agents]
   );
 
+  const toast = useToast();
+
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
-    try { await sdk.profiles.follow(userId); } catch {}
+    try {
+      await sdk.profiles.follow(userId);
+      toast.show('Followed');
+    } catch {
+      toast.show('Failed to follow', 'error');
+    }
   };
 
   // Build unified "For You" feed: posts interleaved with suggestions

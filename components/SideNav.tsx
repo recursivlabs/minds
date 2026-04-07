@@ -78,6 +78,19 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { conversations } = useConversations();
   const { communities } = useCommunities(5);
   const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
+  const [unreadNotifs, setUnreadNotifs] = React.useState(0);
+
+  // Fetch unread notification count
+  React.useEffect(() => {
+    if (!sdk) return;
+    (async () => {
+      try {
+        const res = await (sdk as any).notifications.list({ limit: 10 });
+        const notifs = res.data || [];
+        setUnreadNotifs(notifs.filter((n: any) => n.status === 'unread').length);
+      } catch {}
+    })();
+  }, [sdk, pathname]); // Refetch when navigating (cheap, cached)
 
   // Real-time unread tracking
   React.useEffect(() => {
@@ -152,8 +165,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             size={20}
             color={active ? colors.accent : colors.textMuted}
           />
-          {/* Gold dot badge for notifications — hidden until we have real unread count */}
-          {false && item.name === 'notifications' && (
+          {/* Gold dot badge for unread notifications */}
+          {unreadNotifs > 0 && item.name === 'notifications' && (
             <View
               style={{
                 position: 'absolute',

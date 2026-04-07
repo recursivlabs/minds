@@ -228,12 +228,13 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   return (
     <Pressable
       onPress={() => !isEditing && router.push(`/(tabs)/post/${post.id}` as any)}
-      style={({ pressed }) => ({
-        backgroundColor: pressed && !isEditing ? colors.surfaceHover : 'transparent',
+      style={({ pressed, hovered }: any) => ({
+        backgroundColor: pressed && !isEditing ? colors.surfaceHover : (hovered && !isEditing) ? 'rgba(255,255,255,0.02)' : 'transparent',
         borderBottomWidth: 0.5,
         borderBottomColor: 'rgba(255,255,255,0.06)',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
+        ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease', cursor: isEditing ? 'default' : 'pointer' } as any : {}),
       })}
     >
       {/* Author row */}
