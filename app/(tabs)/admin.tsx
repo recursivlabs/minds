@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
+import { TabBar } from '../../components/TabBar';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
@@ -649,11 +650,12 @@ export default function AdminScreen() {
     <Container safeTop padded={false}>
       <ScreenHeader title="Admin" />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.sm }}>
-        {(['dashboard', 'users', 'content', 'reports', 'communities', 'invites', 'network'] as Tab[]).map(t => (
-          <TabButton key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onPress={() => setTab(t)} />
-        ))}
-      </ScrollView>
+      <TabBar
+        tabs={(['dashboard', 'users', 'content', 'reports', 'communities', 'invites', 'network'] as const).map(t => ({ key: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+        active={tab}
+        onChange={(k) => setTab(k as Tab)}
+        scrollable
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['5xl'] }}>
         {tab === 'dashboard' && <DashboardTab sdk={sdk} />}

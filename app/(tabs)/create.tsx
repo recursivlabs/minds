@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 import { Text, Button, Input } from '../../components';
 import { Container } from '../../components/Container';
+import { TabBar } from '../../components/TabBar';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
@@ -261,38 +262,7 @@ export default function CreateScreen() {
       </View>
 
       {/* Mode switcher */}
-      <View
-        style={{
-          flexDirection: 'row',
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.sm,
-          gap: spacing.sm,
-          borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
-        }}
-      >
-        {MODES.map((m) => (
-          <Pressable
-            key={m.key}
-            onPress={() => setMode(m.key)}
-            style={{
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.sm,
-              borderRadius: radius.full,
-              backgroundColor: mode === m.key ? colors.accentSubtle : 'transparent',
-              borderWidth: mode === m.key ? 0 : 0.5,
-              borderColor: colors.glassBorder,
-            }}
-          >
-            <Text
-              variant="label"
-              color={mode === m.key ? colors.accent : colors.textMuted}
-            >
-              {m.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <TabBar tabs={MODES} active={mode} onChange={(k) => setMode(k as Mode)} />
 
       {/* Content area */}
       {mode === 'post' ? (

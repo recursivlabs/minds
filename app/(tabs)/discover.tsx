@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, Skeleton, PostCard } from '../../components';
 import { Container } from '../../components/Container';
+import { TabBar } from '../../components/TabBar';
 import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
 import { colors, spacing, radius, typography } from '../../constants/theme';
@@ -391,39 +392,7 @@ export default function DiscoverScreen() {
       </View>
 
       {/* Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.xl,
-          gap: spacing.xs,
-        }}
-        style={{
-          borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
-          flexGrow: 0,
-        }}
-      >
-        {TABS.map((tab) => (
-          <Pressable
-            key={tab.key}
-            onPress={() => { setActiveTab(tab.key); }}
-            style={{
-              paddingVertical: spacing.md,
-              paddingHorizontal: spacing.md,
-              borderBottomWidth: 2,
-              borderBottomColor: activeTab === tab.key ? colors.accent : 'transparent',
-            }}
-          >
-            <Text
-              variant="label"
-              color={activeTab === tab.key ? colors.accent : colors.textMuted}
-            >
-              {tab.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <TabBar tabs={TABS} active={activeTab} onChange={(k) => setActiveTab(k as DiscoverTab)} scrollable />
 
       {/* List */}
       {loading ? (

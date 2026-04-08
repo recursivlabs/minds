@@ -8,6 +8,7 @@ import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useMyProfile, usePosts, useCommunities, useAgents } from '../../lib/hooks';
 import { colors, spacing, radius, typography } from '../../constants/theme';
+import { TabBar } from '../../components/TabBar';
 import { getBookmarks } from '../../lib/bookmarks';
 import { getCached } from '../../lib/cache';
 
@@ -249,35 +250,8 @@ export default function ProfileScreen() {
         </View>
 
         {/* Content tabs */}
-        <View
-          style={{
-            flexDirection: 'row',
-            paddingHorizontal: spacing.xl,
-            marginTop: spacing.xl,
-            gap: spacing.lg,
-            borderBottomWidth: 0.5,
-            borderBottomColor: colors.borderSubtle,
-          }}
-        >
-          {TABS.map((tab) => (
-            <Pressable
-              key={tab.key}
-              onPress={() => setActiveTab(tab.key)}
-              style={{
-                paddingBottom: spacing.md,
-                borderBottomWidth: 2,
-                borderBottomColor: activeTab === tab.key ? colors.accent : 'transparent',
-              }}
-            >
-              <Text
-                variant="caption"
-                color={activeTab === tab.key ? colors.accent : colors.textMuted}
-                style={{ fontWeight: activeTab === tab.key ? '500' : '300' }}
-              >
-                {tab.label}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={{ marginTop: spacing.xl }}>
+          <TabBar tabs={TABS} active={activeTab} onChange={(k) => setActiveTab(k as typeof activeTab)} scrollable />
         </View>
 
         {/* Tab content */}
