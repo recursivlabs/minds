@@ -407,10 +407,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       {showMenu && (
         <View
           style={{
-            position: 'absolute',
-            right: spacing.xl,
-            bottom: spacing['5xl'],
-            backgroundColor: colors.bg,
+            ...(Platform.OS === 'web'
+              ? { position: 'fixed' as any, top: '30%', right: spacing['3xl'], maxWidth: 200 }
+              : { position: 'absolute', right: spacing.xl, bottom: spacing['5xl'] }),
+            backgroundColor: colors.surfaceRaised,
             borderRadius: radius.md,
             borderWidth: 1,
             borderColor: colors.border,
@@ -418,7 +418,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             zIndex: 99999,
             elevation: 999,
             minWidth: 160,
-            ...(Platform.OS === 'web' ? { boxShadow: '0 8px 32px rgba(0,0,0,0.8)' } as any : {}),
+            ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)' } as any : {}),
           }}
         >
           {isOwnPost && (
