@@ -276,6 +276,16 @@ export default function SettingsScreen() {
             </View>
           )}
         </Section>
+
+        <Section title="About">
+          <Text variant="body" color={colors.textSecondary}>Minds 2.0</Text>
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
+            Built on Recursiv · Powered by open source
+          </Text>
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
+            Version 2.0.0
+          </Text>
+        </Section>
       </ScrollView>
     </Container>
   );

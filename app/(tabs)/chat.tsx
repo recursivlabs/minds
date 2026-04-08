@@ -603,6 +603,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         <Pressable onPress={onBack} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
+        <Avatar uri={partnerInfo?.image || partnerInfo?.user?.image} name={partnerName} size="sm" />
         <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>{partnerName}</Text>
       </View>
 
