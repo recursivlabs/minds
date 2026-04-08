@@ -149,7 +149,7 @@ export default function CommunityDetailScreen() {
                 {isMember ? 'Joined' : 'Join'}
               </Button>
               <Button
-                onPress={() => router.push('/(tabs)/create')}
+                onPress={() => router.push({ pathname: '/(tabs)/create', params: { communityId: community.id, communityName: community.name } } as any)}
                 variant="secondary"
                 size="sm"
               >

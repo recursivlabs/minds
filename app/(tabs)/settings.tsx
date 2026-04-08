@@ -6,6 +6,7 @@ import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius } from '../../constants/theme';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -202,6 +203,39 @@ export default function SettingsScreen() {
             <Text variant="body">Community activity</Text>
             <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
           </View>
+        </Section>
+
+        <Section title="Data">
+          <Button
+            onPress={async () => {
+              if (!sdk) return;
+              try {
+                const [profileRes, postsRes, followingRes] = await Promise.all([
+                  sdk.profiles.me().catch(() => null),
+                  sdk.posts.list({ limit: 200, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
+                  sdk.profiles.following(profileRes?.data?.id || '', { limit: 500 }).catch(() => ({ data: [] })),
+                ]);
+                const exportData = {
+                  profile: profileRes?.data,
+                  posts: postsRes?.data || [],
+                  following: followingRes?.data || [],
+                  exported_at: new Date().toISOString(),
+                };
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'minds-export.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                showMsg('Data exported');
+              } catch { showMsg('Export failed', true); }
+            }}
+            variant="secondary"
+            size="sm"
+          >
+            Export My Data
+          </Button>
         </Section>
 
         <Section title="Legal">

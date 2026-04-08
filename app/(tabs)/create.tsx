@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 import { Text, Button, Input } from '../../components';
@@ -31,6 +31,7 @@ const MODES: { key: Mode; label: string }[] = [
 
 export default function CreateScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ communityId?: string; communityName?: string }>();
   const { sdk, user } = useAuth();
   const [mode, setMode] = React.useState<Mode>('post');
 
@@ -41,7 +42,9 @@ export default function CreateScreen() {
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState('');
   const [mediaUri, setMediaUri] = React.useState<string | null>(null);
-  const [selectedCommunity, setSelectedCommunity] = React.useState<any>(null);
+  const [selectedCommunity, setSelectedCommunity] = React.useState<any>(
+    params.communityId ? { id: params.communityId, name: params.communityName || 'Community' } : null
+  );
   const [showCommunityPicker, setShowCommunityPicker] = React.useState(false);
   const { communities } = useCommunities(30);
 

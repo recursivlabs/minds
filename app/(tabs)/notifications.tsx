@@ -35,16 +35,30 @@ export default function NotificationsScreen() {
   }, [sdk]);
 
   const handlePress = (notif: any) => {
-    const url = notif.actionUrl || notif.action_url;
-    if (url) {
-      // Parse action URL to navigate within the app
-      if (url.includes('/post/')) {
-        const postId = url.split('/post/').pop();
-        if (postId) router.push(`/(tabs)/post/${postId}` as any);
-      } else if (url.includes('/user/') || url.includes('/profile/')) {
-        const username = url.split('/').pop();
-        if (username) router.push(`/(tabs)/user/${username}` as any);
-      }
+    // Mark as read
+    if (notif.id && notif.status === 'unread' && sdk) {
+      (sdk as any).notifications.markAsRead(notif.id).catch(() => {});
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
+    }
+
+    // Navigate based on URL or target
+    const url = notif.actionUrl || notif.action_url || '';
+    const targetType = notif.targetType || notif.target_type || '';
+    const targetId = notif.targetId || notif.target_id || '';
+
+    if (url.includes('/post/') || targetType === 'post') {
+      const postId = url.includes('/post/') ? url.split('/post/').pop() : targetId;
+      if (postId) router.push(`/(tabs)/post/${postId}` as any);
+    } else if (url.includes('/user/') || url.includes('/profile/') || targetType === 'user' || targetType === 'follow') {
+      const username = url.includes('/') ? url.split('/').pop() : targetId;
+      if (username) router.push(`/(tabs)/user/${username}` as any);
+    } else if (url.includes('/community/') || targetType === 'community') {
+      const commId = url.includes('/community/') ? url.split('/community/').pop() : targetId;
+      if (commId) router.push(`/(tabs)/community/${commId}` as any);
+    } else if (url.includes('/chat') || targetType === 'message' || targetType === 'chat') {
+      const chatId = targetId;
+      if (chatId) router.push({ pathname: '/(tabs)/chat', params: { id: chatId } } as any);
+      else router.push('/(tabs)/chat');
     }
   };
 
