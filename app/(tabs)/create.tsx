@@ -151,7 +151,7 @@ export default function CreateScreen() {
               await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
               mediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
             }
-          } catch { /* Image upload failed, post without media */ }
+          } catch { Alert.alert('Image Upload', 'Image could not be uploaded. Post will be created without media.'); }
         }
         await sdk.posts.create({
           content: content.trim() || ' ',
@@ -296,14 +296,17 @@ export default function CreateScreen() {
         <View style={{ flex: 1, padding: spacing.xl }}>
           {/* Community picker */}
           <View style={{ marginBottom: spacing.md, position: 'relative' }}>
+            {!selectedCommunity && content.trim().length > 0 && (
+              <Text variant="caption" color={colors.error} style={{ marginBottom: spacing.xs }}>Choose a community to post in</Text>
+            )}
             <Pressable
               onPress={() => setShowCommunityPicker(!showCommunityPicker)}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
                 paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-                backgroundColor: selectedCommunity ? colors.accentSubtle : colors.surface,
+                backgroundColor: selectedCommunity ? colors.accentSubtle : (!selectedCommunity && content.trim().length > 0) ? colors.errorMuted : colors.surface,
                 borderRadius: radius.full, alignSelf: 'flex-start',
-                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : colors.glassBorder,
+                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : (!selectedCommunity && content.trim().length > 0) ? colors.error + '40' : colors.glassBorder,
               }}
             >
               <Ionicons name={selectedCommunity ? 'people' : 'add-circle-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />

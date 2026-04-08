@@ -7,6 +7,7 @@ import { Avatar } from './Avatar';
 import { Button } from './Button';
 import { useAuth } from '../lib/auth';
 import { useProfiles, useAgents, useCommunities } from '../lib/hooks';
+import { getItem, setItem } from '../lib/storage';
 import { colors, spacing, radius } from '../constants/theme';
 
 const ONBOARDING_KEY = 'minds:onboarding:completed';
@@ -16,18 +17,17 @@ export function useOnboarding() {
   const { user } = useAuth();
 
   React.useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const done = window.localStorage.getItem(ONBOARDING_KEY);
-      if (!done && user) setCompleted(false);
+    if (!user) return;
+    (async () => {
+      const done = await getItem(ONBOARDING_KEY);
+      if (!done) setCompleted(false);
       else setCompleted(true);
-    }
+    })();
   }, [user]);
 
   const complete = React.useCallback(() => {
     setCompleted(true);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.localStorage.setItem(ONBOARDING_KEY, 'true');
-    }
+    setItem(ONBOARDING_KEY, 'true');
   }, []);
 
   return { showOnboarding: !completed, completeOnboarding: complete };

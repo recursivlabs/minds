@@ -22,21 +22,13 @@ export default function PostDetailScreen() {
   const [replyText, setReplyText] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
+  // Use replies from the post detail response (server returns them)
   React.useEffect(() => {
-    if (!id || !sdk) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await sdk.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
-        const postReplies = (res.data || []).filter(
-          (p: any) => p.parentId === id || p.parent_id === id || p.reply_to_id === id || p.replyToId === id
-        );
-        if (!cancelled) setReplies(postReplies);
-      } catch {}
-      finally { if (!cancelled) setRepliesLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [id, sdk]);
+    if (!post) return;
+    const postReplies = post.replies || [];
+    setReplies(postReplies);
+    setRepliesLoading(false);
+  }, [post]);
 
   const handleReply = async () => {
     if (!replyText.trim() || !sdk || !id) return;

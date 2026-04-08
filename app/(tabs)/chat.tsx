@@ -52,7 +52,7 @@ export default function ChatScreen() {
           userId = match?.id;
         } catch {}
       }
-      if (!userId) { setDmError('User not found'); return; }
+      if (!userId) { setDmError('User or agent not found. Check the username.'); return; }
       const res = await sdk.chat.dm({ user_id: userId });
       if (res.data?.id) {
         setActiveConvoId(res.data.id);
