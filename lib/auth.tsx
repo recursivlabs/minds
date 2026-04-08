@@ -26,7 +26,7 @@ const API_KEY_SCOPES = [
   'settings:read', 'settings:write',
   'billing:read', 'billing:write',
   'notifications:read', 'notifications:write',
-  'uploads:read', 'uploads:write',
+  'uploads:write',
 ] as const;
 
 interface User {
