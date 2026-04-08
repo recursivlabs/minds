@@ -2,6 +2,13 @@ import * as React from 'react';
 import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, ORG_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
+import { registerPushToken, registerTokenWithServer } from './notifications';
+
+function registerPushTokenBackground(sdk: Recursiv) {
+  registerPushToken().then(token => {
+    if (token) registerTokenWithServer(sdk, token);
+  }).catch(() => {});
+}
 
 const KEYS = {
   apiKey: 'minds:api_key',
@@ -83,6 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setAuthedSdk(sdk);
             setUser(JSON.parse(storedUser));
             setOrgId(storedOrgId);
+            // Register push token in background
+            registerPushTokenBackground(sdk);
           } catch {
             await clearStorage();
           }

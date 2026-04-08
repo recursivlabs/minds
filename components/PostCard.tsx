@@ -13,6 +13,7 @@ import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
 import { isMuted, toggleMute } from '../lib/muted';
+import { getCached } from '../lib/cache';
 import { colors, spacing, radius, typography } from '../constants/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
@@ -77,6 +78,13 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   );
   const createdAt = post.createdAt || post.created_at || new Date().toISOString();
   const isOwnPost = user?.id && (author.id === user.id);
+  const communityId = post.communityId || post.community_id;
+  const communityName = React.useMemo(() => {
+    if (!communityId) return null;
+    const communities = getCached('communities:30') || getCached('communities:50') || getCached('communities:10') || getCached('communities:100') || [];
+    const match = communities.find((c: any) => c.id === communityId);
+    return match?.name || null;
+  }, [communityId]);
 
   const handleVote = async (type: 'upvote' | 'downvote') => {
     if (!sdk) return;
@@ -251,11 +259,19 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
       {/* Content column */}
       <View style={{ flex: 1 }}>
-      {/* Author name + time */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
+      {/* Author name + time + community */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, flexWrap: 'wrap' }}>
         <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
           <Text variant="label">{authorName}</Text>
         </Pressable>
+        {communityName && (
+          <>
+            <Text variant="caption" color={colors.textMuted}>in</Text>
+            <Pressable onPress={() => router.push(`/(tabs)/community/${communityId}` as any)}>
+              <Text variant="label" color={colors.accent}>{communityName}</Text>
+            </Pressable>
+          </>
+        )}
         <Text variant="caption" color={colors.textMuted}>{timeAgo(createdAt)}</Text>
       </View>
 

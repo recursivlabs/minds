@@ -1,18 +1,16 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, TextInput, Platform, ActivityIndicator } from 'react-native';
+import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
-import { colors, spacing, radius, typography } from '../../../constants/theme';
+import { colors, spacing } from '../../../constants/theme';
 
 export default function CommunityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sdk, user } = useAuth();
 
@@ -23,51 +21,56 @@ export default function CommunityDetailScreen() {
   const [isMember, setIsMember] = React.useState(false);
   const [joinLoading, setJoinLoading] = React.useState(false);
 
+  // Load community details
   React.useEffect(() => {
     if (!id || !sdk) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await sdk.communities.get(id);
-        if (!cancelled) {
+        if (!cancelled && res.data) {
           setCommunity(res.data);
-          setIsMember((res.data as any)?.isMember || (res.data as any)?.is_member || false);
+          setIsMember(!!(res.data as any).is_member || !!(res.data as any).isMember);
         }
-      } catch {}
-      finally { if (!cancelled) setLoading(false); }
+      } catch (err: any) {
+        if (!cancelled) setCommunity(null);
+      }
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [id, sdk]);
 
+  // Load community posts — use community UUID from the loaded community data
   React.useEffect(() => {
-    if (!id || !sdk) return;
+    if (!sdk || !community?.id) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await sdk.posts.list({ limit: 30, organization_id: ORG_ID || undefined });
-        const communityPosts = (res.data || []).filter(
-          (p: any) => p.communityId === id || p.community_id === id
-        );
-        if (!cancelled) setPosts(communityPosts);
+        // Pass community_id as query param so server filters server-side
+        const res = await sdk.posts.list({
+          limit: 50,
+          organization_id: ORG_ID || undefined,
+          community_id: community.id,
+        } as any);
+        if (!cancelled) setPosts(res.data || []);
       } catch {}
-      finally { if (!cancelled) setPostsLoading(false); }
+      if (!cancelled) setPostsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [id, sdk]);
+  }, [sdk, community?.id]);
 
   const handleJoinLeave = async () => {
-    if (!sdk || !id) return;
+    if (!sdk || !community?.id) return;
     setJoinLoading(true);
     const wasMember = isMember;
     setIsMember(!wasMember);
     try {
-      if (wasMember) await sdk.communities.leave(id);
-      else await sdk.communities.join(id);
+      if (wasMember) await sdk.communities.leave(community.id);
+      else await sdk.communities.join(community.id);
     } catch {
       setIsMember(wasMember);
-    } finally {
-      setJoinLoading(false);
     }
+    setJoinLoading(false);
   };
 
   if (loading) {
@@ -86,14 +89,19 @@ export default function CommunityDetailScreen() {
     return (
       <Container safeTop padded={false}>
         <ScreenHeader title="Community" />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text variant="body" color={colors.textMuted}>Community not found</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg }}>
+          <Ionicons name="people-outline" size={40} color={colors.accent} />
+          <Text variant="h2" color={colors.text}>Community not found</Text>
+          <Text variant="body" color={colors.textSecondary} style={{ maxWidth: 300, textAlign: 'center' }}>
+            This community may have been removed or the link is incorrect.
+          </Text>
         </View>
       </Container>
     );
   }
 
-  const memberCount = community.memberCount || community.member_count || 0;
+  const memberCount = community.member_count || community.memberCount || 0;
+  const postCount = community.post_count || community.postCount || 0;
 
   return (
     <Container safeTop padded={false}>
@@ -103,14 +111,22 @@ export default function CommunityDetailScreen() {
         data={posts}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
-          <View style={{ padding: spacing.xl, gap: spacing.md }}>
+          <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+            {/* Community info */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
               <Avatar uri={community.image || community.avatar} name={community.name} size="xl" />
               <View style={{ flex: 1 }}>
                 <Text variant="h2">{community.name}</Text>
-                <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-                  {memberCount} member{memberCount !== 1 ? 's' : ''}
-                </Text>
+                <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: spacing.xs }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                    <Ionicons name="people-outline" size={14} color={colors.textMuted} />
+                    <Text variant="caption" color={colors.textMuted}>{memberCount}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                    <Ionicons name="newspaper-outline" size={14} color={colors.textMuted} />
+                    <Text variant="caption" color={colors.textMuted}>{postCount}</Text>
+                  </View>
+                </View>
               </View>
             </View>
 
@@ -120,36 +136,44 @@ export default function CommunityDetailScreen() {
               </Text>
             )}
 
-            <Button
-              onPress={handleJoinLeave}
-              loading={joinLoading}
-              variant={isMember ? 'secondary' : 'primary'}
-              size="sm"
-            >
-              {isMember ? 'Leave' : 'Join'}
-            </Button>
+            {/* Actions */}
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <Button
+                onPress={handleJoinLeave}
+                loading={joinLoading}
+                variant={isMember ? 'secondary' : 'primary'}
+                size="sm"
+              >
+                {isMember ? 'Joined' : 'Join'}
+              </Button>
+              <Button
+                onPress={() => router.push('/(tabs)/create')}
+                variant="secondary"
+                size="sm"
+              >
+                Create Post
+              </Button>
+            </View>
 
-            <View
-              style={{
-                borderBottomWidth: 0.5,
-                borderBottomColor: 'rgba(255,255,255,0.06)',
-                paddingBottom: spacing.md,
-              }}
-            />
+            {/* Separator */}
+            <View style={{ borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }} />
+
+            {/* Posts header */}
+            <Text variant="label" color={colors.textMuted}>Posts</Text>
           </View>
         }
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={({ item }) => <PostCard post={item} compact />}
         ListEmptyComponent={
           !postsLoading ? (
-            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.md }}>
-              <Text variant="body" color={colors.textMuted}>
-                No posts in this community yet
+            <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+              <Ionicons name="newspaper-outline" size={40} color={colors.accent} />
+              <Text variant="h2" color={colors.text}>No posts yet</Text>
+              <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300 }}>
+                Be the first to post in this community.
               </Text>
-              {isMember && (
-                <Text variant="caption" color={colors.accent}>
-                  Be the first to post!
-                </Text>
-              )}
+              <Button onPress={() => router.push('/(tabs)/create')} size="sm">
+                Create Post
+              </Button>
             </View>
           ) : (
             <View style={{ padding: spacing.xl, alignItems: 'center' }}>
