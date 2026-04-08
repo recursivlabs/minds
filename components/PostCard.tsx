@@ -14,6 +14,7 @@ import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
 import { isMuted, toggleMute } from '../lib/muted';
 import { getCached } from '../lib/cache';
+import { LinkPreview } from './LinkPreview';
 import { colors, spacing, radius, typography } from '../constants/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
@@ -342,6 +343,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               resizeMode="cover"
             />
           ) : null}
+          <LinkPreview content={content} />
         </View>
       )}
 
