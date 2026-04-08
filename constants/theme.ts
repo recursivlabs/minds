@@ -4,26 +4,26 @@
  */
 
 export const colors = {
-  // Backgrounds — deeper, more contrast
-  bg: '#06060a',
-  surface: 'rgba(255,255,255,0.03)',
-  surfaceRaised: 'rgba(255,255,255,0.05)',
-  surfaceHover: 'rgba(255,255,255,0.07)',
+  // Backgrounds — Linear-style dark
+  bg: '#0f0f0f',
+  surface: '#181818',
+  surfaceRaised: '#1e1e1e',
+  surfaceHover: 'rgba(255,255,255,0.06)',
 
   // Glass effect
   glass: 'rgba(255,255,255,0.04)',
-  glassBorder: 'rgba(255,255,255,0.06)',
+  glassBorder: 'rgba(255,255,255,0.08)',
 
-  // Borders — much subtler
-  border: 'rgba(255,255,255,0.08)',
-  borderSubtle: 'rgba(255,255,255,0.04)',
+  // Borders — subtle separators only
+  border: 'rgba(255,255,255,0.12)',
+  borderSubtle: 'rgba(255,255,255,0.08)',
   borderFocus: '#d4a844',
 
-  // Text — same
-  text: '#f5f5f5',
-  textSecondary: '#a0a0a8',
-  textMuted: '#606068',
-  textInverse: '#06060a',
+  // Text — 4 levels like Linear
+  text: 'rgba(240,240,240, 0.95)',
+  textSecondary: 'rgba(240,240,240, 0.72)',
+  textMuted: 'rgba(240,240,240, 0.42)',
+  textInverse: '#0f0f0f',
 
   // Accent — Minds gold (keep)
   accent: '#d4a844',
@@ -53,19 +53,19 @@ export const colors = {
 };
 
 export const lightColors = {
-  bg: '#f8f9fa',
-  surface: 'rgba(0,0,0,0.02)',
-  surfaceRaised: 'rgba(0,0,0,0.04)',
-  surfaceHover: 'rgba(0,0,0,0.06)',
-  glass: 'rgba(0,0,0,0.03)',
-  glassBorder: 'rgba(0,0,0,0.08)',
-  border: 'rgba(0,0,0,0.10)',
-  borderSubtle: 'rgba(0,0,0,0.05)',
+  bg: '#f6f6f6',
+  surface: '#ffffff',
+  surfaceRaised: '#ffffff',
+  surfaceHover: 'rgba(24,24,24, 0.06)',
+  glass: 'rgba(24,24,24, 0.04)',
+  glassBorder: 'rgba(24,24,24, 0.12)',
+  border: 'rgba(24,24,24, 0.17)',
+  borderSubtle: 'rgba(24,24,24, 0.10)',
   borderFocus: '#d4a844',
-  text: '#1a1a2e',
-  textSecondary: '#555566',
-  textMuted: '#888899',
-  textInverse: '#f8f9fa',
+  text: 'rgba(25,25,25, 0.95)',
+  textSecondary: 'rgba(25,25,25, 0.72)',
+  textMuted: 'rgba(25,25,25, 0.42)',
+  textInverse: '#f6f6f6',
   accent: '#d4a844',
   accentHover: '#e6bc54',
   accentMuted: 'rgba(212, 168, 68, 0.12)',
@@ -101,17 +101,17 @@ export const spacing = {
 
 export const radius = {
   sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
+  md: 8,
+  lg: 12,
+  xl: 16,
   full: 9999,
 } as const;
 
 export const typography = {
   hero: {
     fontSize: 36,
-    lineHeight: 42,
-    fontFamily: 'Geist-Light',
+    lineHeight: 44,
+    fontFamily: 'Geist-Regular',
     letterSpacing: -0.8,
   },
   h1: {
@@ -123,38 +123,38 @@ export const typography = {
   h2: {
     fontSize: 22,
     lineHeight: 28,
-    fontFamily: 'Geist-Medium',
+    fontFamily: 'Geist-SemiBold',
     letterSpacing: -0.3,
   },
   h3: {
-    fontSize: 18,
-    lineHeight: 24,
-    fontFamily: 'Geist-Medium',
+    fontSize: 17,
+    lineHeight: 22,
+    fontFamily: 'Geist-SemiBold',
     letterSpacing: -0.2,
   },
   body: {
     fontSize: 15,
     lineHeight: 22,
-    fontFamily: 'Geist-Light',
+    fontFamily: 'Geist-Regular',
     letterSpacing: 0,
   },
   bodyMedium: {
     fontSize: 15,
     lineHeight: 22,
-    fontFamily: 'Geist-Regular',
+    fontFamily: 'Geist-SemiBold',
     letterSpacing: 0,
   },
   caption: {
     fontSize: 13,
     lineHeight: 18,
-    fontFamily: 'Geist-Light',
+    fontFamily: 'Geist-Regular',
     letterSpacing: 0,
   },
   label: {
     fontSize: 13,
     lineHeight: 18,
-    fontFamily: 'Geist-Regular',
-    letterSpacing: 0.2,
+    fontFamily: 'Geist-SemiBold',
+    letterSpacing: 0,
   },
   mono: {
     fontSize: 14,

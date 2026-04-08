@@ -199,8 +199,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       style={{
         width,
         backgroundColor: colors.bg,
-        borderRightWidth: 0.5,
-        borderRightColor: 'rgba(255,255,255,0.06)',
+        borderRightWidth: 1,
+        borderRightColor: colors.borderSubtle,
         ...(Platform.OS === 'web' ? { transition: 'width 0.2s ease' } as any : {}),
       }}
     >
