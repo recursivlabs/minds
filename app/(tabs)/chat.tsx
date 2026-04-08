@@ -392,16 +392,23 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
 
         unsub = sdk.realtime.onMessage((msg: any) => {
           if (msg.conversationId !== conversationId) return;
+          const senderId = msg.sender?.id || msg.senderId;
           const newMsg = {
             id: msg.id,
             content: msg.text || msg.content || '',
-            sender: msg.sender || { id: msg.senderId, name: msg.senderName },
+            sender: msg.sender || { id: senderId, name: msg.senderName },
             createdAt: msg.createdAt || new Date().toISOString(),
           };
           if (messageIdsRef.current.has(newMsg.id)) return;
           messageIdsRef.current.add(newMsg.id);
+
+          // Clear typing indicator if message is from the other person (agent reply arrived)
+          if (senderId !== user?.id) {
+            setAgentTyping(false);
+          }
+
           setMessages(prev => {
-            // Remove matching optimistic messages
+            // Remove matching optimistic/agent messages
             const filtered = prev.filter(m => {
               if ((m.id.startsWith('temp-') || m.id.startsWith('agent-')) && m.content?.trim() === newMsg.content?.trim()) return false;
               return true;
@@ -508,63 +515,67 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       // Send via SDK
       await sdk.chat.send({ conversation_id: conversationId, content: messageText });
 
-      // Check if partner is an AI agent — try SSE streaming
       const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
       const otherName = partnerInfo?.name || partnerInfo?.user?.name || 'Agent';
       const isAgent = partnerInfo?.isAi || partnerInfo?.is_ai
         || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
         || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
 
-      if (isAgent && otherId) {
-        setAgentTyping(true);
-        try {
-          const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
-          if (result.content) {
-            const agentMsg = {
-              id: 'agent-' + Date.now(),
-              content: result.content,
-              sender: { id: otherId, name: otherName },
-              createdAt: new Date().toISOString(),
-            };
-            setMessages(prev => [...prev, agentMsg]);
-          }
-        } catch {
-          // SSE failed — try sdk.agents.chat() as fallback
+      if (wsConnectedRef.current) {
+        // WebSocket connected — server handles agent auto-reply and broadcasts it.
+        // We just show typing indicator and wait for the WS message event.
+        if (isAgent) {
+          setAgentTyping(true);
+          setTimeout(() => setAgentTyping(false), 30000); // safety timeout
+        }
+      } else {
+        // No WebSocket — manually trigger agent response via SSE
+        if (isAgent && otherId) {
+          setAgentTyping(true);
           try {
-            const agentRes = await (sdk as any).agents.chat(otherId, { message: messageText });
-            const agentData = agentRes?.data || agentRes;
-            const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
-            if (reply) {
+            const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
+            if (result.content) {
               setMessages(prev => [...prev, {
                 id: 'agent-' + Date.now(),
-                content: reply,
+                content: result.content,
+                sender: { id: otherId, name: otherName },
+                createdAt: new Date().toISOString(),
+              }]);
+            }
+          } catch {
+            try {
+              const agentRes = await (sdk as any).agents.chat(otherId, { message: messageText });
+              const agentData = agentRes?.data || agentRes;
+              const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
+              if (reply) {
+                setMessages(prev => [...prev, {
+                  id: 'agent-' + Date.now(),
+                  content: reply,
+                  sender: { id: otherId, name: otherName },
+                  createdAt: new Date().toISOString(),
+                }]);
+              }
+            } catch {}
+          }
+          setAgentTyping(false);
+        } else if (otherId) {
+          // Try SSE in case it's an unlabeled agent
+          try {
+            setAgentTyping(true);
+            const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
+            if (result.content) {
+              setMessages(prev => [...prev, {
+                id: 'agent-' + Date.now(),
+                content: result.content,
                 sender: { id: otherId, name: otherName },
                 createdAt: new Date().toISOString(),
               }]);
             }
           } catch {}
+          setAgentTyping(false);
         }
-        setAgentTyping(false);
-      } else if (otherId) {
-        // Not flagged as agent, but try anyway (some agents don't have the flag)
-        try {
-          setAgentTyping(true);
-          const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
-          if (result.content) {
-            setMessages(prev => [...prev, {
-              id: 'agent-' + Date.now(),
-              content: result.content,
-              sender: { id: otherId, name: otherName },
-              createdAt: new Date().toISOString(),
-            }]);
-          }
-        } catch {
-          // Not an agent — that's fine, human will respond via polling
-        }
-        setAgentTyping(false);
       }
     } catch {
-      // Remove optimistic message on failure
       setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
       setSending(false);

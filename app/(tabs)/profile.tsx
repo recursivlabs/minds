@@ -503,27 +503,43 @@ export default function ProfileScreen() {
                     if (!sdk) return;
                     setEditSaving(true);
                     try {
-                      // Upload avatar using dedicated avatar upload flow
+                      // Upload avatar
                       if (editAvatarUri) {
                         try {
+                          // Get the blob first to know its size and type
+                          const blobRes = await fetch(editAvatarUri);
+                          const blob = await blobRes.blob();
+                          const contentType = blob.type || 'image/jpeg';
+
                           const uploads = (sdk as any).uploads;
                           const uploadRes = await uploads.getAvatarUploadUrl({
-                            content_type: 'image/jpeg',
-                            content_length: 0,
+                            content_type: contentType,
+                            content_length: blob.size,
                           });
+                          console.log('[Avatar] Upload URL response:', JSON.stringify(uploadRes.data));
+
                           const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
                           const key = uploadRes.data?.key;
+
                           if (uploadUrl) {
-                            const response = await fetch(editAvatarUri);
-                            const blob = await response.blob();
-                            await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
-                            // Confirm upload — this links the avatar to the user profile
+                            const putRes = await fetch(uploadUrl, {
+                              method: 'PUT',
+                              body: blob,
+                              headers: { 'Content-Type': contentType },
+                            });
+                            console.log('[Avatar] PUT status:', putRes.status);
+
                             if (key) {
-                              await uploads.confirmAvatarUpload(key);
+                              const confirmRes = await uploads.confirmAvatarUpload(key);
+                              console.log('[Avatar] Confirm response:', JSON.stringify(confirmRes.data));
                             }
+                          } else {
+                            console.error('[Avatar] No upload URL returned');
+                            Alert.alert('Error', 'Could not get upload URL');
                           }
                         } catch (err: any) {
                           console.error('[Avatar] Upload failed:', err?.message || err);
+                          Alert.alert('Avatar Error', err?.message || 'Upload failed');
                         }
                       }
                       await sdk.profiles.update({
