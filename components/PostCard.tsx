@@ -19,6 +19,7 @@ import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
 interface Props {
   post: any;
+  canModerate?: boolean;
   onVoteChange?: (postId: string, newScore: number, userVote: 'upvote' | 'downvote' | null) => void;
   onPostDeleted?: (postId: string) => void;
   compact?: boolean;
@@ -35,7 +36,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 604800)}w`;
 }
 
-export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPostDeleted, compact = false }: Props) {
+export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPostDeleted, compact = false, canModerate = false }: Props) {
   const router = useRouter();
   const { sdk, user } = useAuth();
   const toast = useToast();
@@ -428,7 +429,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               <Text variant="body">Edit</Text>
             </Pressable>
           )}
-          {isOwnPost && (
+          {(isOwnPost || canModerate) && (
             <Pressable
               onPress={() => { setShowMenu(false); handleDelete(); }}
               style={{ padding: spacing.md }}

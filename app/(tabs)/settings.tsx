@@ -204,6 +204,18 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title="Legal">
+          <Pressable onPress={() => { if (Platform.OS === 'web') window.open('https://minds.com/p/terms', '_blank'); }} style={{ paddingVertical: spacing.sm }}>
+            <Text variant="body" color={colors.accent}>Terms of Service</Text>
+          </Pressable>
+          <Pressable onPress={() => { if (Platform.OS === 'web') window.open('https://minds.com/p/privacy', '_blank'); }} style={{ paddingVertical: spacing.sm }}>
+            <Text variant="body" color={colors.accent}>Privacy Policy</Text>
+          </Pressable>
+          <Pressable onPress={() => { if (Platform.OS === 'web') window.open('https://minds.com/p/community-guidelines', '_blank'); }} style={{ paddingVertical: spacing.sm }}>
+            <Text variant="body" color={colors.accent}>Community Guidelines</Text>
+          </Pressable>
+        </Section>
+
         <Section title="Danger Zone">
           {!deleteConfirm ? (
             <Button onPress={() => setDeleteConfirm(true)} variant="secondary" size="sm" accentColor={colors.error}>Delete Account</Button>

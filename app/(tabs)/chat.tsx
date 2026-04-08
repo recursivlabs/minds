@@ -165,6 +165,7 @@ export default function ChatScreen() {
             const other = item.participants?.find((p: any) => p.id !== user?.id) || item.participants?.[0];
             const name = item.name || other?.name || 'Conversation';
             const avatar = other?.image || null;
+            const isAgentConvo = other?.isAi || other?.is_ai || other?.type === 'agent';
             const lastMsg = item.lastMessage || item.last_message;
             const lastText = lastMsg?.content || lastMsg?.text || '';
             const time = lastMsg?.createdAt || lastMsg?.created_at || item.updatedAt || '';
@@ -185,7 +186,14 @@ export default function ChatScreen() {
                 <Avatar uri={avatar} name={name} size="lg" />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 }}>
+                      <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{name}</Text>
+                      {isAgentConvo && (
+                        <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: 4 }}>
+                          <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>AI</Text>
+                        </View>
+                      )}
+                    </View>
                     {time ? (
                       <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
                         {new Date(time).toLocaleDateString([], { month: 'short', day: 'numeric' })}

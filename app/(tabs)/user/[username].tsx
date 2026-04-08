@@ -172,6 +172,24 @@ export default function UserProfileScreen() {
               >
                 Message
               </Button>
+              <Button
+                onPress={async () => {
+                  if (!profile?.id) return;
+                  try {
+                    const apiKey = await require('../../lib/storage').getItem('minds:api_key');
+                    await fetch(`${require('../../lib/recursiv').BASE_ORIGIN}/api/v1/reports`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+                      body: JSON.stringify({ target_type: 'user', target_id: profile.id, reason: 'Reported from profile', details: '' }),
+                    });
+                  } catch {}
+                  Alert.alert('Report', 'User has been reported. Thank you.');
+                }}
+                variant="ghost"
+                size="sm"
+              >
+                Report
+              </Button>
             </View>
           )}
         </View>

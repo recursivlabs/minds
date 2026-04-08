@@ -220,7 +220,7 @@ export default function CommunityDetailScreen() {
             <Text variant="label" color={colors.textMuted}>Posts</Text>
           </View>
         }
-        renderItem={({ item }) => <PostCard post={item} compact />}
+        renderItem={({ item }) => <PostCard post={item} compact canModerate={isCreator} />}
         ListEmptyComponent={
           !postsLoading ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
