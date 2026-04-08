@@ -50,19 +50,23 @@ export default function UserProfileScreen() {
     return () => { cancelled = true; };
   }, [profile?.id, sdk, username]);
 
-  const followerCount = profile?.followerCount || profile?.follower_count || 0;
+  const baseFollowerCount = profile?.followerCount || profile?.follower_count || 0;
   const followingCount = profile?.followingCount || profile?.following_count || 0;
+  const [followerOffset, setFollowerOffset] = React.useState(0);
+  const followerCount = baseFollowerCount + followerOffset;
 
   const handleToggleFollow = async () => {
     if (!sdk || !profile?.id) return;
     setFollowLoading(true);
     const wasFollowing = isFollowing;
     setIsFollowing(!wasFollowing);
+    setFollowerOffset(prev => wasFollowing ? prev - 1 : prev + 1);
     try {
       if (wasFollowing) await sdk.profiles.unfollow(profile.id);
       else await sdk.profiles.follow(profile.id);
     } catch {
       setIsFollowing(wasFollowing);
+      setFollowerOffset(prev => wasFollowing ? prev + 1 : prev - 1);
     } finally {
       setFollowLoading(false);
     }

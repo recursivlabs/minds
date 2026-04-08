@@ -102,7 +102,7 @@ export default function CreateScreen() {
         };
         input.click();
       }
-    } catch {}
+    } catch (e) { /* image picker cancelled or unavailable */ }
   };
 
   const handlePickImage = async () => {

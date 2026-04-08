@@ -53,7 +53,7 @@ export default function CommunityDetailScreen() {
           community_id: community.id,
         } as any);
         if (!cancelled) setPosts(res.data || []);
-      } catch {}
+      } catch (e) { /* community posts fetch failed — show empty state */ }
       if (!cancelled) setPostsLoading(false);
     })();
     return () => { cancelled = true; };

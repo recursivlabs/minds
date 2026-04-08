@@ -50,7 +50,7 @@ export default function ChatScreen() {
           const agents = agentRes.data || [];
           const match = agents.find((a: any) => a.username === dmUsername.trim() || a.name?.toLowerCase() === dmUsername.trim().toLowerCase());
           userId = match?.id;
-        } catch {}
+        } catch (e) { /* agent lookup failed */ }
       }
       if (!userId) { setDmError('User or agent not found. Check the username.'); return; }
       const res = await sdk.chat.dm({ user_id: userId });
