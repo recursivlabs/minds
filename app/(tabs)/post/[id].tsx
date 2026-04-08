@@ -95,7 +95,7 @@ export default function PostDetailScreen() {
                   paddingHorizontal: spacing.xl,
                   paddingVertical: spacing.md,
                   borderBottomWidth: 0.5,
-                  borderBottomColor: 'rgba(255,255,255,0.06)',
+                  borderBottomColor: colors.borderSubtle,
                 }}
               >
                 <Text variant="caption" color={colors.textSecondary}>
@@ -129,7 +129,7 @@ export default function PostDetailScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
-          borderTopColor: 'rgba(255,255,255,0.06)',
+          borderTopColor: colors.borderSubtle,
           paddingBottom: insets.bottom || spacing.md,
         }}
       >

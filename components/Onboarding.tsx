@@ -93,7 +93,7 @@ export function OnboardingFlow({ onComplete }: Props) {
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: spacing.md,
                 paddingVertical: spacing.md, paddingHorizontal: spacing.sm,
-                borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
+                borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
               }}
             >
               <Avatar uri={p.image || p.avatar} name={p.name} size="md" />
@@ -138,7 +138,7 @@ export function OnboardingFlow({ onComplete }: Props) {
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: spacing.md,
                 paddingVertical: spacing.md, paddingHorizontal: spacing.sm,
-                borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)',
+                borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
               }}
             >
               <Avatar uri={c.image || c.avatar} name={c.name} size="md" />

@@ -101,7 +101,7 @@ export default function NotificationsScreen() {
                 backgroundColor: pressed ? colors.surfaceHover
                   : item.status === 'unread' ? 'rgba(212,168,68,0.03)' : 'transparent',
                 borderBottomWidth: 0.5,
-                borderBottomColor: 'rgba(255,255,255,0.04)',
+                borderBottomColor: colors.borderSubtle,
               })}
             >
               {item.imageUrl || item.image_url ? (

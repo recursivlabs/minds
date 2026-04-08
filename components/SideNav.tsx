@@ -289,7 +289,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             <View
               style={{
                 height: 0.5,
-                backgroundColor: 'rgba(255,255,255,0.06)',
+                backgroundColor: colors.borderSubtle,
                 marginHorizontal: spacing.lg,
                 marginVertical: spacing.xl,
               }}

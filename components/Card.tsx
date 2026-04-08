@@ -22,7 +22,7 @@ export function Card({ variant = 'default', padding = 'lg', style, ...props }: P
           borderRadius: radius.md,
           padding: spacing[padding],
           ...(variant !== 'ghost'
-            ? { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)' }
+            ? { borderWidth: 0.5, borderColor: colors.borderSubtle }
             : {}),
           ...(Platform.OS === 'web' && variant !== 'ghost'
             ? { backdropFilter: 'blur(20px)' } as any

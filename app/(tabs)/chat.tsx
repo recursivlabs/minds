@@ -76,7 +76,7 @@ export default function ChatScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
+          borderBottomColor: colors.borderSubtle,
         }}
       >
         <Text variant="h3">Messages</Text>
@@ -94,7 +94,7 @@ export default function ChatScreen() {
               gap: spacing.sm,
               padding: spacing.xl,
               borderBottomWidth: 0.5,
-              borderBottomColor: 'rgba(255,255,255,0.06)',
+              borderBottomColor: colors.borderSubtle,
             }}
           >
             <TextInput
@@ -589,7 +589,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
+          borderBottomColor: colors.borderSubtle,
         }}
       >
         <Pressable onPress={onBack} hitSlop={12}>
@@ -642,7 +642,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
-          borderTopColor: 'rgba(255,255,255,0.06)',
+          borderTopColor: colors.borderSubtle,
           paddingBottom: insets.bottom || spacing.md,
         }}
       >

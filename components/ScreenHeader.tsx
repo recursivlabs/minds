@@ -26,7 +26,7 @@ export const ScreenHeader = React.memo(function ScreenHeader({ title, showBack =
         paddingHorizontal: spacing.xl,
         paddingVertical: spacing.md,
         borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
+        borderBottomColor: colors.borderSubtle,
         minHeight: 52,
       }}
     >

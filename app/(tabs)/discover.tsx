@@ -56,7 +56,7 @@ function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; on
         paddingVertical: spacing.lg,
         backgroundColor: pressed ? colors.surfaceHover : 'transparent',
         borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.04)',
+        borderBottomColor: colors.borderSubtle,
       })}
     >
       <Avatar uri={avatar} name={name} size="lg" />
@@ -110,7 +110,7 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
         paddingVertical: spacing.lg,
         backgroundColor: pressed ? colors.surfaceHover : 'transparent',
         borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.04)',
+        borderBottomColor: colors.borderSubtle,
       })}
     >
       <Avatar uri={avatar} name={name} size="lg" />
@@ -163,7 +163,7 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
         paddingVertical: spacing.lg,
         backgroundColor: pressed ? colors.surfaceHover : 'transparent',
         borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.04)',
+        borderBottomColor: colors.borderSubtle,
       })}
     >
       <Avatar uri={avatar} name={name} size="lg" />
@@ -231,6 +231,26 @@ export default function DiscoverScreen() {
   const { profiles, loading: profilesLoading } = useProfiles(50);
   const { results: searchResults, loading: searchLoading } = useSearchPosts(searchQuery);
 
+  // Search people via SDK when searching
+  const [searchedPeople, setSearchedPeople] = React.useState<any[]>([]);
+  const [searchPeopleLoading, setSearchPeopleLoading] = React.useState(false);
+  React.useEffect(() => {
+    if (!searchQuery.trim() || activeTab !== 'people' || !sdk) { setSearchedPeople([]); return; }
+    let cancelled = false;
+    setSearchPeopleLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await sdk.profiles.search({ query: searchQuery, limit: 20 });
+        if (!cancelled) setSearchedPeople(res.data || []);
+      } catch {
+        // Fall back to client-side filter
+        if (!cancelled) setSearchedPeople([]);
+      }
+      if (!cancelled) setSearchPeopleLoading(false);
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [searchQuery, activeTab, sdk]);
+
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
     try {
@@ -259,8 +279,11 @@ export default function DiscoverScreen() {
       return filtered.map((p: any, i: number) => ({ type: 'post', data: p, key: `p-${p.id || i}` }));
     }
     if (activeTab === 'people') {
-      const source = followMode ? followList : profiles || [];
-      return filterByQuery(source, ['name', 'username', 'bio']).map((p: any, i: number) => ({ type: 'person', data: p, key: `u-${p.id || i}` }));
+      if (followMode) {
+        return filterByQuery(followList, ['name', 'username', 'bio']).map((p: any, i: number) => ({ type: 'person', data: p, key: `u-${p.id || i}` }));
+      }
+      const source = isSearching && searchedPeople.length > 0 ? searchedPeople : filterByQuery(profiles || [], ['name', 'username', 'bio']);
+      return source.map((p: any, i: number) => ({ type: 'person', data: p, key: `u-${p.id || i}` }));
     }
     if (activeTab === 'communities') {
       return filterByQuery(communities || [], ['name', 'description']).map((c: any, i: number) => ({ type: 'community', data: c, key: `c-${c.id || i}` }));
@@ -322,7 +345,7 @@ export default function DiscoverScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
+          borderBottomColor: colors.borderSubtle,
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -377,7 +400,7 @@ export default function DiscoverScreen() {
         }}
         style={{
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
+          borderBottomColor: colors.borderSubtle,
           flexGrow: 0,
         }}
       >

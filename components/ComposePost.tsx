@@ -25,7 +25,7 @@ export function ComposePost({ placeholder = "What's on your mind?" }: Props) {
         gap: spacing.md,
         padding: spacing.xl,
         borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
+        borderBottomColor: colors.borderSubtle,
       }}
     >
       <Avatar uri={user?.image} name={user?.name} size="sm" />

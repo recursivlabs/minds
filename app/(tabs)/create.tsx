@@ -229,7 +229,7 @@ export default function CreateScreen() {
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
+          borderBottomColor: colors.borderSubtle,
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -265,7 +265,7 @@ export default function CreateScreen() {
           paddingVertical: spacing.sm,
           gap: spacing.sm,
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
+          borderBottomColor: colors.borderSubtle,
         }}
       >
         {MODES.map((m) => (
@@ -520,7 +520,7 @@ export default function CreateScreen() {
                             paddingVertical: spacing.md,
                             backgroundColor: idx === agentModelIdx ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
                             borderBottomWidth: idx < MODELS.length - 1 ? 0.5 : 0,
-                            borderBottomColor: 'rgba(255,255,255,0.04)',
+                            borderBottomColor: colors.borderSubtle,
                           })}
                         >
                           <View style={{ flex: 1 }}>
@@ -571,7 +571,7 @@ export default function CreateScreen() {
             paddingHorizontal: spacing.xl,
             paddingVertical: spacing.md,
             borderTopWidth: 0.5,
-            borderTopColor: 'rgba(255,255,255,0.06)',
+            borderTopColor: colors.borderSubtle,
           }}
         >
           <Pressable onPress={handlePickImage} hitSlop={8}>

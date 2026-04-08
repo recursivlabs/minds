@@ -50,7 +50,7 @@ export function CommunityCard({ community, variant = 'card' }: Props) {
         borderRadius: radius.lg,
         padding: spacing.xl,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: colors.borderSubtle,
         width: 200,
         marginRight: spacing.md,
       })}

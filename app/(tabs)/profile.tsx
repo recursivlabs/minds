@@ -228,7 +228,7 @@ export default function ProfileScreen() {
             marginTop: spacing.xl,
             gap: spacing.lg,
             borderBottomWidth: 0.5,
-            borderBottomColor: 'rgba(255,255,255,0.06)',
+            borderBottomColor: colors.borderSubtle,
           }}
         >
           {TABS.map((tab) => (

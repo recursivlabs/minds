@@ -29,7 +29,7 @@ export function Header({ showBack, title }: Props) {
           paddingHorizontal: spacing.xl,
           backgroundColor: colors.bg,
           borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.06)',
+          borderBottomColor: colors.borderSubtle,
           minHeight: 40,
         }}
       >
@@ -65,7 +65,7 @@ export function Header({ showBack, title }: Props) {
         paddingHorizontal: spacing.xl,
         backgroundColor: colors.bg,
         borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
+        borderBottomColor: colors.borderSubtle,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
