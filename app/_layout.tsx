@@ -10,6 +10,7 @@ import { AuthProvider } from '../lib/auth';
 import { ThemeProvider } from '../lib/theme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/Toast';
+import { NetworkBanner } from '../components/NetworkBanner';
 import { initSentry } from '../lib/sentry';
 import { injectWebStyles } from '../lib/webStyles';
 
@@ -43,6 +44,7 @@ export default function RootLayout() {
             <ProjectProvider>
               <AuthProvider>
                 <ToastProvider>
+                  <NetworkBanner />
                   <StatusBar style="light" />
                   <Slot />
                 </ToastProvider>
