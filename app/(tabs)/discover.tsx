@@ -2,7 +2,7 @@ import * as React from 'react';
 import { View, FlatList, TextInput, Platform, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Avatar, Button, Skeleton } from '../../components';
+import { Text, Avatar, Button, Skeleton, PostCard } from '../../components';
 import { Container } from '../../components/Container';
 import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
@@ -37,59 +37,6 @@ const TABS: { key: DiscoverTab; label: string }[] = [
   { key: 'communities', label: 'Communities' },
   { key: 'agents', label: 'Agents' },
 ];
-
-function PostCardFull({ post, onPress }: { post: any; onPress: () => void }) {
-  const author = post.author?.name || 'Anonymous';
-  const authorAvatar = post.author?.image || post.author?.avatar;
-  const authorUsername = post.author?.username;
-  const content = post.content || '';
-  const title = post.title;
-  const score = (post.upvoteCount || 0) - (post.downvoteCount || 0);
-  const replyCount = post.replyCount || post.reply_count || 0;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.lg,
-        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-        borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.04)',
-      })}
-    >
-      {/* Author row */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
-        <Avatar uri={authorAvatar} name={author} size="sm" />
-        <Text variant="bodyMedium" style={{ fontSize: 13 }}>{author}</Text>
-        {authorUsername && (
-          <Text variant="caption" color={colors.textMuted}>@{authorUsername}</Text>
-        )}
-      </View>
-      {/* Title */}
-      {title && (
-        <Text variant="bodyMedium" numberOfLines={2} style={{ marginBottom: spacing.xs }}>
-          {title}
-        </Text>
-      )}
-      {/* Content preview */}
-      <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ lineHeight: 22 }}>
-        {content.slice(0, 280)}
-      </Text>
-      {/* Engagement row */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl, marginTop: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Ionicons name="arrow-up-outline" size={14} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{score}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Ionicons name="chatbubble-outline" size={13} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
 
 function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
   const name = person.name || 'Unknown';
@@ -306,12 +253,7 @@ export default function DiscoverScreen() {
 
   const renderItem = ({ item }: { item: { type: string; data: any; key: string } }) => {
     if (item.type === 'post') {
-      return (
-        <PostCardFull
-          post={item.data}
-          onPress={() => router.push(`/(tabs)/post/${item.data.id}` as any)}
-        />
-      );
+      return <PostCard post={item.data} compact />;
     }
     if (item.type === 'person') {
       return (

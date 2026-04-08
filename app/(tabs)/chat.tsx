@@ -517,8 +517,17 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     setMessages(prev => [...prev, tempMsg]);
 
     try {
-      // Send via SDK
-      await sdk.chat.send({ conversation_id: conversationId, content: messageText });
+      // Send via SDK — get the real server message ID back
+      const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText });
+      const serverMsgId = sendRes?.data?.id;
+
+      // Swap optimistic temp ID → real server ID so WS event deduplicates
+      if (serverMsgId) {
+        messageIdsRef.current.add(serverMsgId);
+        setMessages(prev => prev.map(m =>
+          m.id === tempId ? { ...m, id: serverMsgId } : m
+        ));
+      }
 
       const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
       const otherName = partnerInfo?.name || partnerInfo?.user?.name || 'Agent';
