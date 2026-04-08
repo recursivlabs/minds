@@ -85,7 +85,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     if (!sdk) return;
     (async () => {
       try {
-        const res = await (sdk as any).notifications.list({ limit: 10 });
+        const res = await sdk.notifications.list({ limit: 10 });
         const notifs = res.data || [];
         setUnreadNotifs(notifs.filter((n: any) => n.status === 'unread').length);
       } catch {}

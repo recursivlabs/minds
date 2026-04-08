@@ -46,7 +46,7 @@ export default function ChatScreen() {
       } catch {
         // Try as agent username
         try {
-          const agentRes = await (sdk as any).agents.listDiscoverable({ limit: 100 });
+          const agentRes = await sdk.agents.listDiscoverable({ limit: 100 });
           const agents = agentRes.data || [];
           const match = agents.find((a: any) => a.username === dmUsername.trim() || a.name?.toLowerCase() === dmUsername.trim().toLowerCase());
           userId = match?.id;
@@ -545,7 +545,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             }
           } catch {
             try {
-              const agentRes = await (sdk as any).agents.chat(otherId, { message: messageText });
+              const agentRes = await sdk.agents.chat(otherId, { message: messageText });
               const agentData = agentRes?.data || agentRes;
               const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
               if (reply) {

@@ -44,7 +44,7 @@ export default function EmailScreen() {
     if (!sdk) return;
     setLoading(true);
     try {
-      const res = await (sdk as any).email.listCampaigns();
+      const res = await sdk.email.listCampaigns();
       setCampaigns(Array.isArray(res) ? res : res?.campaigns || []);
     } catch { setCampaigns([]); }
     setLoading(false);
@@ -56,7 +56,7 @@ export default function EmailScreen() {
     if (!sdk || !form.name || !form.subject) return;
     setSaving(true);
     try {
-      await (sdk as any).email.createCampaign(form);
+      await sdk.email.createCampaign(form);
       setShowCreate(false);
       setForm({ name: '', subject: '', from_email: '', html_content: '' });
       await load();
@@ -68,8 +68,8 @@ export default function EmailScreen() {
     if (!sdk) return;
     try {
       const [d, s] = await Promise.all([
-        (sdk as any).email.getCampaign(id).catch(() => null),
-        (sdk as any).email.getCampaignStats(id).catch(() => null),
+        sdk.email.getCampaign(id).catch(() => null),
+        sdk.email.getCampaignStats(id).catch(() => null),
       ]);
       setDetail(d);
       setStats(s);
@@ -80,7 +80,7 @@ export default function EmailScreen() {
     if (!sdk) return;
     setActionLoading(action);
     try {
-      await (sdk as any).email[`${action}Campaign`](id);
+      await sdk.email[`${action}Campaign`](id);
       await openDetail(id);
       await load();
     } catch { msg(`Failed to ${action} campaign.`); }

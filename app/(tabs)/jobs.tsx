@@ -26,7 +26,7 @@ export default function JobsScreen() {
     if (!sdk) return;
     setLoading(true);
     try {
-      const res = await (sdk as any).jobs.list();
+      const res = await sdk.jobs.list();
       setJobs(Array.isArray(res) ? res : res?.jobs || []);
     } catch { setJobs([]); }
     setLoading(false);
@@ -38,7 +38,7 @@ export default function JobsScreen() {
     if (!sdk || !form.name || !form.cron) return;
     setSaving(true);
     try {
-      await (sdk as any).jobs.create(form);
+      await sdk.jobs.create(form);
       setShowCreate(false);
       setForm({ name: '', cron: '', handler_code: '' });
       await load();
@@ -50,7 +50,7 @@ export default function JobsScreen() {
     if (!sdk) return;
     setDeleting(id);
     try {
-      await (sdk as any).jobs.delete(id);
+      await sdk.jobs.delete(id);
       setJobs(j => j.filter(x => x.id !== id));
     } catch { showError('Failed to delete job.'); }
     setDeleting(null);

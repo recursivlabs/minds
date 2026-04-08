@@ -143,7 +143,7 @@ export default function CreateScreen() {
         let mediaUrls: string[] | undefined;
         if (mediaUri) {
           try {
-            const uploadRes = await (sdk as any).uploads.getMediaUploadUrl({
+            const uploadRes = await sdk.uploads.getMediaUploadUrl({
               content_type: 'image/jpeg',
               content_length: 0,
             });
@@ -166,7 +166,7 @@ export default function CreateScreen() {
       } else if (mode === 'agent') {
         if (!agentName.trim()) { setSubmitting(false); return; }
         const username = agentName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).slice(2, 6);
-        await (sdk as any).agents.create({
+        await sdk.agents.create({
           name: agentName.trim(),
           username,
           bio: agentBio.trim() || undefined,

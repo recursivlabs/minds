@@ -27,7 +27,7 @@ export default function WebhooksScreen() {
     if (!sdk) return;
     setLoading(true);
     try {
-      const res = await (sdk as any).webhooks.list();
+      const res = await sdk.webhooks.list();
       setWebhooks(Array.isArray(res) ? res : res?.webhooks || []);
     } catch { setWebhooks([]); }
     setLoading(false);
@@ -40,7 +40,7 @@ export default function WebhooksScreen() {
     setSaving(true);
     try {
       const event_types = events.split(',').map(e => e.trim()).filter(Boolean);
-      await (sdk as any).webhooks.register({ url, event_types });
+      await sdk.webhooks.register({ url, event_types });
       setShowCreate(false);
       setUrl('');
       setEvents('');
@@ -53,7 +53,7 @@ export default function WebhooksScreen() {
     if (!sdk) return;
     setDeleting(id);
     try {
-      await (sdk as any).webhooks.delete(id);
+      await sdk.webhooks.delete(id);
       setWebhooks(w => w.filter(x => x.id !== id));
     } catch { showError('Failed to delete webhook.'); }
     setDeleting(null);

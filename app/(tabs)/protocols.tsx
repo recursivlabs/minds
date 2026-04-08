@@ -31,8 +31,8 @@ export default function ProtocolsScreen() {
     setLoading(true);
     try {
       const [p, s] = await Promise.all([
-        (sdk as any).protocols.list().catch(() => []),
-        (sdk as any).protocols.getSettings().catch(() => null),
+        sdk.protocols.list().catch(() => []),
+        sdk.protocols.getSettings().catch(() => null),
       ]);
       setProtocols(Array.isArray(p) ? p : p?.protocols || []);
       setSettings(s);
@@ -46,7 +46,7 @@ export default function ProtocolsScreen() {
     if (!sdk || !searchQuery.trim()) return;
     setSearching(true);
     try {
-      const res = await (sdk as any).protocols.search({ query: searchQuery });
+      const res = await sdk.protocols.search({ query: searchQuery });
       setSearchResults(Array.isArray(res) ? res : res?.results || []);
     } catch { setSearchResults([]); }
     setSearching(false);
@@ -56,7 +56,7 @@ export default function ProtocolsScreen() {
     if (!sdk || !settings) return;
     setSaving(true);
     try {
-      await (sdk as any).protocols.updateSettings(settings);
+      await sdk.protocols.updateSettings(settings);
       showSuccess('Settings saved.');
     } catch { showError('Failed to save settings.'); }
     setSaving(false);

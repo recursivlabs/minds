@@ -36,7 +36,7 @@ export default function AppsScreen() {
     if (!sdk) return;
     setLoading(true);
     try {
-      const res = await (sdk as any).projects.list({ organization_id: ORG_ID });
+      const res = await sdk.projects.list({ organization_id: ORG_ID });
       setProjects(Array.isArray(res) ? res : res?.projects || []);
     } catch { setProjects([]); }
     setLoading(false);
@@ -48,7 +48,7 @@ export default function AppsScreen() {
     if (!sdk || !form.name) return;
     setSaving(true);
     try {
-      await (sdk as any).projects.create({ name: form.name, organization_id: ORG_ID });
+      await sdk.projects.create({ name: form.name, organization_id: ORG_ID });
       setShowCreate(false);
       setForm({ name: '', description: '' });
       await load();
@@ -60,8 +60,8 @@ export default function AppsScreen() {
     if (!sdk) return;
     try {
       const [p, d] = await Promise.all([
-        (sdk as any).projects.get(id).catch(() => null),
-        (sdk as any).projects.deployments(id).catch(() => []),
+        sdk.projects.get(id).catch(() => null),
+        sdk.projects.deployments(id).catch(() => []),
       ]);
       setDetail(p);
       setDeployments(Array.isArray(d) ? d : d?.deployments || []);
@@ -72,7 +72,7 @@ export default function AppsScreen() {
     if (!sdk) return;
     setDeploying(true);
     try {
-      await (sdk as any).projects.deploy(id, { type: 'production' });
+      await sdk.projects.deploy(id, { type: 'production' });
       showSuccess('Deployment started.');
       await openDetail(id);
     } catch { showError('Failed to deploy.'); }

@@ -28,8 +28,8 @@ export default function OrgSettingsScreen() {
     setLoading(true);
     try {
       const [os, sec] = await Promise.all([
-        (sdk as any).organizationSettings.get(ORG_ID).catch(() => null),
-        (sdk as any).organizationSecurity.get(ORG_ID).catch(() => null),
+        sdk.organizationSettings.get(ORG_ID).catch(() => null),
+        sdk.organizationSecurity.get(ORG_ID).catch(() => null),
       ]);
       setOrgSettings(os);
       setSecurity(sec);
@@ -45,7 +45,7 @@ export default function OrgSettingsScreen() {
     if (!sdk || !githubOwner.trim()) return;
     setSaving('github');
     try {
-      await (sdk as any).organizationSettings.connectGitHub(ORG_ID, { github_owner: githubOwner });
+      await sdk.organizationSettings.connectGitHub(ORG_ID, { github_owner: githubOwner });
       showSuccess('GitHub connected.');
       await load();
     } catch { showError('Failed to connect GitHub.'); }
@@ -56,7 +56,7 @@ export default function OrgSettingsScreen() {
     if (!sdk) return;
     setSaving('github-dc');
     try {
-      await (sdk as any).organizationSettings.disconnectGitHub(ORG_ID);
+      await sdk.organizationSettings.disconnectGitHub(ORG_ID);
       setGithubOwner('');
       showSuccess('GitHub disconnected.');
       await load();
@@ -68,7 +68,7 @@ export default function OrgSettingsScreen() {
     if (!sdk || !templateUrl.trim()) return;
     setSaving('template');
     try {
-      await (sdk as any).organizationSettings.setDefaultTemplate(ORG_ID, { url: templateUrl });
+      await sdk.organizationSettings.setDefaultTemplate(ORG_ID, { url: templateUrl });
       showSuccess('Default template updated.');
     } catch { showError('Failed to set template.'); }
     setSaving('');
@@ -80,7 +80,7 @@ export default function OrgSettingsScreen() {
     setSecurity(updated);
     setSaving('security');
     try {
-      await (sdk as any).organizationSecurity.update(ORG_ID, updated);
+      await sdk.organizationSecurity.update(ORG_ID, updated);
     } catch { showError('Failed to update security.'); await load(); }
     setSaving('');
   };

@@ -27,7 +27,7 @@ export default function NotificationsScreen() {
     (async () => {
       if (!sdk) { setLoading(false); return; }
       try {
-        const res = await (sdk as any).notifications.list({ limit: 30 });
+        const res = await sdk.notifications.list({ limit: 30 });
         setNotifications(res.data || []);
       } catch {}
       finally { setLoading(false); }
@@ -37,7 +37,7 @@ export default function NotificationsScreen() {
   const handlePress = (notif: any) => {
     // Mark as read
     if (notif.id && notif.status === 'unread' && sdk) {
-      (sdk as any).notifications.markAsRead(notif.id).catch(() => {});
+      sdk.notifications.markAsRead(notif.id).catch(() => {});
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
     }
 
@@ -65,7 +65,7 @@ export default function NotificationsScreen() {
   const markAllRead = async () => {
     if (!sdk) return;
     try {
-      await (sdk as any).notifications.markAllAsRead();
+      await sdk.notifications.markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
     } catch {}
   };

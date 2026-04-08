@@ -552,7 +552,7 @@ export default function ProfileScreen() {
                           const blob = await blobRes.blob();
                           const contentType = blob.type || 'image/jpeg';
 
-                          const uploads = (sdk as any).uploads;
+                          const uploads = sdk.uploads;
                           const uploadRes = await uploads.getAvatarUploadUrl({
                             content_type: contentType,
                             content_length: blob.size,

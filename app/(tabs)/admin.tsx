@@ -26,7 +26,7 @@ function AITab({ sdk }: { sdk: any }) {
     setMessages(prev => [...prev, { role: 'user', text: msg }]);
     setSending(true);
     try {
-      const res = await (sdk as any).agents.chat(BUSINESS_AI_AGENT_ID, { message: msg });
+      const res = await sdk.agents.chat(BUSINESS_AI_AGENT_ID, { message: msg });
       const data = res?.data || res;
       const reply = data?.content || data?.message || data?.response || (typeof data === 'string' ? data : 'No response');
       setMessages(prev => [...prev, { role: 'agent', text: reply }]);
@@ -392,8 +392,8 @@ function ReportsTab({ sdk }: { sdk: any }) {
   React.useEffect(() => {
     (async () => {
       try {
-        const apiKey = await (sdk as any).client?.apiKey;
-        const baseUrl = (sdk as any).client?.baseUrl;
+        const apiKey = await sdk.client?.apiKey;
+        const baseUrl = sdk.client?.baseUrl;
         if (baseUrl && apiKey) {
           const res = await fetch(`${baseUrl}/reports`, {
             headers: { Authorization: `Bearer ${apiKey}` },
