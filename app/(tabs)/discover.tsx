@@ -8,6 +8,27 @@ import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from
 import { useAuth } from '../../lib/auth';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
+function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
+  const [toggled, setToggled] = React.useState(!!isFollowed);
+  return (
+    <Pressable
+      onPress={(e) => { setToggled(!toggled); onPress(e); }}
+      style={{
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.xs + 2,
+        borderRadius: radius.full,
+        backgroundColor: toggled ? colors.surface : colors.accentMuted,
+        borderWidth: toggled ? 1 : 0,
+        borderColor: colors.borderSubtle,
+      }}
+    >
+      <Text variant="caption" color={toggled ? colors.textSecondary : colors.accent}>
+        {toggled ? 'Following' : 'Follow'}
+      </Text>
+    </Pressable>
+  );
+}
+
 type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents';
 
 const TABS: { key: DiscoverTab; label: string }[] = [
@@ -70,7 +91,7 @@ function PostCardFull({ post, onPress }: { post: any; onPress: () => void }) {
   );
 }
 
-function PersonCard({ person, onPress, onFollow }: { person: any; onPress: () => void; onFollow: () => void }) {
+function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
   const name = person.name || 'Unknown';
   const username = person.username;
   const bio = person.bio || person.description || '';
@@ -98,17 +119,7 @@ function PersonCard({ person, onPress, onFollow }: { person: any; onPress: () =>
             <Text variant="bodyMedium">{name}</Text>
             {username && <Text variant="caption" color={colors.textMuted}>@{username}</Text>}
           </View>
-          <Pressable
-            onPress={(e) => { e.stopPropagation?.(); onFollow(); }}
-            style={{
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.xs + 2,
-              borderRadius: radius.full,
-              backgroundColor: colors.accentMuted,
-            }}
-          >
-            <Text variant="caption" color={colors.accent} style={{ fontWeight: '500' }}>Follow</Text>
-          </Pressable>
+          <FollowUnfollowButton isFollowed={isFollowed} onPress={(e: any) => { e?.stopPropagation?.(); onFollow(); }} />
         </View>
         {bio ? (
           <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
@@ -248,7 +259,14 @@ export default function DiscoverScreen() {
 
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
-    try { await sdk.profiles.follow(userId); } catch {}
+    try {
+      if (followMode) {
+        // In following list — toggle (unfollow)
+        await sdk.profiles.unfollow(userId);
+      } else {
+        await sdk.profiles.follow(userId);
+      }
+    } catch {}
   };
 
   const filterByQuery = (items: any[], fields: string[]) => {
@@ -299,6 +317,7 @@ export default function DiscoverScreen() {
       return (
         <PersonCard
           person={item.data}
+          isFollowed={!!followMode}
           onPress={() => router.push(`/(tabs)/user/${item.data.username || item.data.id}` as any)}
           onFollow={() => handleFollow(item.data.id)}
         />

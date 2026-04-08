@@ -146,35 +146,19 @@ function DashboardTab({ sdk }: { sdk: any }) {
   React.useEffect(() => {
     (async () => {
       try {
-        // Try org-scoped admin stats first
-        let s: any = null;
-        try {
-          s = await sdk.admin.stats({ organization_id: ORG_ID || undefined });
-        } catch {
-          try { s = await sdk.admin.stats(); } catch {}
-        }
-        // Try org members count as fallback for user count
-        if (!s && ORG_ID) {
-          try {
-            const membersRes = await sdk.organizations.members(ORG_ID, { limit: 1 });
-            const postsRes = await sdk.posts.list({ limit: 1, organization_id: ORG_ID });
-            const commRes = await sdk.communities.list({ limit: 1, organization_id: ORG_ID });
-            s = {
-              users: membersRes.meta?.total ?? membersRes.data?.length ?? 0,
-              posts: postsRes.meta?.total ?? postsRes.data?.length ?? 0,
-              communities: commRes.meta?.total ?? commRes.data?.length ?? 0,
-            };
-          } catch {}
-        }
-        setStats(s);
-
-        let su: any = [];
-        try {
-          su = await sdk.admin.signupsByDay({ days: 14, organization_id: ORG_ID || undefined });
-        } catch {
-          try { su = await sdk.admin.signupsByDay({ days: 14 }); } catch {}
-        }
-        setSignups(Array.isArray(su) ? su : su?.days || []);
+        // Count from actual list endpoints (accurate for org-scoped data)
+        const [membersRes, postsRes, commRes, agentsRes] = await Promise.all([
+          sdk.organizations.members(ORG_ID, { limit: 200 }).catch(() => ({ data: [] })),
+          sdk.posts.list({ limit: 200, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
+          sdk.communities.list({ limit: 100, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
+          sdk.agents.listDiscoverable({ limit: 100, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
+        ]);
+        setStats({
+          users: (membersRes.data || []).length,
+          posts: (postsRes.data || []).length,
+          communities: (commRes.data || []).length,
+          agents: (agentsRes.data || []).length,
+        });
       } catch {
         setError('Could not load dashboard data.');
       }
@@ -194,17 +178,18 @@ function DashboardTab({ sdk }: { sdk: any }) {
   return (
     <View style={{ gap: spacing.xl }}>
       <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
-        <StatCard label="Users" value={stats?.users ?? stats?.totalUsers ?? '---'} />
-        <StatCard label="Posts" value={stats?.posts ?? stats?.totalPosts ?? '---'} />
-        <StatCard label="Communities" value={stats?.communities ?? stats?.totalCommunities ?? '---'} />
+        <StatCard label="Members" value={stats?.users ?? '---'} />
+        <StatCard label="Posts" value={stats?.posts ?? '---'} />
+        <StatCard label="Communities" value={stats?.communities ?? '---'} />
+        <StatCard label="Agents" value={stats?.agents ?? '---'} />
       </View>
-      {signups.length > 0 && (
+      {false && (
         <Card>
-          <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Signups (14 days)</Text>
+          <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Signups</Text>
           <View style={{ gap: spacing.xs }}>
-            {signups.map((d: any, i: number) => {
-              const count = d.count ?? d.signups ?? 0;
-              const maxCount = Math.max(...signups.map((x: any) => x.count ?? x.signups ?? 0), 1);
+            {[].map((d: any, i: number) => {
+              const count = 0;
+              const maxCount = 1;
               return (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <Text variant="caption" color={colors.textMuted} style={{ width: 60, fontSize: 10 }}>
