@@ -111,7 +111,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         await sdk.posts.react(post.id, type as any);
       }
     } catch (err: any) {
-      console.error('[Vote] Failed:', err?.message || err, 'postId:', post.id, 'type:', type);
+      // Vote failed — toast shown, state rolled back
       toast.show('Vote failed', 'error');
       setUserVote(prevVote);
       setScore(prevScore);

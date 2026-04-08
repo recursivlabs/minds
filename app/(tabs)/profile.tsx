@@ -516,7 +516,7 @@ export default function ProfileScreen() {
                             content_type: contentType,
                             content_length: blob.size,
                           });
-                          console.log('[Avatar] Upload URL response:', JSON.stringify(uploadRes.data));
+                          // Upload URL received
 
                           const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
                           const key = uploadRes.data?.key;
@@ -527,18 +527,18 @@ export default function ProfileScreen() {
                               body: blob,
                               headers: { 'Content-Type': contentType },
                             });
-                            console.log('[Avatar] PUT status:', putRes.status);
+                            // PUT completed
 
                             if (key) {
                               const confirmRes = await uploads.confirmAvatarUpload(key);
-                              console.log('[Avatar] Confirm response:', JSON.stringify(confirmRes.data));
+                              // Avatar confirmed
                             }
                           } else {
-                            console.error('[Avatar] No upload URL returned');
+                            // No upload URL
                             Alert.alert('Error', 'Could not get upload URL');
                           }
                         } catch (err: any) {
-                          console.error('[Avatar] Upload failed:', err?.message || err);
+                          // Avatar upload failed — alert shown below
                           Alert.alert('Avatar Error', err?.message || 'Upload failed');
                         }
                       }

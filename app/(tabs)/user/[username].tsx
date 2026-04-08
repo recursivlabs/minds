@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -160,7 +160,7 @@ export default function UserProfileScreen() {
                       router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
                     }
                   } catch {
-                    if (Platform.OS === 'web') alert('Could not start chat');
+                    Alert.alert('Error', 'Could not start chat');
                   }
                 }}
                 variant="secondary"
