@@ -65,7 +65,10 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         setCache(cacheKey, data);
       } else {
         setPosts(prev => {
-          const merged = [...prev, ...data];
+          // Deduplicate by ID
+          const seen = new Set(prev.map((p: any) => p.id));
+          const newOnly = data.filter((p: any) => !seen.has(p.id));
+          const merged = [...prev, ...newOnly];
           setCache(cacheKey, merged);
           return merged;
         });

@@ -22,11 +22,10 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
   { name: 'wallet', label: 'Wallet', icon: 'wallet-outline', activeIcon: 'wallet' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
-];
-
-const BOTTOM_ITEMS: NavItem[] = [
   { name: 'admin', label: 'Admin', icon: 'shield-outline', activeIcon: 'shield' },
 ];
+
+const BOTTOM_ITEMS: NavItem[] = [];
 
 export function useSidebarState() {
   const { width: windowWidth } = useWindowDimensions();
@@ -304,7 +303,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                 Recent
               </Text>
               <ScrollView
-                style={{ maxHeight: 240 }}
+                style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
               >

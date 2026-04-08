@@ -243,19 +243,20 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease', cursor: isEditing ? 'default' : 'pointer' } as any : {}),
       })}
     >
-      {/* Author row */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
+      <View style={{ flexDirection: 'row', gap: spacing.md }}>
+      {/* Avatar column */}
+      <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)} style={{ paddingTop: 2 }}>
+        <Avatar uri={authorAvatar} name={authorName} size="sm" />
+      </Pressable>
+
+      {/* Content column */}
+      <View style={{ flex: 1 }}>
+      {/* Author name + time */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
         <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
-          <Avatar uri={authorAvatar} name={authorName} size="sm" />
+          <Text variant="label">{authorName}</Text>
         </Pressable>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
-            <Text variant="label">{authorName}</Text>
-          </Pressable>
-          <Text variant="caption" color={colors.textMuted}>
-            {timeAgo(createdAt)}
-          </Text>
-        </View>
+        <Text variant="caption" color={colors.textMuted}>{timeAgo(createdAt)}</Text>
       </View>
 
       {/* Content */}
@@ -362,6 +363,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <Pressable onPress={() => setShowMenu(!showMenu)} hitSlop={8} style={{ padding: 2 }}>
           <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
         </Pressable>
+      </View>
+      {/* End content column */}
+      </View>
+      {/* End avatar + content row */}
       </View>
 
       {/* Backdrop overlay for menu */}

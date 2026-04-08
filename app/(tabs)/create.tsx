@@ -133,7 +133,7 @@ export default function CreateScreen() {
     setSubmitting(true);
     try {
       if (mode === 'post') {
-        if (!content.trim() && !mediaUri) {
+        if ((!content.trim() && !mediaUri) || !selectedCommunity) {
           setSubmitting(false);
           return;
         }

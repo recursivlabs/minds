@@ -408,9 +408,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           }
 
           setMessages(prev => {
-            // Remove matching optimistic/agent messages
+            // Remove ONE matching optimistic message
+            let removedTemp = false;
             const filtered = prev.filter(m => {
-              if ((m.id.startsWith('temp-') || m.id.startsWith('agent-')) && m.content?.trim() === newMsg.content?.trim()) return false;
+              if (!removedTemp && m.id.startsWith('temp-') && senderId === user?.id && m.content?.trim() === newMsg.content?.trim()) {
+                removedTemp = true;
+                return false;
+              }
+              if (m.id.startsWith('agent-') && m.content?.trim() === newMsg.content?.trim()) return false;
               return true;
             });
             const byId = new Map<string, any>();
