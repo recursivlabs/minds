@@ -394,11 +394,8 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           if (msg.conversationId !== conversationId) return;
           const senderId = msg.sender?.id || msg.senderId;
 
-          // Own messages come through WS too — show them (no optimistic now)
-
           const msgContent = (msg.text || msg.content || '').trim();
-          // Skip blank messages (tool calls, empty events)
-          if (!msgContent) return;
+          if (!msgContent) return; // Skip blank messages (tool calls)
 
           const newMsg = {
             id: msg.id,
@@ -409,8 +406,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           if (messageIdsRef.current.has(newMsg.id)) return;
           messageIdsRef.current.add(newMsg.id);
 
-          // Clear typing indicator — agent reply arrived
-          setAgentTyping(false);
+          // Only clear typing indicator for non-own messages (agent replied)
+          if (senderId !== user?.id) {
+            setAgentTyping(false);
+          }
 
           setMessages(prev => {
             // Remove agent-* optimistic if content matches

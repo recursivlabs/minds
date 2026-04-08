@@ -49,10 +49,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const colors = mode === 'dark' ? darkColors : lightColors as typeof darkColors;
 
-  // key={mode} forces full remount of all children when theme changes
-  // This ensures every component reads the updated global colors
   return (
-    <ThemeContext.Provider value={{ mode, colors, toggle }} key={mode}>
+    <ThemeContext.Provider value={{ mode, colors, toggle }}>
       {children}
     </ThemeContext.Provider>
   );

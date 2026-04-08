@@ -527,15 +527,14 @@ export default function ProfileScreen() {
                               body: blob,
                               headers: { 'Content-Type': contentType },
                             });
-                            // PUT completed
-
+                            if (!putRes.ok) {
+                              throw new Error(`Upload failed: ${putRes.status} ${putRes.statusText}`);
+                            }
                             if (key) {
-                              const confirmRes = await uploads.confirmAvatarUpload(key);
-                              // Avatar confirmed
+                              await uploads.confirmAvatarUpload(key);
                             }
                           } else {
-                            // No upload URL
-                            Alert.alert('Error', 'Could not get upload URL');
+                            throw new Error('No upload URL returned from server');
                           }
                         } catch (err: any) {
                           // Avatar upload failed — alert shown below
