@@ -8,6 +8,8 @@ import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useMyProfile, usePosts, useCommunities, useAgents } from '../../lib/hooks';
 import { colors, spacing, radius, typography } from '../../constants/theme';
+import { getBookmarks } from '../../lib/bookmarks';
+import { getCached } from '../../lib/cache';
 
 function ProfileSection({ title, children, onSeeAll, onCreate, createLabel }: {
   title: string;
@@ -38,6 +40,31 @@ function ProfileSection({ title, children, onSeeAll, onCreate, createLabel }: {
   );
 }
 
+function SavedPostsTab() {
+  const bookmarkIds = getBookmarks();
+  const savedPosts = bookmarkIds.map(id => getCached(`post:${id}`)).filter(Boolean);
+
+  if (savedPosts.length === 0) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+        <Ionicons name="bookmark-outline" size={40} color={colors.accent} />
+        <Text variant="h2" color={colors.text} align="center">Saved</Text>
+        <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
+          Posts you bookmark will appear here.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {savedPosts.map((post: any) => (
+        <PostCard key={post.id} post={post} compact />
+      ))}
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { sdk, user, signOut } = useAuth();
@@ -53,7 +80,7 @@ export default function ProfileScreen() {
   const [editBio, setEditBio] = React.useState('');
   const [editSaving, setEditSaving] = React.useState(false);
   const [editAvatarUri, setEditAvatarUri] = React.useState<string | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'posts' | 'communities' | 'agents' | 'apps'>('posts');
+  const [activeTab, setActiveTab] = React.useState<'posts' | 'communities' | 'agents' | 'apps' | 'saved'>('posts');
 
   const handlePickEditAvatar = async () => {
     try {
@@ -92,6 +119,7 @@ export default function ProfileScreen() {
     { key: 'communities' as const, label: 'Communities' },
     { key: 'agents' as const, label: 'Agents' },
     { key: 'apps' as const, label: 'Apps' },
+    { key: 'saved' as const, label: 'Saved' },
   ];
 
   // Don't flash blank profile — use user from auth as fallback while profile loads
@@ -372,6 +400,10 @@ export default function ProfileScreen() {
             <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>Build and deploy apps powered by the Minds network.</Text>
             <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create</Button>
           </View>
+        )}
+
+        {activeTab === 'saved' && (
+          <SavedPostsTab />
         )}
 
         <View style={{ height: spacing['4xl'] }} />
