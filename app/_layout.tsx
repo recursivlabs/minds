@@ -11,8 +11,10 @@ import { ThemeProvider } from '../lib/theme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/Toast';
 import { initSentry } from '../lib/sentry';
+import { injectWebStyles } from '../lib/webStyles';
 
 initSentry();
+injectWebStyles();
 
 SplashScreen.preventAutoHideAsync();
 
