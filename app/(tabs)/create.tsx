@@ -15,6 +15,7 @@ const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker'
 import { Text, Button, Input } from '../../components';
 import { Container } from '../../components/Container';
 import { TabBar } from '../../components/TabBar';
+import { MentionPicker, useMentions } from '../../components/MentionPicker';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
@@ -43,6 +44,7 @@ export default function CreateScreen() {
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState('');
   const [mediaUri, setMediaUri] = React.useState<string | null>(null);
+  const { mentionQuery, showMentions, insertMention } = useMentions(content, setContent);
   const [selectedCommunity, setSelectedCommunity] = React.useState<any>(
     params.communityId ? { id: params.communityId, name: params.communityName || 'Community' } : null
   );
@@ -344,11 +346,13 @@ export default function CreateScreen() {
             )}
           </View>
 
+          <MentionPicker query={mentionQuery} onSelect={insertMention} visible={showMentions} />
+
           <View style={{ flexDirection: 'row', gap: spacing.md, flex: 1 }}>
             <Avatar uri={user?.image} name={user?.name} size="md" />
             <View style={{ flex: 1 }}>
               <TextInput
-                placeholder="What's on your mind?"
+                placeholder="What's on your mind? Use @ to mention people"
                 placeholderTextColor={colors.textMuted}
                 value={content}
                 onChangeText={setContent}
