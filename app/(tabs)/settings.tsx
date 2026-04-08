@@ -20,7 +20,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
 
   const [loading, setLoading] = React.useState(true);
   const [sessions, setSessions] = React.useState<any[]>([]);
@@ -141,6 +141,11 @@ export default function SettingsScreen() {
           </View>
         )}
         <Section title="Account">
+          <View style={{ paddingVertical: spacing.sm, marginBottom: spacing.md }}>
+            <Text variant="caption" color={colors.textMuted}>Email</Text>
+            <Text variant="body" style={{ marginTop: spacing.xs }}>{user?.email || 'Not set'}</Text>
+          </View>
+          <Divider marginVertical={spacing.sm} />
           <Input label="Current password" secureTextEntry value={pw.current} onChangeText={t => setPw(p => ({ ...p, current: t }))} placeholder="Current password" />
           <Input label="New password" secureTextEntry value={pw.next} onChangeText={t => setPw(p => ({ ...p, next: t }))} placeholder="New password" />
           <Button onPress={changePassword} loading={saving === 'pw'} size="sm" disabled={!pw.current || !pw.next}>Change Password</Button>
