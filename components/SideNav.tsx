@@ -74,9 +74,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const pathname = usePathname();
   const { user, sdk } = useAuth();
   const { mode, toggle: toggleTheme, colors } = useTheme();
-  const { conversations } = useConversations();
+  const { conversations, refresh: refreshConvos } = useConversations();
   const { communities } = useCommunities(5);
   const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
+  const [lastMessageConvoId, setLastMessageConvoId] = React.useState<string | null>(null);
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
 
   // Fetch unread notification count
@@ -91,7 +92,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     })();
   }, [sdk, pathname]); // Refetch when navigating (cheap, cached)
 
-  // Real-time unread tracking
+  // Real-time unread tracking + conversation reordering
   React.useEffect(() => {
     if (!sdk) return;
     let unsub: (() => void) | undefined;
@@ -102,12 +103,15 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           const convoId = msg.conversationId || msg.conversation_id;
           if (convoId && msg.senderId !== user?.id && msg.sender?.id !== user?.id) {
             setUnreadConvos(prev => new Set(prev).add(convoId));
+            setLastMessageConvoId(convoId);
+            // Refresh conversation list to reorder by latest message
+            refreshConvos();
           }
         });
       } catch {}
     })();
     return () => { unsub?.(); };
-  }, [sdk, user?.id]);
+  }, [sdk, user?.id, refreshConvos]);
 
   const isActive = (name: string) => {
     if (name === 'index') return pathname === '/' || pathname === '';

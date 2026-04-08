@@ -337,7 +337,14 @@ function ContentTab({ sdk }: { sdk: any }) {
 
   const deletePost = async (id: string) => {
     setDeletingId(id);
-    try { await sdk.admin.deletePost(id); setPosts(p => p.filter(x => x.id !== id)); } catch { Alert.alert('Error', 'Failed to delete post.'); }
+    try {
+      // Try SDK posts.delete first (works for own posts and with proper scope)
+      try { await sdk.posts.delete(id); } catch {
+        // Fallback to admin endpoint
+        await sdk.admin.deletePost(id);
+      }
+      setPosts(p => p.filter(x => x.id !== id));
+    } catch { Alert.alert('Error', 'Failed to delete post. Check your permissions.'); }
     setDeletingId('');
   };
 

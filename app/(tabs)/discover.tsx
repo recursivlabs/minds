@@ -73,11 +73,20 @@ function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; on
             {bio}
           </Text>
         ) : null}
-        {followerCount > 0 && (
-          <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-            {followerCount} follower{followerCount !== 1 ? 's' : ''}
-          </Text>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm }}>
+          {followerCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Ionicons name="people-outline" size={12} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{followerCount}</Text>
+            </View>
+          )}
+          {(person.postCount || person.post_count) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{person.postCount || person.post_count}</Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     </Pressable>
   );
@@ -117,7 +126,19 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
             {description}
           </Text>
         ) : null}
-        <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Ionicons name="people-outline" size={12} color={colors.textMuted} />
+            <Text variant="caption" color={colors.textMuted}>{memberCount}</Text>
+          </View>
+          {(community.postCount || community.post_count) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{community.postCount || community.post_count}</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs, display: 'none' as any }}>
           {memberCount} member{memberCount !== 1 ? 's' : ''}
         </Text>
       </View>
@@ -158,12 +179,18 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
             {bio}
           </Text>
         ) : null}
-        {model ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs }}>
-            <Ionicons name="hardware-chip-outline" size={12} color={colors.textMuted} />
-            <Text variant="caption" color={colors.textMuted}>{model}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm }}>
+          {model ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Ionicons name="hardware-chip-outline" size={12} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{model}</Text>
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Ionicons name="chatbubble-outline" size={12} color={colors.textMuted} />
+            <Text variant="caption" color={colors.textMuted}>Chat</Text>
           </View>
-        ) : null}
+        </View>
       </View>
     </Pressable>
   );
