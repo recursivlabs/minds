@@ -185,6 +185,25 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title="Notifications">
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">Replies to my posts</Text>
+            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">New followers</Text>
+            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">Upvotes on my posts</Text>
+            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">Community activity</Text>
+            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
+          </View>
+        </Section>
+
         <Section title="Danger Zone">
           {!deleteConfirm ? (
             <Button onPress={() => setDeleteConfirm(true)} variant="secondary" size="sm" accentColor={colors.error}>Delete Account</Button>

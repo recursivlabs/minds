@@ -208,7 +208,16 @@ export default function ProfileScreen() {
               <Text variant="bodyMedium">{followerCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Followers</Text>
             </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Text variant="bodyMedium">{myPosts.length}</Text>
+              <Text variant="caption" color={colors.textMuted}>Posts</Text>
+            </View>
           </View>
+          {(displayProfile?.createdAt || displayProfile?.created_at) && (
+            <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
+              Joined {new Date(displayProfile.createdAt || displayProfile.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+            </Text>
+          )}
         </View>
 
         {/* Content tabs */}
