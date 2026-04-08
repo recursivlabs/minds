@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,7 +49,7 @@ export default function PostDetailScreen() {
         ]);
         setPost((prev: any) => prev ? { ...prev, replyCount: (prev.replyCount || prev.reply_count || 0) + 1 } : prev);
       }
-    } catch {}
+    } catch { Alert.alert('Error', 'Failed to post reply.'); }
     finally { setSubmitting(false); }
   };
 
