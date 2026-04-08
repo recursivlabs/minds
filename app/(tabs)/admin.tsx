@@ -9,7 +9,7 @@ import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type Tab = 'dashboard' | 'users' | 'content' | 'invites' | 'network';
+type Tab = 'dashboard' | 'users' | 'content' | 'communities' | 'invites' | 'network';
 
 const BUSINESS_AI_AGENT_ID = '411ac3a9-dfbc-4463-8963-2e26a645211e';
 
@@ -383,6 +383,73 @@ function ContentTab({ sdk }: { sdk: any }) {
 }
 
 /* --- Invites --- */
+/* --- Communities --- */
+function CommunitiesTab({ sdk }: { sdk: any }) {
+  const router = useRouter();
+  const [communities, setCommunities] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [deletingId, setDeletingId] = React.useState('');
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await sdk.communities.list({ limit: 100, organization_id: ORG_ID || undefined });
+        setCommunities(res.data || []);
+      } catch {}
+      setLoading(false);
+    })();
+  }, [sdk]);
+
+  const deleteCommunity = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await sdk.communities.delete(id);
+      setCommunities(c => c.filter(x => x.id !== id));
+    } catch { Alert.alert('Error', 'Failed to delete community.'); }
+    setDeletingId('');
+  };
+
+  if (loading) return <Skeleton height={200} />;
+
+  return (
+    <View style={{ gap: spacing.xl }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text variant="label" color={colors.textMuted}>{communities.length} communities</Text>
+        <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create</Button>
+      </View>
+      {communities.length === 0 ? (
+        <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+          <Ionicons name="people-outline" size={40} color={colors.accent} />
+          <Text variant="h2" color={colors.text}>No communities</Text>
+          <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 300 }}>
+            Create communities for users to post in.
+          </Text>
+        </View>
+      ) : communities.map((c: any) => (
+        <Card key={c.id}>
+          <Pressable onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <Avatar uri={c.image || c.avatar} name={c.name} size="md" />
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyMedium">{c.name}</Text>
+                <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: spacing.xs }}>
+                  <Text variant="caption" color={colors.textMuted}>{c.memberCount || c.member_count || 0} members</Text>
+                  <Text variant="caption" color={colors.textMuted}>{c.privacy || 'public'}</Text>
+                </View>
+                {c.description && <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs }}>{c.description}</Text>}
+              </View>
+            </View>
+          </Pressable>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md }}>
+            <Button onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)} variant="ghost" size="sm">View</Button>
+            <Button onPress={() => deleteCommunity(c.id)} variant="ghost" size="sm" accentColor={colors.error} loading={deletingId === c.id}>Delete</Button>
+          </View>
+        </Card>
+      ))}
+    </View>
+  );
+}
+
 function InvitesTab({ sdk }: { sdk: any }) {
   const [codes, setCodes] = React.useState<any[]>([]);
   const [waitlist, setWaitlist] = React.useState<any[]>([]);
@@ -523,7 +590,7 @@ export default function AdminScreen() {
       <ScreenHeader title="Admin" />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.sm }}>
-        {(['dashboard', 'users', 'content', 'invites', 'network'] as Tab[]).map(t => (
+        {(['dashboard', 'users', 'content', 'communities', 'invites', 'network'] as Tab[]).map(t => (
           <TabButton key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onPress={() => setTab(t)} />
         ))}
       </ScrollView>
@@ -532,6 +599,7 @@ export default function AdminScreen() {
         {tab === 'dashboard' && <DashboardTab sdk={sdk} />}
         {tab === 'users' && <UsersTab sdk={sdk} />}
         {tab === 'content' && <ContentTab sdk={sdk} />}
+        {tab === 'communities' && <CommunitiesTab sdk={sdk} />}
         {tab === 'invites' && <InvitesTab sdk={sdk} />}
         {tab === 'network' && <NetworkTab sdk={sdk} />}
       </ScrollView>

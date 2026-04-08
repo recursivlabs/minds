@@ -1,8 +1,9 @@
 import * as React from 'react';
-import { View, Platform, Animated, Dimensions, Pressable, TextInput } from 'react-native';
+import { View, Platform, Animated, Dimensions, Pressable, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
+import { BASE_URL, BASE_ORIGIN } from '../lib/recursiv';
 import { Text, Button } from '../components';
 import { colors, spacing } from '../constants/theme';
 
@@ -574,6 +575,24 @@ export default function LandingScreen() {
           >
             <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
               {loading ? 'Signing in...' : 'Log in'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={async () => {
+            if (!loginId.trim()) { setError('Enter your email first'); return; }
+            try {
+              await fetch(`${BASE_URL.replace('/api/v1', '')}/api/auth/forget-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: loginId.trim(), redirectTo: `${BASE_ORIGIN}/reset-password` }),
+              });
+              setError('');
+              Alert.alert('Password Reset', 'If an account exists with that email, you\'ll receive a reset link.');
+            } catch {
+              Alert.alert('Error', 'Could not send reset email. Try again.');
+            }
+          }}>
+            <Text variant="caption" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
+              Forgot password?
             </Text>
           </Pressable>
           <Pressable onPress={() => { setScreen('home'); setError(''); setLoginId(''); setLoginPw(''); }}>
