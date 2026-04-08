@@ -9,7 +9,7 @@ import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type Tab = 'dashboard' | 'users' | 'content' | 'communities' | 'invites' | 'network';
+type Tab = 'dashboard' | 'users' | 'content' | 'reports' | 'communities' | 'invites' | 'network';
 
 const BUSINESS_AI_AGENT_ID = '411ac3a9-dfbc-4463-8963-2e26a645211e';
 
@@ -383,6 +383,66 @@ function ContentTab({ sdk }: { sdk: any }) {
 }
 
 /* --- Invites --- */
+/* --- Reports --- */
+function ReportsTab({ sdk }: { sdk: any }) {
+  const [reports, setReports] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const router = useRouter();
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const apiKey = await (sdk as any).client?.apiKey;
+        const baseUrl = (sdk as any).client?.baseUrl;
+        if (baseUrl && apiKey) {
+          const res = await fetch(`${baseUrl}/reports`, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+          });
+          if (res.ok) {
+            const json = await res.json();
+            setReports(json.data || []);
+          }
+        }
+      } catch {}
+      setLoading(false);
+    })();
+  }, [sdk]);
+
+  if (loading) return <Skeleton height={200} />;
+
+  return (
+    <View style={{ gap: spacing.xl }}>
+      <Text variant="label" color={colors.textMuted}>{reports.length} report{reports.length !== 1 ? 's' : ''}</Text>
+      {reports.length === 0 ? (
+        <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+          <Ionicons name="shield-checkmark-outline" size={40} color={colors.accent} />
+          <Text variant="h2" color={colors.text}>No reports</Text>
+          <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 300 }}>
+            When users report content, it will appear here for review.
+          </Text>
+        </View>
+      ) : reports.map((r: any) => (
+        <Card key={r.id}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="bodyMedium">{r.reason}</Text>
+              <Text variant="caption" color={colors.textMuted}>
+                {r.target_type} · {r.status} · {r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}
+              </Text>
+              {r.details && <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs }}>{r.details}</Text>}
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {r.target_type === 'post' && (
+                <Button onPress={() => router.push(`/(tabs)/post/${r.target_id}` as any)} variant="ghost" size="sm">View</Button>
+              )}
+            </View>
+          </View>
+        </Card>
+      ))}
+    </View>
+  );
+}
+
 /* --- Communities --- */
 function CommunitiesTab({ sdk }: { sdk: any }) {
   const router = useRouter();
@@ -590,7 +650,7 @@ export default function AdminScreen() {
       <ScreenHeader title="Admin" />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.sm }}>
-        {(['dashboard', 'users', 'content', 'communities', 'invites', 'network'] as Tab[]).map(t => (
+        {(['dashboard', 'users', 'content', 'reports', 'communities', 'invites', 'network'] as Tab[]).map(t => (
           <TabButton key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onPress={() => setTab(t)} />
         ))}
       </ScrollView>
@@ -599,6 +659,7 @@ export default function AdminScreen() {
         {tab === 'dashboard' && <DashboardTab sdk={sdk} />}
         {tab === 'users' && <UsersTab sdk={sdk} />}
         {tab === 'content' && <ContentTab sdk={sdk} />}
+        {tab === 'reports' && <ReportsTab sdk={sdk} />}
         {tab === 'communities' && <CommunitiesTab sdk={sdk} />}
         {tab === 'invites' && <InvitesTab sdk={sdk} />}
         {tab === 'network' && <NetworkTab sdk={sdk} />}
