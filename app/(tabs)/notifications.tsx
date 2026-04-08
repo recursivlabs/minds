@@ -62,6 +62,16 @@ export default function NotificationsScreen() {
     }
   };
 
+  const markAllRead = async () => {
+    if (!sdk) return;
+    try {
+      await (sdk as any).notifications.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
+    } catch {}
+  };
+
+  const unreadCount = notifications.filter(n => n.status === 'unread').length;
+
   const getIcon = (type: string): string => {
     if (type?.includes('reply') || type?.includes('comment')) return 'chatbubble';
     if (type?.includes('follow')) return 'person-add';
@@ -72,7 +82,14 @@ export default function NotificationsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-      <ScreenHeader title="Notifications" />
+      <ScreenHeader
+        title="Notifications"
+        right={unreadCount > 0 ? (
+          <Pressable onPress={markAllRead} hitSlop={8}>
+            <Text variant="caption" color={colors.accent}>Mark all read</Text>
+          </Pressable>
+        ) : undefined}
+      />
 
       {loading ? (
         <View style={{ padding: spacing.xl, gap: spacing.lg }}>

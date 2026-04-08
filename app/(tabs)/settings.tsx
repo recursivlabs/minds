@@ -207,6 +207,18 @@ export default function SettingsScreen() {
 
         <Section title="Data">
           <Button
+            onPress={() => {
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.localStorage.removeItem('minds:cache');
+                showMsg('Cache cleared. Reload to see effect.');
+              }
+            }}
+            variant="ghost"
+            size="sm"
+          >
+            Clear Cache
+          </Button>
+          <Button
             onPress={async () => {
               if (!sdk) return;
               try {
