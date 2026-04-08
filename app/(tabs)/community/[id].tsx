@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { View, FlatList, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
@@ -7,7 +7,7 @@ import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
-import { colors, spacing } from '../../../constants/theme';
+import { colors, spacing, radius } from '../../../constants/theme';
 
 export default function CommunityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,6 +20,8 @@ export default function CommunityDetailScreen() {
   const [postsLoading, setPostsLoading] = React.useState(true);
   const [isMember, setIsMember] = React.useState(false);
   const [joinLoading, setJoinLoading] = React.useState(false);
+  const [showModMenu, setShowModMenu] = React.useState(false);
+  const isCreator = community?.created_by?.id === user?.id || community?.createdBy?.id === user?.id;
 
   // Load community details
   React.useEffect(() => {
@@ -137,7 +139,7 @@ export default function CommunityDetailScreen() {
             )}
 
             {/* Actions */}
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
               <Button
                 onPress={handleJoinLeave}
                 loading={joinLoading}
@@ -153,7 +155,63 @@ export default function CommunityDetailScreen() {
               >
                 Create Post
               </Button>
+              {isCreator && (
+                <Button
+                  onPress={() => setShowModMenu(!showModMenu)}
+                  variant="ghost"
+                  size="sm"
+                >
+                  Manage
+                </Button>
+              )}
             </View>
+
+            {/* Mod menu for community creator */}
+            {showModMenu && isCreator && (
+              <View style={{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.borderSubtle }}>
+                <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.xs }}>Moderation</Text>
+                <Button
+                  onPress={async () => {
+                    if (!sdk || !community?.id) return;
+                    try {
+                      const res = await sdk.communities.members(community.id, { limit: 50 });
+                      const members = res.data || [];
+                      Alert.alert('Members', members.map((m: any) => m.user?.name || m.name || 'Unknown').join('\n') || 'No members');
+                    } catch { Alert.alert('Error', 'Could not load members'); }
+                  }}
+                  variant="ghost"
+                  size="sm"
+                >
+                  View Members ({memberCount})
+                </Button>
+                <Button
+                  onPress={async () => {
+                    Alert.alert(
+                      'Delete Community',
+                      'This will permanently delete this community and all its content.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await sdk.communities.delete(community.id);
+                              router.back();
+                            } catch { Alert.alert('Error', 'Could not delete community'); }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  accentColor={colors.error}
+                >
+                  Delete Community
+                </Button>
+              </View>
+            )}
 
             {/* Separator */}
             <View style={{ borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }} />
