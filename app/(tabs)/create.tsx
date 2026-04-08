@@ -323,13 +323,24 @@ export default function CreateScreen() {
                   style={{ position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998 }}
                 />
                 <View style={{
-                  position: 'absolute', top: '100%', left: 0, marginTop: spacing.xs,
-                  backgroundColor: colors.bg, borderRadius: radius.md, borderWidth: 1,
-                  borderColor: colors.border, zIndex: 999999, minWidth: 260, maxHeight: 320,
-                  ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)', overflow: 'auto' } as any : {}),
+                  position: 'fixed' as any,
+                  top: 140,
+                  left: spacing.xl,
+                  right: spacing.xl,
+                  maxWidth: 340,
+                  backgroundColor: colors.surfaceRaised,
+                  borderRadius: radius.lg,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  zIndex: 999999,
+                  maxHeight: 400,
+                  ...(Platform.OS === 'web' ? { boxShadow: '0 16px 64px rgba(0,0,0,0.95)', overflowY: 'auto' } as any : {}),
                 }}>
+                  <View style={{ padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }}>
+                    <Text variant="label" color={colors.textSecondary}>Choose a community</Text>
+                  </View>
                   {(communities || []).length === 0 && (
-                    <View style={{ padding: spacing.lg, alignItems: 'center', gap: spacing.sm }}>
+                    <View style={{ padding: spacing.xl, alignItems: 'center', gap: spacing.sm }}>
                       <Text variant="body" color={colors.textMuted} align="center">No communities yet</Text>
                       <Pressable onPress={() => { setShowCommunityPicker(false); setMode('community' as any); }}>
                         <Text variant="caption" color={colors.accent}>Create one</Text>
@@ -341,14 +352,17 @@ export default function CreateScreen() {
                       key={c.id}
                       onPress={() => { setSelectedCommunity(c); setShowCommunityPicker(false); }}
                       style={({ pressed }) => ({
-                        flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+                        flexDirection: 'row', alignItems: 'center', gap: spacing.md,
                         paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
                         backgroundColor: selectedCommunity?.id === c.id ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
-                        borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.04)',
+                        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
                       })}
                     >
-                      <Avatar uri={c.image || c.avatar} name={c.name} size="xs" />
-                      <Text variant="body" color={selectedCommunity?.id === c.id ? colors.accent : colors.text} style={{ fontSize: 14, flex: 1 }} numberOfLines={1}>{c.name}</Text>
+                      <Avatar uri={c.image || c.avatar} name={c.name} size="sm" />
+                      <View style={{ flex: 1 }}>
+                        <Text variant="body" color={selectedCommunity?.id === c.id ? colors.accent : colors.text} numberOfLines={1}>{c.name}</Text>
+                        {c.description && <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{c.description}</Text>}
+                      </View>
                       {selectedCommunity?.id === c.id && <Ionicons name="checkmark" size={16} color={colors.accent} />}
                     </Pressable>
                   ))}
@@ -566,8 +580,18 @@ export default function CreateScreen() {
           <Pressable onPress={() => setShowTags(!showTags)} hitSlop={8}>
             <Ionicons name="pricetag-outline" size={22} color={tags.length > 0 ? colors.accent : colors.textMuted} />
           </Pressable>
-          <Pressable onPress={() => setIsNsfw(!isNsfw)} hitSlop={8}>
-            <Ionicons name={isNsfw ? 'warning' : 'warning-outline'} size={22} color={isNsfw ? colors.accent : colors.textMuted} />
+          <Pressable
+            onPress={() => setIsNsfw(!isNsfw)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+              paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
+              borderRadius: radius.sm,
+              backgroundColor: isNsfw ? colors.errorMuted : 'transparent',
+              borderWidth: isNsfw ? 0 : 0.5,
+              borderColor: colors.borderSubtle,
+            }}
+          >
+            <Text variant="caption" color={isNsfw ? colors.error : colors.textMuted} style={{ fontSize: 11 }}>NSFW</Text>
           </Pressable>
           <View style={{ flex: 1 }} />
           <Text variant="caption" color={colors.textMuted}>{content.length}</Text>

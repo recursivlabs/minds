@@ -2,7 +2,7 @@ import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Header, FeedTabs, PostCard, Text, Container, FeedSidebar, Button } from '../../components';
+import { Header, FeedTabs, PostCard, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
 import { FeedSkeletons } from '../../components/PostSkeleton';
 import { OnboardingFlow, useOnboarding } from '../../components/Onboarding';
 import { ORG_ID } from '../../lib/recursiv';
@@ -48,6 +48,20 @@ export default function FeedScreen() {
               }}
             />
           )}
+          ListHeaderComponent={
+            <Pressable
+              onPress={() => router.push('/(tabs)/create')}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+              })}
+            >
+              <Avatar uri={user?.image} name={user?.name} size="sm" />
+              <Text variant="body" color={colors.textMuted}>What's on your mind?</Text>
+            </Pressable>
+          }
           onRefresh={refresh}
           refreshing={refreshing}
           onEndReached={loadMore}

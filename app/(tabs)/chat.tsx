@@ -393,28 +393,28 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         unsub = sdk.realtime.onMessage((msg: any) => {
           if (msg.conversationId !== conversationId) return;
           const senderId = msg.sender?.id || msg.senderId;
+
+          // Own messages come through WS too — show them (no optimistic now)
+
+          const msgContent = (msg.text || msg.content || '').trim();
+          // Skip blank messages (tool calls, empty events)
+          if (!msgContent) return;
+
           const newMsg = {
             id: msg.id,
-            content: msg.text || msg.content || '',
+            content: msgContent,
             sender: msg.sender || { id: senderId, name: msg.senderName },
             createdAt: msg.createdAt || new Date().toISOString(),
           };
           if (messageIdsRef.current.has(newMsg.id)) return;
           messageIdsRef.current.add(newMsg.id);
 
-          // Clear typing indicator if message is from the other person (agent reply arrived)
-          if (senderId !== user?.id) {
-            setAgentTyping(false);
-          }
+          // Clear typing indicator — agent reply arrived
+          setAgentTyping(false);
 
           setMessages(prev => {
-            // Remove ONE matching optimistic message
-            let removedTemp = false;
+            // Remove agent-* optimistic if content matches
             const filtered = prev.filter(m => {
-              if (!removedTemp && m.id.startsWith('temp-') && senderId === user?.id && m.content?.trim() === newMsg.content?.trim()) {
-                removedTemp = true;
-                return false;
-              }
               if (m.id.startsWith('agent-') && m.content?.trim() === newMsg.content?.trim()) return false;
               return true;
             });
@@ -452,35 +452,17 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         try {
           const msgRes = await sdk.chat.messages(conversationId, { limit: 20 });
           const rawMessages = msgRes.data || [];
-          const newMsgs = rawMessages
-            .filter((m: any) => !messageIdsRef.current.has(m.id))
-            .reverse()
-            .map((m: any) => ({
-              id: m.id,
-              content: m.content || m.text || '',
-              sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
-              createdAt: m.createdAt || m.created_at || new Date().toISOString(),
-            }));
+          rawMessages.forEach((m: any) => messageIdsRef.current.add(m.id));
+          const allServerMsgs = rawMessages.reverse().map((m: any) => ({
+            id: m.id,
+            content: (m.content || m.text || '').trim(),
+            sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
+            createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+          })).filter((m: any) => m.content); // Skip blank messages
 
-          if (newMsgs.length > 0) {
-            newMsgs.forEach((m: any) => messageIdsRef.current.add(m.id));
-            setMessages(prev => {
-              const newContents = new Set(newMsgs.map((m: any) => m.content?.trim()));
-              const filtered = prev.filter(m => {
-                if (m.id.startsWith('temp-') && newContents.has(m.content?.trim())) return false;
-                if (m.id.startsWith('agent-') && newContents.has(m.content?.trim())) return false;
-                return true;
-              });
-              const byId = new Map<string, any>();
-              for (const m of filtered) byId.set(m.id, m);
-              for (const m of newMsgs) byId.set(m.id, m);
-              return Array.from(byId.values()).sort(
-                (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-              );
-            });
-          }
+          setMessages(allServerMsgs);
         } catch {}
-    }, 5000);
+      }, 5000);
 
     }, 2000); // Wait 2s for WS to connect before falling back to polling
 
@@ -506,27 +488,25 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     setText('');
     setSending(true);
 
-    // Optimistic user message
-    const tempId = 'temp-' + Date.now();
-    const tempMsg = {
-      id: tempId,
-      content: messageText,
-      sender: { id: user?.id, name: user?.name },
-      createdAt: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, tempMsg]);
-
     try {
-      // Send via SDK — get the real server message ID back
+      // Send message — no optimistic insert, let server confirm via WS or poll
       const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText });
       const serverMsgId = sendRes?.data?.id;
 
-      // Swap optimistic temp ID → real server ID so WS event deduplicates
-      if (serverMsgId) {
+      // If WS is connected, the message will arrive via WS event.
+      // If polling, add it immediately from the send response.
+      if (serverMsgId && !wsConnectedRef.current) {
+        if (!messageIdsRef.current.has(serverMsgId)) {
+          messageIdsRef.current.add(serverMsgId);
+          setMessages(prev => [...prev, {
+            id: serverMsgId,
+            content: messageText,
+            sender: { id: user?.id, name: user?.name },
+            createdAt: new Date().toISOString(),
+          }]);
+        }
+      } else if (serverMsgId) {
         messageIdsRef.current.add(serverMsgId);
-        setMessages(prev => prev.map(m =>
-          m.id === tempId ? { ...m, id: serverMsgId } : m
-        ));
       }
 
       const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
@@ -590,7 +570,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         }
       }
     } catch {
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      // Send failed — nothing to remove since we didn't add optimistically
     } finally {
       setSending(false);
     }
