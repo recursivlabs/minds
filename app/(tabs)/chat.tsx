@@ -376,48 +376,104 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     return () => { cancelled = true; };
   }, [conversationId, sdk, user?.id]);
 
-  // Poll for new messages every 3s (WebSocket token endpoint 404s via API keys)
+  // Real-time messages via WebSocket, fall back to polling
+  const wsConnectedRef = React.useRef(false);
+
   React.useEffect(() => {
     if (!sdk || loading) return;
+    let unsub: (() => void) | undefined;
 
-    pollRef.current = setInterval(async () => {
+    // Try WebSocket first
+    (async () => {
       try {
-        const msgRes = await sdk.chat.messages(conversationId, { limit: 20 });
-        const rawMessages = msgRes.data || [];
-        const newMsgs = rawMessages
-          .filter((m: any) => !messageIdsRef.current.has(m.id))
-          .reverse()
-          .map((m: any) => ({
-            id: m.id,
-            content: m.content || m.text || '',
-            sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
-            createdAt: m.createdAt || m.created_at || new Date().toISOString(),
-          }));
+        await sdk.realtime.connect();
+        sdk.realtime.joinConversation(conversationId);
+        wsConnectedRef.current = true;
 
-        if (newMsgs.length > 0) {
-          newMsgs.forEach((m: any) => messageIdsRef.current.add(m.id));
+        unsub = sdk.realtime.onMessage((msg: any) => {
+          if (msg.conversationId !== conversationId) return;
+          const newMsg = {
+            id: msg.id,
+            content: msg.text || msg.content || '',
+            sender: msg.sender || { id: msg.senderId, name: msg.senderName },
+            createdAt: msg.createdAt || new Date().toISOString(),
+          };
+          if (messageIdsRef.current.has(newMsg.id)) return;
+          messageIdsRef.current.add(newMsg.id);
           setMessages(prev => {
-            // Build set of new message contents for matching against optimistic
-            const newContents = new Set(newMsgs.map((m: any) => m.content?.trim()));
-            // Remove optimistic messages that now have a real server version
+            // Remove matching optimistic messages
             const filtered = prev.filter(m => {
-              if (m.id.startsWith('temp-') && newContents.has(m.content?.trim())) return false;
-              if (m.id.startsWith('agent-') && newContents.has(m.content?.trim())) return false;
+              if ((m.id.startsWith('temp-') || m.id.startsWith('agent-')) && m.content?.trim() === newMsg.content?.trim()) return false;
               return true;
             });
-            // Merge and deduplicate by ID
             const byId = new Map<string, any>();
             for (const m of filtered) byId.set(m.id, m);
-            for (const m of newMsgs) byId.set(m.id, m);
+            byId.set(newMsg.id, newMsg);
             return Array.from(byId.values()).sort(
               (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             );
           });
-        }
-      } catch {}
-    }, 5000);
+        });
+      } catch {
+        // WebSocket failed — fall back to polling
+        wsConnectedRef.current = false;
+      }
+    })();
 
     return () => {
+      unsub?.();
+      if (wsConnectedRef.current) {
+        sdk.realtime.leaveConversation(conversationId);
+      }
+    };
+  }, [conversationId, sdk, loading]);
+
+  // Fallback polling — only if WebSocket didn't connect
+  React.useEffect(() => {
+    if (!sdk || loading) return;
+
+    // Wait a moment for WS to connect before starting poll
+    const startTimer = setTimeout(() => {
+      if (wsConnectedRef.current) return; // WS connected, no need to poll
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const msgRes = await sdk.chat.messages(conversationId, { limit: 20 });
+          const rawMessages = msgRes.data || [];
+          const newMsgs = rawMessages
+            .filter((m: any) => !messageIdsRef.current.has(m.id))
+            .reverse()
+            .map((m: any) => ({
+              id: m.id,
+              content: m.content || m.text || '',
+              sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
+              createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+            }));
+
+          if (newMsgs.length > 0) {
+            newMsgs.forEach((m: any) => messageIdsRef.current.add(m.id));
+            setMessages(prev => {
+              const newContents = new Set(newMsgs.map((m: any) => m.content?.trim()));
+              const filtered = prev.filter(m => {
+                if (m.id.startsWith('temp-') && newContents.has(m.content?.trim())) return false;
+                if (m.id.startsWith('agent-') && newContents.has(m.content?.trim())) return false;
+                return true;
+              });
+              const byId = new Map<string, any>();
+              for (const m of filtered) byId.set(m.id, m);
+              for (const m of newMsgs) byId.set(m.id, m);
+              return Array.from(byId.values()).sort(
+                (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+              );
+            });
+          }
+        } catch {}
+    }, 5000);
+
+    }, 2000); // Wait 2s for WS to connect before falling back to polling
+
+    return () => {
+      clearTimeout(startTimer);
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [conversationId, sdk, loading]);
