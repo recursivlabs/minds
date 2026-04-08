@@ -74,23 +74,24 @@ function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; on
             {bio}
           </Text>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm }}>
-          {followerCount > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{followerCount}</Text>
-            </View>
-          )}
-          {(person.postCount || person.post_count) ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{person.postCount || person.post_count}</Text>
-            </View>
-          ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          {followerCount > 0 && <Text variant="caption" color={colors.textMuted}>{followerCount} follower{followerCount !== 1 ? 's' : ''}</Text>}
+          {(person.postCount || person.post_count) ? <Text variant="caption" color={colors.textMuted}>· {person.postCount || person.post_count} posts</Text> : null}
+          {(person.createdAt || person.created_at) && <Text variant="caption" color={colors.textMuted}>· Joined {timeAgoShort(person.createdAt || person.created_at)}</Text>}
         </View>
       </View>
     </Pressable>
   );
+}
+
+function timeAgoShort(dateStr?: string): string {
+  if (!dateStr) return '';
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 2592000) return `${Math.floor(diff / 604800)}w ago`;
+  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 }
 
 function CommunityCard({ community, onPress }: { community: any; onPress: () => void }) {
@@ -98,7 +99,9 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
   const description = community.description || community.bio || '';
   const avatar = community.image || community.avatar;
   const memberCount = community.memberCount || community.member_count || 0;
+  const postCount = community.postCount || community.post_count || 0;
   const privacy = community.privacy;
+  const createdAt = community.createdAt || community.created_at;
 
   return (
     <Pressable
@@ -110,7 +113,7 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
         paddingHorizontal: spacing.xl,
         paddingVertical: spacing.lg,
         backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-        borderBottomWidth: 0.5,
+        borderBottomWidth: 1,
         borderBottomColor: colors.borderSubtle,
       })}
     >
@@ -123,25 +126,15 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
           )}
         </View>
         {description ? (
-          <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+          <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
             {description}
           </Text>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-            <Text variant="caption" color={colors.textMuted}>{memberCount}</Text>
-          </View>
-          {(community.postCount || community.post_count) ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{community.postCount || community.post_count}</Text>
-            </View>
-          ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          <Text variant="caption" color={colors.textMuted}>{memberCount} member{memberCount !== 1 ? 's' : ''}</Text>
+          {postCount > 0 && <Text variant="caption" color={colors.textMuted}>· {postCount} post{postCount !== 1 ? 's' : ''}</Text>}
+          {createdAt && <Text variant="caption" color={colors.textMuted}>· Created {timeAgoShort(createdAt)}</Text>}
         </View>
-        <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs, display: 'none' as any }}>
-          {memberCount} member{memberCount !== 1 ? 's' : ''}
-        </Text>
       </View>
     </Pressable>
   );
@@ -180,17 +173,9 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
             {bio}
           </Text>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm }}>
-          {model ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Ionicons name="hardware-chip-outline" size={12} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{model}</Text>
-            </View>
-          ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Ionicons name="chatbubble-outline" size={12} color={colors.textMuted} />
-            <Text variant="caption" color={colors.textMuted}>Chat</Text>
-          </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          {model && <Text variant="caption" color={colors.textMuted}>Powered by {model}</Text>}
+          <Text variant="caption" color={colors.accent}>Chat now →</Text>
         </View>
       </View>
     </Pressable>
@@ -415,6 +400,19 @@ export default function DiscoverScreen() {
           data={items}
           keyExtractor={(item) => item.key}
           renderItem={renderItem}
+          ListHeaderComponent={items.length > 0 ? (
+            <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
+              <Text variant="caption" color={colors.textMuted}>
+                {isSearching
+                  ? `${items.length} result${items.length !== 1 ? 's' : ''}`
+                  : activeTab === 'posts' ? `${items.length} trending posts`
+                  : activeTab === 'people' ? `${items.length} people on the network`
+                  : activeTab === 'communities' ? `${items.length} communities to join`
+                  : `${items.length} agents you can chat with`
+                }
+              </Text>
+            </View>
+          ) : null}
           ListEmptyComponent={
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
               <Ionicons
