@@ -75,6 +75,9 @@ export function parseMarkdownSegments(text: string): MarkdownSegment[] {
       // Link
       segments.push({ type: 'link', text: match[8], url: match[9] });
     } else if (match[10]) {
+      // Hashtag
+      segments.push({ type: 'hashtag', text: `#${match[11]}`, tag: match[11] });
+    } else if (match[12]) {
       // Line break
       segments.push({ type: 'break' });
     }

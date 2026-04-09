@@ -227,6 +227,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                   {seg.text}
                 </Text>
               );
+            case 'hashtag':
+              return (
+                <Text key={i} variant="body" color={colors.accent} onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts', q: `#${(seg as any).tag}` } } as any)}>
+                  {seg.text}
+                </Text>
+              );
             case 'link':
               return (
                 <Text key={i} variant="body" color={colors.accent} onPress={() => Linking.openURL(seg.url)} style={{ textDecorationLine: 'underline' }}>

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, TextInput, Platform, Pressable, ScrollView } from 'react-native';
+import { View, FlatList, TextInput, Platform, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, Skeleton, PostCard } from '../../components';
@@ -184,12 +184,12 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string; mode?: string; userId?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; mode?: string; userId?: string; q?: string }>();
   const { sdk } = useAuth();
   const [activeTab, setActiveTab] = React.useState<DiscoverTab>(
     (params.tab as DiscoverTab) || 'posts'
   );
-  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchQuery, setSearchQuery] = React.useState(params.q || '');
 
   // Followers/following mode
   const [followList, setFollowList] = React.useState<any[]>([]);
@@ -226,7 +226,7 @@ export default function DiscoverScreen() {
     setSearchPeopleLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const res = await sdk.profiles.search({ query: searchQuery, limit: 20 });
+        const res = await sdk.profiles.search({ q: searchQuery, limit: 20 });
         if (!cancelled) setSearchedPeople(res.data || []);
       } catch {
         // Fall back to client-side filter
