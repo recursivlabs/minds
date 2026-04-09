@@ -35,7 +35,7 @@ const MODES: { key: Mode; label: string }[] = [
 
 export default function CreateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ communityId?: string; communityName?: string }>();
+  const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string }>();
   const { sdk, user } = useAuth();
   const [mode, setMode] = React.useState<Mode>('post');
 
@@ -56,7 +56,7 @@ export default function CreateScreen() {
   }, []);
 
   // Post state
-  const [content, setContent] = React.useState('');
+  const [content, setContent] = React.useState(params.quote || '');
   const [isNsfw, setIsNsfw] = React.useState(false);
   const [showTags, setShowTags] = React.useState(false);
   const [tags, setTags] = React.useState<string[]>([]);

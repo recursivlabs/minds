@@ -371,16 +371,16 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </Pressable>
 
         <Pressable
-          onPress={async () => {
-            if (!sdk) return;
-            try {
-              await sdk.posts.create({
-                content: `Repost from @${authorUsername}:\n\n${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`,
-                organization_id: post.organizationId || post.organization_id || undefined,
-                community_id: post.communityId || post.community_id || undefined,
-              } as any);
-              toast.show('Reposted');
-            } catch { toast.show('Repost failed', 'error'); }
+          onPress={() => {
+            const quoteText = `\n\n> @${authorUsername}: ${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`;
+            router.push({
+              pathname: '/(tabs)/create',
+              params: {
+                communityId: post.communityId || post.community_id || '',
+                communityName: communityName || '',
+                quote: quoteText,
+              },
+            } as any);
           }}
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
