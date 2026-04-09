@@ -89,6 +89,10 @@ export default function CreateScreen() {
   const [blogTitle, setBlogTitle] = React.useState('');
   const [blogContent, setBlogContent] = React.useState('');
 
+  // Schedule state
+  const [scheduleDate, setScheduleDate] = React.useState<string>('');
+  const [showSchedule, setShowSchedule] = React.useState(false);
+
   // App state
   const [appName, setAppName] = React.useState('');
   const [appDesc, setAppDesc] = React.useState('');
@@ -603,8 +607,8 @@ export default function CreateScreen() {
         </ScrollView>
       )}
 
-      {/* Bottom toolbar (post mode only) */}
-      {mode === 'post' && (
+      {/* Bottom toolbar (post and blog mode) */}
+      {(mode === 'post' || mode === 'blog') && (
         <View
           style={{
             flexDirection: 'row',
@@ -635,8 +639,46 @@ export default function CreateScreen() {
           >
             <Text variant="caption" color={isNsfw ? colors.error : colors.textMuted} style={{ fontSize: 11 }}>NSFW</Text>
           </Pressable>
+          <Pressable
+            onPress={() => setShowSchedule(!showSchedule)}
+            hitSlop={8}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+              paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
+              borderRadius: radius.sm,
+              backgroundColor: scheduleDate ? colors.accentSubtle : 'transparent',
+              borderWidth: scheduleDate ? 0 : 0.5,
+              borderColor: colors.borderSubtle,
+            }}
+          >
+            <Ionicons name="time-outline" size={14} color={scheduleDate ? colors.accent : colors.textMuted} />
+            <Text variant="caption" color={scheduleDate ? colors.accent : colors.textMuted} style={{ fontSize: 11 }}>
+              {scheduleDate ? new Date(scheduleDate).toLocaleDateString() : 'Schedule'}
+            </Text>
+          </Pressable>
           <View style={{ flex: 1 }} />
-          <Text variant="caption" color={colors.textMuted}>{content.length}</Text>
+          <Text variant="caption" color={colors.textMuted}>{(mode === 'blog' ? blogContent : content).length}</Text>
+        </View>
+      )}
+      {showSchedule && (
+        <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}>
+          <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>Schedule post for later</Text>
+          <TextInput
+            placeholder="YYYY-MM-DD HH:MM"
+            placeholderTextColor={colors.textMuted}
+            value={scheduleDate}
+            onChangeText={setScheduleDate}
+            style={{
+              backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder,
+              borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 10,
+              color: colors.text, ...typography.body,
+              ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
+            }}
+          />
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
+            <Button onPress={() => { setScheduleDate(''); setShowSchedule(false); }} variant="ghost" size="sm">Clear</Button>
+            <Button onPress={() => setShowSchedule(false)} size="sm">Set</Button>
+          </View>
         </View>
       )}
     </Container>
