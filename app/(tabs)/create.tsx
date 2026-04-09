@@ -23,10 +23,11 @@ import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
-type Mode = 'post' | 'agent' | 'app' | 'community';
+type Mode = 'post' | 'blog' | 'agent' | 'app' | 'community';
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'post', label: 'Post' },
+  { key: 'blog', label: 'Blog' },
   { key: 'agent', label: 'Agent' },
   { key: 'app', label: 'App' },
   { key: 'community', label: 'Community' },
@@ -83,6 +84,10 @@ export default function CreateScreen() {
     { id: 'openai/gpt-5.4', label: 'GPT-5.4', provider: 'OpenAI' },
     { id: 'openai/o3', label: 'o3', provider: 'OpenAI' },
   ];
+
+  // Blog state
+  const [blogTitle, setBlogTitle] = React.useState('');
+  const [blogContent, setBlogContent] = React.useState('');
 
   // App state
   const [appName, setAppName] = React.useState('');
@@ -184,6 +189,20 @@ export default function CreateScreen() {
         } as any);
         if (draftRef.current) deleteDraft(draftRef.current);
         router.back();
+      } else if (mode === 'blog') {
+        if (!blogTitle.trim() || !blogContent.trim() || !selectedCommunity) {
+          setSubmitting(false);
+          return;
+        }
+        await sdk.posts.create({
+          content: blogContent.trim(),
+          title: blogTitle.trim(),
+          content_format: 'markdown',
+          organization_id: ORG_ID || undefined,
+          community_id: selectedCommunity?.id || undefined,
+        } as any);
+        if (draftRef.current) deleteDraft(draftRef.current);
+        router.back();
       } else if (mode === 'agent') {
         if (!agentName.trim()) { setSubmitting(false); return; }
         const username = agentName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).slice(2, 6);
@@ -233,11 +252,13 @@ export default function CreateScreen() {
   };
 
   const canSubmit = mode === 'post' ? ((content.trim().length > 0 || !!mediaUri) && !!selectedCommunity)
+    : mode === 'blog' ? (blogTitle.trim().length > 0 && blogContent.trim().length > 0 && !!selectedCommunity)
     : mode === 'agent' ? (agentName.trim().length > 0 && agentBio.trim().length > 0)
     : mode === 'app' ? (appName.trim().length > 0 && appDesc.trim().length > 0)
     : (communityName.trim().length > 0 && communityDesc.trim().length > 0);
 
   const submitLabel = mode === 'post' ? 'Post'
+    : mode === 'blog' ? 'Publish'
     : mode === 'agent' ? 'Create Agent'
     : mode === 'app' ? 'Create App'
     : 'Create Community';
@@ -293,7 +314,7 @@ export default function CreateScreen() {
       <TabBar tabs={MODES} active={mode} onChange={(k) => setMode(k as Mode)} />
 
       {/* Content area */}
-      {mode === 'post' ? (
+      {(mode === 'post' || mode === 'blog') ? (
         <View style={{ flex: 1, padding: spacing.xl }}>
           {/* Community picker */}
           <View style={{ marginBottom: spacing.md, position: 'relative' }}>
@@ -374,18 +395,36 @@ export default function CreateScreen() {
 
           <MentionPicker query={mentionQuery} onSelect={insertMention} visible={showMentions} />
 
+          {mode === 'blog' && (
+            <TextInput
+              placeholder="Title"
+              placeholderTextColor={colors.textMuted}
+              value={blogTitle}
+              onChangeText={setBlogTitle}
+              style={{
+                color: colors.text,
+                fontFamily: 'Geist-SemiBold',
+                fontSize: 22,
+                lineHeight: 28,
+                padding: 0,
+                marginBottom: spacing.lg,
+                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
+              }}
+            />
+          )}
+
           <View style={{ flexDirection: 'row', gap: spacing.md, flex: 1 }}>
-            <Avatar uri={user?.image} name={user?.name} size="md" />
+            {mode === 'post' && <Avatar uri={user?.image} name={user?.name} size="md" />}
             <View style={{ flex: 1 }}>
               <TextInput
-                placeholder="What's on your mind? Use @ to mention people"
+                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's on your mind? Use @ to mention people"}
                 placeholderTextColor={colors.textMuted}
-                value={content}
-                onChangeText={setContent}
+                value={mode === 'blog' ? blogContent : content}
+                onChangeText={mode === 'blog' ? setBlogContent : setContent}
                 multiline
-                autoFocus
+                autoFocus={mode !== 'blog'}
                 onKeyPress={(e: any) => {
-                  if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                  if (mode !== 'blog' && Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
                     e.preventDefault();
                     handleSubmit();
                   }
