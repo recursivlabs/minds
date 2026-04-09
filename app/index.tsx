@@ -341,11 +341,11 @@ const lightColors = {
 
 // ─── MAIN SCREEN ─────────────────────────────────────────────
 
-type ScreenMode = 'home' | 'earlyAccess' | 'login' | 'submitted';
+type ScreenMode = 'home' | 'earlyAccess' | 'login' | 'signUp' | 'submitted';
 
 export default function LandingScreen() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, signIn } = useAuth();
+  const { isAuthenticated, isLoading, signIn, signUp } = useAuth();
   const [isDark, setIsDark] = React.useState(true);
   const darkOpacity = React.useRef(new Animated.Value(1)).current;
   const lightOpacity = React.useRef(new Animated.Value(0)).current;
@@ -354,6 +354,9 @@ export default function LandingScreen() {
   const [email, setEmail] = React.useState('');
   const [loginId, setLoginId] = React.useState('');
   const [loginPw, setLoginPw] = React.useState('');
+  const [signUpName, setSignUpName] = React.useState('');
+  const [signUpEmail, setSignUpEmail] = React.useState('');
+  const [signUpPw, setSignUpPw] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
@@ -386,6 +389,27 @@ export default function LandingScreen() {
     if (!email.trim() || !email.includes('@')) return;
     // TODO: store email in database via SDK
     setScreen('submitted');
+  };
+
+  const handleSignUp = async () => {
+    if (!signUpName.trim() || !signUpEmail.trim() || !signUpPw.trim()) {
+      setError('All fields are required');
+      return;
+    }
+    if (signUpPw.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await signUp(signUpName.trim(), signUpEmail.trim().toLowerCase(), signUpPw);
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      setError(err?.message || 'Sign up failed. Try a different email.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -515,6 +539,80 @@ export default function LandingScreen() {
       );
     }
 
+    if (screen === 'signUp') {
+      return (
+        <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
+          <Text variant="h3" color={c.wordmark} align="center">Create Account</Text>
+          {error ? <Text variant="caption" color={colors.error} align="center">{error}</Text> : null}
+          <TextInput
+            placeholder="Name"
+            placeholderTextColor={c.subtleText}
+            value={signUpName}
+            onChangeText={setSignUpName}
+            autoCapitalize="words"
+            style={{
+              backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder,
+              borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13,
+              color: c.inputText, fontSize: 15,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
+          <TextInput
+            placeholder="Email"
+            placeholderTextColor={c.subtleText}
+            value={signUpEmail}
+            onChangeText={setSignUpEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={{
+              backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder,
+              borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13,
+              color: c.inputText, fontSize: 15,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
+          <TextInput
+            placeholder="Password (8+ characters)"
+            placeholderTextColor={c.subtleText}
+            value={signUpPw}
+            onChangeText={setSignUpPw}
+            secureTextEntry
+            style={{
+              backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder,
+              borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13,
+              color: c.inputText, fontSize: 15,
+              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+            }}
+          />
+          <Pressable
+            onPress={handleSignUp}
+            disabled={loading}
+            style={({ pressed }) => ({
+              paddingVertical: 14, borderRadius: 10,
+              backgroundColor: c.buttonBg,
+              alignItems: 'center' as const,
+              opacity: loading ? 0.5 : pressed ? 0.85 : 1,
+              ...(Platform.OS === 'web' ? { cursor: loading ? 'default' : 'pointer' } as any : {}),
+            })}
+          >
+            <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
+              {loading ? 'Creating account...' : 'Sign Up'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => { setScreen('login'); setError(''); }}>
+            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
+              Already have an account? Log in
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => { setScreen('home'); setError(''); setSignUpName(''); setSignUpEmail(''); setSignUpPw(''); }}>
+            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.5 }}>
+              Back
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     if (screen === 'login') {
       return (
         <View style={{ width: '100%', maxWidth: 320, gap: spacing.md }}>
@@ -595,6 +693,11 @@ export default function LandingScreen() {
               Forgot password?
             </Text>
           </Pressable>
+          <Pressable onPress={() => { setScreen('signUp'); setError(''); }}>
+            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
+              Don't have an account? Sign up
+            </Text>
+          </Pressable>
           <Pressable onPress={() => { setScreen('home'); setError(''); setLoginId(''); setLoginPw(''); }}>
             <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.5 }}>
               Back
@@ -604,11 +707,11 @@ export default function LandingScreen() {
       );
     }
 
-    // Home — two buttons
+    // Home — three buttons
     return (
       <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
         <Pressable
-          onPress={() => setScreen('earlyAccess')}
+          onPress={() => setScreen('signUp')}
           style={({ pressed }) => ({
             paddingVertical: 14,
             paddingHorizontal: 24,
@@ -620,7 +723,7 @@ export default function LandingScreen() {
           })}
         >
           <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
-            Request early access
+            Sign Up
           </Text>
         </Pressable>
 
