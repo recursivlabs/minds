@@ -287,6 +287,13 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title="Appearance">
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">Language</Text>
+            <Text variant="body" color={colors.textMuted}>English</Text>
+          </View>
+        </Section>
+
         <Section title="Content">
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Show NSFW content</Text>

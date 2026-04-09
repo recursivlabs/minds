@@ -9,7 +9,25 @@
       "output": "single",
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-router"],
+    "ios": {
+      "bundleIdentifier": "com.minds.app",
+      "associatedDomains": ["applinks:minds.on.recursiv.io", "applinks:minds.com"]
+    },
+    "android": {
+      "package": "com.minds.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "minds.on.recursiv.io" },
+            { "scheme": "https", "host": "minds.com" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "plugins": ["expo-router", "expo-notifications"],
     "experiments": {
       "typedRoutes": true
     }

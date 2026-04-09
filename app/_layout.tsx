@@ -13,9 +13,11 @@ import { ToastProvider } from '../components/Toast';
 import { NetworkBanner } from '../components/NetworkBanner';
 import { initSentry } from '../lib/sentry';
 import { injectWebStyles } from '../lib/webStyles';
+import { initKeyboardShortcuts } from '../lib/keyboard';
 
 initSentry();
 injectWebStyles();
+initKeyboardShortcuts();
 
 SplashScreen.preventAutoHideAsync();
 

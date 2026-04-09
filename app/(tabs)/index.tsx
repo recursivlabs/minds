@@ -8,6 +8,7 @@ import { OnboardingFlow, useOnboarding } from '../../components/Onboarding';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
+import { registerShortcut } from '../../lib/keyboard';
 import { colors, spacing } from '../../constants/theme';
 
 type FeedTab = 'foryou' | 'latest' | 'following' | 'trending';
@@ -20,6 +21,17 @@ export default function FeedScreen() {
 
   const sortMap = { foryou: 'score', latest: 'latest', following: 'following', trending: 'score' } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
+
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const unsubs = [
+      registerShortcut('n', () => router.push('/(tabs)/create')),
+      registerShortcut('/', () => router.push('/(tabs)/discover' as any)),
+      registerShortcut('g', () => router.push('/(tabs)/chat')),
+      registerShortcut('escape', () => refresh()),
+    ];
+    return () => unsubs.forEach(u => u());
+  }, [router, refresh]);
 
   if (showOnboarding) {
     return <OnboardingFlow onComplete={completeOnboarding} />;
