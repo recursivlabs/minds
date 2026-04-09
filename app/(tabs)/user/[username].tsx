@@ -173,6 +173,28 @@ export default function UserProfileScreen() {
                 Message
               </Button>
               <Button
+                onPress={() => {
+                  Alert.prompt ? Alert.prompt(
+                    'Tip',
+                    `Send a tip to ${profile.name || username}`,
+                    async (amount: string) => {
+                      if (!amount || !sdk || !profile?.walletAddress) return;
+                      try {
+                        await sdk.wallet.send(profile.walletAddress, amount);
+                        Alert.alert('Success', `Tipped ${amount} ETH`);
+                      } catch { Alert.alert('Error', 'Tip failed'); }
+                    },
+                    'plain-text',
+                    '',
+                    'decimal-pad'
+                  ) : Alert.alert('Tip', 'Tipping will be available when the token system launches.');
+                }}
+                variant="ghost"
+                size="sm"
+              >
+                Tip
+              </Button>
+              <Button
                 onPress={async () => {
                   if (!profile?.id) return;
                   try {
