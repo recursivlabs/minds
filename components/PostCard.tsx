@@ -15,6 +15,8 @@ import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
 import { isMuted, toggleMute } from '../lib/muted';
 import { getCached } from '../lib/cache';
 import { LinkPreview } from './LinkPreview';
+import { MediaViewer } from './MediaViewer';
+import { Badge, getBadges } from './Badge';
 import { colors, spacing, radius, typography } from '../constants/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
@@ -267,10 +269,11 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
       {/* Content column */}
       <View style={{ flex: 1 }}>
-      {/* Author name + time + community */}
+      {/* Author name + badges + time + community */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, flexWrap: 'wrap' }}>
-        <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)}>
+        <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Text variant="label">{authorName}</Text>
+          {getBadges(author).map(b => <Badge key={b} type={b} size="sm" />)}
         </Pressable>
         {communityName && (
           <>
@@ -324,25 +327,13 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <NSFWOverlay>
           <View>
             {renderMarkdownContent()}
-            {media ? (
-              <Image
-                source={{ uri: typeof media === 'string' ? media : media.url }}
-                style={{ width: '100%', height: 200, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
-                resizeMode="cover"
-              />
-            ) : null}
+            <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
           </View>
         </NSFWOverlay>
       ) : (
         <View>
           {renderMarkdownContent()}
-          {media ? (
-            <Image
-              source={{ uri: typeof media === 'string' ? media : media.url }}
-              style={{ width: '100%', height: 200, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
-              resizeMode="cover"
-            />
-          ) : null}
+          <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
           <LinkPreview content={content} />
         </View>
       )}
@@ -371,6 +362,24 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         >
           <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
           <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={async () => {
+            if (!sdk) return;
+            try {
+              await sdk.posts.create({
+                content: `Repost from @${authorUsername}:\n\n${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`,
+                organization_id: post.organizationId || post.organization_id || undefined,
+                community_id: post.communityId || post.community_id || undefined,
+              } as any);
+              toast.show('Reposted');
+            } catch { toast.show('Repost failed', 'error'); }
+          }}
+          hitSlop={8}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
+        >
+          <Ionicons name="repeat-outline" size={16} color={colors.textMuted} />
         </Pressable>
 
         <Pressable

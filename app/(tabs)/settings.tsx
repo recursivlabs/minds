@@ -7,6 +7,7 @@ import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
+import { getPreference, setPreference } from '../../lib/preferences';
 import { colors, spacing, radius } from '../../constants/theme';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -188,6 +189,27 @@ export default function SettingsScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Show email on profile</Text>
             <Switch value={privacy.showEmail} onValueChange={v => togglePrivacy('showEmail', v)} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
+          </View>
+        </Section>
+
+        <Section title="Content">
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">Show NSFW content</Text>
+            <Switch
+              value={getPreference('showNsfw')}
+              onValueChange={v => { setPreference('showNsfw', v); }}
+              trackColor={{ true: colors.accent, false: colors.glass }}
+              thumbColor={colors.text}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">Autoplay videos</Text>
+            <Switch
+              value={getPreference('autoplayVideo')}
+              onValueChange={v => { setPreference('autoplayVideo', v); }}
+              trackColor={{ true: colors.accent, false: colors.glass }}
+              thumbColor={colors.text}
+            />
           </View>
         </Section>
 

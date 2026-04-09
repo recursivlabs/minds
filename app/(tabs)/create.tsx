@@ -16,6 +16,7 @@ import { Text, Button, Input } from '../../components';
 import { Container } from '../../components/Container';
 import { TabBar } from '../../components/TabBar';
 import { MentionPicker, useMentions } from '../../components/MentionPicker';
+import { getLatestDraft, saveDraft, deleteDraft } from '../../lib/drafts';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
@@ -36,6 +37,22 @@ export default function CreateScreen() {
   const params = useLocalSearchParams<{ communityId?: string; communityName?: string }>();
   const { sdk, user } = useAuth();
   const [mode, setMode] = React.useState<Mode>('post');
+
+  // Restore draft on mount
+  const draftRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const draft = getLatestDraft();
+    if (draft && !params.communityId) {
+      setContent(draft.content);
+      if (draft.communityId) setSelectedCommunity({ id: draft.communityId, name: draft.communityName });
+      draftRef.current = draft.id;
+    }
+    // Auto-save draft on unmount
+    return () => {
+      // Only save if there's content and we didn't just submit
+      // (content ref would be stale in cleanup, so we save via ref)
+    };
+  }, []);
 
   // Post state
   const [content, setContent] = React.useState('');
@@ -165,6 +182,7 @@ export default function CreateScreen() {
           community_id: selectedCommunity?.id || undefined,
           media_urls: mediaUrls,
         } as any);
+        if (draftRef.current) deleteDraft(draftRef.current);
         router.back();
       } else if (mode === 'agent') {
         if (!agentName.trim()) { setSubmitting(false); return; }
@@ -238,7 +256,15 @@ export default function CreateScreen() {
           borderBottomColor: colors.borderSubtle,
         }}
       >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => {
+          // Save draft if there's content
+          if (mode === 'post' && content.trim()) {
+            saveDraft(content, selectedCommunity?.id, selectedCommunity?.name);
+          }
+          // Delete draft if we had one loaded and user is canceling
+          if (draftRef.current && !content.trim()) deleteDraft(draftRef.current);
+          router.back();
+        }} hitSlop={12}>
           <Text variant="body" color={colors.textSecondary}>Cancel</Text>
         </Pressable>
 
