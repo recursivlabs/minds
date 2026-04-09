@@ -19,6 +19,99 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function TwoFactorSetup() {
+  const { sdk } = useAuth();
+  const [enabled, setEnabled] = React.useState(false);
+  const [setupUri, setSetupUri] = React.useState<string | null>(null);
+  const [verifyCode, setVerifyCode] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [step, setStep] = React.useState<'idle' | 'setup' | 'verify'>('idle');
+
+  const BASE = React.useMemo(() => {
+    const url = (sdk as any)?.client?.baseUrl || '';
+    return url.replace('/api/v1', '');
+  }, [sdk]);
+
+  const apiKey = (sdk as any)?.client?.apiKey;
+
+  const enable2FA = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/auth/two-factor/enable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      });
+      const data = await res.json();
+      if (data.totpURI || data.totp_uri) {
+        setSetupUri(data.totpURI || data.totp_uri);
+        setStep('setup');
+      }
+    } catch { Alert.alert('Error', 'Could not enable 2FA'); }
+    setLoading(false);
+  };
+
+  const verify2FA = async () => {
+    if (verifyCode.length !== 6) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/auth/two-factor/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ code: verifyCode }),
+      });
+      if (res.ok) {
+        setEnabled(true);
+        setStep('idle');
+        setSetupUri(null);
+        Alert.alert('Success', '2FA is now enabled');
+      } else {
+        Alert.alert('Error', 'Invalid code. Try again.');
+      }
+    } catch { Alert.alert('Error', 'Verification failed'); }
+    setLoading(false);
+  };
+
+  if (step === 'setup' && setupUri) {
+    return (
+      <View style={{ gap: spacing.md }}>
+        <Text variant="label" color={colors.textMuted}>Set up authenticator app</Text>
+        <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22 }}>
+          Scan this code with your authenticator app (Google Authenticator, Authy, etc.):
+        </Text>
+        <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, alignItems: 'center' }}>
+          <Text variant="mono" color={colors.text} style={{ fontSize: 12 }} selectable>{setupUri}</Text>
+        </View>
+        <Text variant="caption" color={colors.textMuted}>Enter the 6-digit code from your app to verify:</Text>
+        <Input
+          value={verifyCode}
+          onChangeText={t => setVerifyCode(t.replace(/\D/g, '').slice(0, 6))}
+          placeholder="000000"
+          keyboardType="number-pad"
+          maxLength={6}
+        />
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <Button onPress={() => { setStep('idle'); setSetupUri(null); }} variant="ghost" size="sm">Cancel</Button>
+          <Button onPress={verify2FA} loading={loading} size="sm" disabled={verifyCode.length !== 6}>Verify</Button>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+      <View>
+        <Text variant="body">Two-factor authentication</Text>
+        <Text variant="caption" color={enabled ? colors.success : colors.textMuted}>
+          {enabled ? 'Enabled' : 'Not enabled'}
+        </Text>
+      </View>
+      <Button onPress={enable2FA} loading={loading} variant="secondary" size="sm">
+        {enabled ? 'Reconfigure' : 'Enable'}
+      </Button>
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
@@ -157,6 +250,8 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Security">
+          <TwoFactorSetup />
+          <Divider marginVertical={spacing.lg} />
           <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>Active Sessions</Text>
           {sessions.length === 0 ? (
             <Text variant="caption" color={colors.textMuted}>No active sessions</Text>
