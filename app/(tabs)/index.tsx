@@ -33,12 +33,13 @@ export default function FeedScreen() {
     return () => unsubs.forEach(u => u());
   }, [router, refresh]);
 
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth > 1024;
+
+  // Onboarding check — MUST be after all hooks
   if (showOnboarding) {
     return <OnboardingFlow onComplete={completeOnboarding} />;
   }
-
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth > 1024;
 
   const feedContent = (
     <>
