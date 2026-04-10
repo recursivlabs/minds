@@ -27,7 +27,7 @@
         }
       ]
     },
-    "plugins": ["expo-router", "expo-notifications"],
+    "plugins": ["expo-router"],
     "experiments": {
       "typedRoutes": true
     }
