@@ -231,79 +231,6 @@ export default function ChatScreen() {
   );
 }
 
-/**
- * Call AI agent via SSE streaming endpoint (same pattern as KEMPT).
- * Works around React Native's lack of ReadableStream by reading
- * the full response as text, then parsing SSE events.
- */
-async function callAgentSSE(
-  sdk: any,
-  agentId: string,
-  message: string,
-  conversationId?: string
-): Promise<{ content: string; conversationId: string }> {
-  const client = (sdk.agents as any).client;
-  const baseUrl: string = client.baseUrl;
-  const apiKey: string = client.apiKey;
-
-  const url = `${baseUrl}/agents/${agentId}/chat/stream`;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120_000);
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'text/event-stream',
-      },
-      body: JSON.stringify({
-        message,
-        ...(conversationId ? { conversation_id: conversationId } : {}),
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Agent request failed: HTTP ${response.status}`);
-    }
-
-    const text = await response.text();
-
-    let fullText = '';
-    let returnedConversationId = conversationId || '';
-    const lines = text.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') break;
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.type === 'text_delta' && parsed.delta) {
-            fullText += parsed.delta;
-          } else if (parsed.type === 'message_start' && parsed.conversation_id) {
-            returnedConversationId = parsed.conversation_id;
-          } else if (parsed.type === 'error') {
-            throw new Error(parsed.error || 'AI error');
-          }
-          if (parsed.conversation_id && !returnedConversationId) {
-            returnedConversationId = parsed.conversation_id;
-          }
-        } catch (e: any) {
-          if (e.message && !e.message.startsWith('Unexpected') && !e.message.startsWith('JSON')) throw e;
-        }
-      }
-    }
-
-    return { content: fullText, conversationId: returnedConversationId };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 function ConversationView({ conversationId, onBack }: { conversationId: string; onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
@@ -534,7 +461,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         if (isAgent && otherId) {
           setAgentTyping(true);
           try {
-            const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
+            const result = await sdk.agents.chatStreamText(otherId, { message: messageText, ...(conversationId ? { conversation_id: conversationId } : {}) });
             if (result.content) {
               setMessages(prev => [...prev, {
                 id: 'agent-' + Date.now(),
@@ -560,10 +487,9 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           }
           setAgentTyping(false);
         } else if (otherId) {
-          // Try SSE in case it's an unlabeled agent
+          // Try SSE in case it's an unlabeled agent — but don't show typing for humans
           try {
-            setAgentTyping(true);
-            const result = await callAgentSSE(sdk, otherId, messageText, conversationId);
+            const result = await sdk.agents.chatStreamText(otherId, { message: messageText, ...(conversationId ? { conversation_id: conversationId } : {}) });
             if (result.content) {
               setMessages(prev => [...prev, {
                 id: 'agent-' + Date.now(),
@@ -572,8 +498,9 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
                 createdAt: new Date().toISOString(),
               }]);
             }
-          } catch {}
-          setAgentTyping(false);
+          } catch {
+            // Not an agent — human will respond via WebSocket/polling
+          }
         }
       }
     } catch {
