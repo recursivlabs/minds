@@ -1,8 +1,10 @@
+import * as React from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { View, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
+import { useAuth } from '../../lib/auth';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
@@ -10,6 +12,26 @@ export default function TabLayout() {
   const isDesktop = Platform.OS === 'web';
   const sidebar = useSidebarState();
   const { colors } = useTheme();
+  const { sdk } = useAuth();
+
+  // Poll unread notification count
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  React.useEffect(() => {
+    if (!sdk) return;
+    let active = true;
+    const check = async () => {
+      try {
+        const res = await sdk.notifications.list({ limit: 20 });
+        if (active) {
+          const unread = (res.data || []).filter((n: any) => !n.read && !n.is_read).length;
+          setUnreadCount(unread);
+        }
+      } catch {}
+    };
+    check();
+    const interval = setInterval(check, 60_000); // check every 60s
+    return () => { active = false; clearInterval(interval); };
+  }, [sdk]);
 
   if (isDesktop) {
     return (
@@ -118,18 +140,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="wallet"
+        name="notifications"
         options={{
-          title: 'Wallet',
+          title: 'Alerts',
           tabBarIcon: ({ color }) => (
-            <Ionicons name="wallet-outline" size={22} color={color} />
+            <Ionicons name="notifications-outline" size={22} color={color} />
           ),
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.error || '#ef4444', fontSize: 10 },
         }}
       />
+      <Tabs.Screen name="wallet" options={{ href: null }} />
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />
       <Tabs.Screen name="admin" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen name="billing" options={{ href: null }} />
       <Tabs.Screen name="invites" options={{ href: null }} />
