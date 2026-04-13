@@ -51,6 +51,8 @@ interface AuthContextValue {
   orgId: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  sendOtp: (email: string) => Promise<void>;
+  verifyOtp: (email: string, otp: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -126,6 +128,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgId(ORG_ID);
   }
 
+  const sendOtp = React.useCallback(async (email: string) => {
+    await anonSdk.auth.sendOtp({ email });
+  }, []);
+
+  const verifyOtp = React.useCallback(async (email: string, otp: string) => {
+    const result = await anonSdk.auth.verifyOtpAndCreateKey(
+      { email, otp },
+      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], organizationId: ORG_ID },
+    );
+
+    await persistSession(result.apiKey, {
+      id: result.user?.id || '',
+      name: result.user?.name || '',
+      email: result.user?.email || email,
+      username: (result.user as any)?.username || email.split('@')[0],
+      image: result.user?.image ?? null,
+      bio: '',
+    });
+  }, []);
+
   const signUp = React.useCallback(async (name: string, email: string, password: string) => {
     const result = await anonSdk.auth.signUpAndCreateKey(
       { name, email, password },
@@ -172,11 +194,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       orgId,
       isLoading,
       isAuthenticated: !!user,
+      sendOtp,
+      verifyOtp,
       signUp,
       signIn,
       signOut,
     }),
-    [user, authedSdk, orgId, isLoading, signUp, signIn, signOut],
+    [user, authedSdk, orgId, isLoading, sendOtp, verifyOtp, signUp, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

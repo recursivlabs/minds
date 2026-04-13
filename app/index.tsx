@@ -341,11 +341,11 @@ const lightColors = {
 
 // ─── MAIN SCREEN ─────────────────────────────────────────────
 
-type ScreenMode = 'home' | 'earlyAccess' | 'login' | 'signUp' | 'submitted';
+type ScreenMode = 'home' | 'earlyAccess' | 'login' | 'signUp' | 'submitted' | 'otp' | 'otpVerify';
 
 export default function LandingScreen() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, signIn, signUp } = useAuth();
+  const { isAuthenticated, isLoading, signIn, signUp, sendOtp, verifyOtp } = useAuth();
   const [isDark, setIsDark] = React.useState(true);
   const darkOpacity = React.useRef(new Animated.Value(1)).current;
   const lightOpacity = React.useRef(new Animated.Value(0)).current;
@@ -357,6 +357,8 @@ export default function LandingScreen() {
   const [signUpName, setSignUpName] = React.useState('');
   const [signUpEmail, setSignUpEmail] = React.useState('');
   const [signUpPw, setSignUpPw] = React.useState('');
+  const [otpEmail, setOtpEmail] = React.useState('');
+  const [otpCode, setOtpCode] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [resetSent, setResetSent] = React.useState(false);
@@ -431,6 +433,40 @@ export default function LandingScreen() {
     }
   };
 
+  const handleSendOtp = async () => {
+    if (!otpEmail.trim() || !otpEmail.includes('@')) {
+      setError('Enter a valid email');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await sendOtp(otpEmail.trim().toLowerCase());
+      setScreen('otpVerify');
+    } catch (err: any) {
+      setError(err?.message || 'Could not send code. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim() || otpCode.length < 6) {
+      setError('Enter the 6-digit code');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await verifyOtp(otpEmail.trim().toLowerCase(), otpCode.trim());
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      setError(err?.message || 'Invalid or expired code. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const c = isDark ? {
     wordmark: colors.accent,
     tagline: colors.text,
@@ -461,7 +497,102 @@ export default function LandingScreen() {
     subtleText: 'rgba(26,26,46,0.5)',
   };
 
+  const inputStyle = {
+    backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder,
+    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13,
+    color: c.inputText, fontSize: 15,
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+  };
+
+  const primaryButtonStyle = (pressed: boolean) => ({
+    paddingVertical: 14, borderRadius: 10,
+    backgroundColor: c.buttonBg,
+    alignItems: 'center' as const,
+    opacity: loading ? 0.5 : pressed ? 0.85 : 1,
+    ...(Platform.OS === 'web' ? { cursor: loading ? 'default' : 'pointer' } as any : {}),
+  });
+
   const renderForm = () => {
+    if (screen === 'otpVerify') {
+      return (
+        <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
+          <Text variant="h3" color={c.wordmark} align="center">Enter code</Text>
+          <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.7, marginBottom: spacing.xs }}>
+            We sent a 6-digit code to {otpEmail}
+          </Text>
+          {error ? <Text variant="caption" color={colors.error} align="center">{error}</Text> : null}
+          <TextInput
+            placeholder="000000"
+            placeholderTextColor={c.subtleText}
+            value={otpCode}
+            onChangeText={(t) => { setOtpCode(t.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+            keyboardType="number-pad"
+            maxLength={6}
+            autoFocus
+            onSubmitEditing={handleVerifyOtp}
+            style={{
+              ...inputStyle,
+              fontSize: 24, letterSpacing: 8, textAlign: 'center' as const,
+              fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+            }}
+          />
+          <Pressable onPress={handleVerifyOtp} disabled={loading} style={({ pressed }) => primaryButtonStyle(pressed)}>
+            <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
+              {loading ? 'Verifying...' : 'Continue'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={async () => {
+            setLoading(true);
+            try { await sendOtp(otpEmail.trim().toLowerCase()); } catch {}
+            setLoading(false);
+          }}>
+            <Text variant="caption" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
+              Resend code
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => { setScreen('otp'); setOtpCode(''); setError(''); }}>
+            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.5 }}>Back</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (screen === 'otp') {
+      return (
+        <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
+          <Text variant="h3" color={c.wordmark} align="center">Continue with email</Text>
+          <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.7, marginBottom: spacing.xs }}>
+            We'll send you a sign-in code
+          </Text>
+          {error ? <Text variant="caption" color={colors.error} align="center">{error}</Text> : null}
+          <TextInput
+            placeholder="Email"
+            placeholderTextColor={c.subtleText}
+            value={otpEmail}
+            onChangeText={(t) => { setOtpEmail(t); setError(''); }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoFocus
+            onSubmitEditing={handleSendOtp}
+            style={inputStyle}
+          />
+          <Pressable onPress={handleSendOtp} disabled={loading} style={({ pressed }) => primaryButtonStyle(pressed)}>
+            <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
+              {loading ? 'Sending code...' : 'Send code'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => { setScreen('login'); setError(''); }}>
+            <Text variant="caption" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
+              Log in with password instead
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => { setScreen('home'); setError(''); setOtpEmail(''); }}>
+            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.5 }}>Back</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     if (screen === 'submitted') {
       return (
         <View style={{ width: '100%', maxWidth: 320, alignItems: 'center', gap: spacing.lg }}>
@@ -701,9 +832,9 @@ export default function LandingScreen() {
               Check your email for a reset link.
             </Text>
           )}
-          <Pressable onPress={() => { setScreen('signUp'); setError(''); }}>
-            <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
-              Don't have an account? Sign up
+          <Pressable onPress={() => { setScreen('otp'); setError(''); }}>
+            <Text variant="caption" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
+              Use email code instead
             </Text>
           </Pressable>
           <Pressable onPress={() => { setScreen('home'); setError(''); setLoginId(''); setLoginPw(''); }}>
@@ -715,11 +846,11 @@ export default function LandingScreen() {
       );
     }
 
-    // Home — three buttons
+    // Home — email code (primary) + password (secondary)
     return (
       <View style={{ width: '100%', maxWidth: 280, gap: spacing.md }}>
         <Pressable
-          onPress={() => setScreen('signUp')}
+          onPress={() => setScreen('otp')}
           style={({ pressed }) => ({
             paddingVertical: 14,
             paddingHorizontal: 24,
@@ -731,7 +862,7 @@ export default function LandingScreen() {
           })}
         >
           <Text variant="bodyMedium" color={c.buttonText} style={{ fontSize: 15 }}>
-            Sign Up
+            Continue with email
           </Text>
         </Pressable>
 
@@ -746,8 +877,8 @@ export default function LandingScreen() {
             ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'opacity 0.15s ease' } as any : {}),
           })}
         >
-          <Text variant="bodyMedium" color={c.ghostText} style={{ fontSize: 15, opacity: 0.7 }}>
-            Log in
+          <Text variant="caption" color={c.ghostText} style={{ opacity: 0.5 }}>
+            Log in with password
           </Text>
         </Pressable>
       </View>
