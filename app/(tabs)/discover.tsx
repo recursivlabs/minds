@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, TextInput, Platform, Pressable } from 'react-native';
+import { View, FlatList, TextInput, Platform, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, Skeleton, PostCard } from '../../components';
@@ -211,7 +211,7 @@ export default function DiscoverScreen() {
     })();
   }, [followMode, followUserId, sdk]);
 
-  const { posts, loading: postsLoading } = usePosts('score', 30);
+  const { posts, loading: postsLoading, loadMore: loadMorePosts, hasMore: hasMorePosts } = usePosts('score', 20);
   const { communities, loading: commLoading } = useCommunities(50);
   const { agents, loading: agentsLoading } = useAgents(50);
   const { profiles, loading: profilesLoading } = useProfiles(50);
@@ -400,6 +400,13 @@ export default function DiscoverScreen() {
           data={items}
           keyExtractor={(item) => item.key}
           renderItem={renderItem}
+          onEndReached={activeTab === 'posts' && !isSearching ? loadMorePosts : undefined}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={activeTab === 'posts' && !isSearching && hasMorePosts && items.length > 0 ? (
+            <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          ) : null}
           ListHeaderComponent={items.length > 0 ? (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>

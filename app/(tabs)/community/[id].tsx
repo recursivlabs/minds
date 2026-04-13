@@ -21,6 +21,9 @@ export default function CommunityDetailScreen() {
   const [isMember, setIsMember] = React.useState(false);
   const [joinLoading, setJoinLoading] = React.useState(false);
   const [showModMenu, setShowModMenu] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const offsetRef = React.useRef(0);
   const isCreator = community?.created_by?.id === user?.id || community?.createdBy?.id === user?.id;
 
   // Load community details
@@ -42,19 +45,41 @@ export default function CommunityDetailScreen() {
     return () => { cancelled = true; };
   }, [id, sdk]);
 
-  // Load community posts — refetch on initial load and when screen regains focus
-  const fetchPosts = React.useCallback(async () => {
+  // Load community posts with pagination
+  const PAGE_SIZE = 20;
+
+  const fetchPosts = React.useCallback(async (refresh = true) => {
     if (!sdk || !community?.id) return;
+    if (refresh) offsetRef.current = 0;
     try {
       const res = await sdk.posts.list({
-        limit: 50,
+        limit: PAGE_SIZE,
+        offset: refresh ? 0 : offsetRef.current,
         organization_id: ORG_ID || undefined,
         community_id: community.id,
       } as any);
-      setPosts(res.data || []);
+      const data = res.data || [];
+      if (refresh) {
+        setPosts(data);
+      } else {
+        setPosts(prev => {
+          const ids = new Set(prev.map((p: any) => p.id));
+          return [...prev, ...data.filter((p: any) => !ids.has(p.id))];
+        });
+      }
+      offsetRef.current = (refresh ? 0 : offsetRef.current) + data.length;
+      setHasMore(res.meta?.has_more ?? data.length === PAGE_SIZE);
     } catch (e) { /* community posts fetch failed — show empty state */ }
     setPostsLoading(false);
+    setLoadingMore(false);
   }, [sdk, community?.id]);
+
+  const loadMore = React.useCallback(() => {
+    if (hasMore && !postsLoading && !loadingMore) {
+      setLoadingMore(true);
+      fetchPosts(false);
+    }
+  }, [hasMore, postsLoading, loadingMore, fetchPosts]);
 
   React.useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
@@ -241,6 +266,13 @@ export default function CommunityDetailScreen() {
             </View>
           )
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore ? (
+          <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : null}
         showsVerticalScrollIndicator={false}
       />
     </Container>
