@@ -11,6 +11,7 @@
     "android": "expo start --android"
   },
   "dependencies": {
+    "@babel/runtime": "^7.29.2",
     "@expo/metro-runtime": "~4.0.0",
     "@expo/vector-icons": "^14.0.0",
     "@react-native-async-storage/async-storage": "1.23.1",
