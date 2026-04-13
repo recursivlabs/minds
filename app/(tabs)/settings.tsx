@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Switch, Platform, Alert } from 'react-native';
+import { View, ScrollView, Pressable, Switch, Platform, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
@@ -380,13 +380,13 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Legal">
-          <Pressable onPress={() => { if (Platform.OS === 'web') window.open('https://minds.com/p/terms', '_blank'); }} style={{ paddingVertical: spacing.sm }}>
+          <Pressable onPress={() => Linking.openURL('https://minds.com/p/terms')} style={{ paddingVertical: spacing.sm }}>
             <Text variant="body" color={colors.accent}>Terms of Service</Text>
           </Pressable>
-          <Pressable onPress={() => { if (Platform.OS === 'web') window.open('https://minds.com/p/privacy', '_blank'); }} style={{ paddingVertical: spacing.sm }}>
+          <Pressable onPress={() => Linking.openURL('https://minds.com/p/privacy')} style={{ paddingVertical: spacing.sm }}>
             <Text variant="body" color={colors.accent}>Privacy Policy</Text>
           </Pressable>
-          <Pressable onPress={() => { if (Platform.OS === 'web') window.open('https://minds.com/p/community-guidelines', '_blank'); }} style={{ paddingVertical: spacing.sm }}>
+          <Pressable onPress={() => Linking.openURL('https://minds.com/p/community-guidelines')} style={{ paddingVertical: spacing.sm }}>
             <Text variant="body" color={colors.accent}>Community Guidelines</Text>
           </Pressable>
         </Section>

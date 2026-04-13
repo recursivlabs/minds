@@ -1,22 +1,20 @@
-import { Platform } from 'react-native';
+import { getItemSync, getItem, setItem } from './storage';
 
 const STORAGE_KEY = 'minds:muted';
 
 let mutedUsers: Set<string> = new Set();
 
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved) mutedUsers = new Set(JSON.parse(saved));
-  } catch {}
-}
+// Sync hydrate on web
+const cached = getItemSync(STORAGE_KEY);
+if (cached) try { mutedUsers = new Set(JSON.parse(cached)); } catch {}
+
+// Async hydrate on native
+getItem(STORAGE_KEY).then(saved => {
+  if (saved) try { mutedUsers = new Set(JSON.parse(saved)); } catch {}
+});
 
 function persist() {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...mutedUsers]));
-    } catch {}
-  }
+  setItem(STORAGE_KEY, JSON.stringify([...mutedUsers]));
 }
 
 export function isMuted(userId: string): boolean {

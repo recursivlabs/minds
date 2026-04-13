@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { getItemSync, getItem, setItem } from './storage';
 
 const PREFS_KEY = 'minds:preferences';
 
@@ -14,18 +14,17 @@ const defaults: Preferences = {
 
 let prefs: Preferences = { ...defaults };
 
-// Hydrate
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
-  try {
-    const saved = window.localStorage.getItem(PREFS_KEY);
-    if (saved) prefs = { ...defaults, ...JSON.parse(saved) };
-  } catch {}
-}
+// Sync hydrate on web
+const cached = getItemSync(PREFS_KEY);
+if (cached) try { prefs = { ...defaults, ...JSON.parse(cached) }; } catch {}
+
+// Async hydrate on native
+getItem(PREFS_KEY).then(saved => {
+  if (saved) try { prefs = { ...defaults, ...JSON.parse(saved) }; } catch {}
+});
 
 function persist() {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    try { window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch {}
-  }
+  setItem(PREFS_KEY, JSON.stringify(prefs));
 }
 
 export function getPreference<K extends keyof Preferences>(key: K): Preferences[K] {

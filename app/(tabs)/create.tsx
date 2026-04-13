@@ -172,15 +172,16 @@ export default function CreateScreen() {
         let mediaUrls: string[] | undefined;
         if (mediaUri) {
           try {
+            const response = await fetch(mediaUri);
+            const blob = await response.blob();
+            const contentType = blob.type || 'image/jpeg';
             const uploadRes = await sdk.uploads.getMediaUploadUrl({
-              content_type: 'image/jpeg',
-              content_length: 0,
+              content_type: contentType,
+              content_length: blob.size,
             });
             const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
             if (uploadUrl) {
-              const response = await fetch(mediaUri);
-              const blob = await response.blob();
-              await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+              await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
               mediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
             }
           } catch { Alert.alert('Image Upload', 'Image could not be uploaded. Post will be created without media.'); }

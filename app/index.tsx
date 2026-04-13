@@ -359,6 +359,7 @@ export default function LandingScreen() {
   const [signUpPw, setSignUpPw] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [resetSent, setResetSent] = React.useState(false);
 
   // Show nothing while restoring session (prevents landing page flash)
   if (isLoading) {
@@ -677,6 +678,7 @@ export default function LandingScreen() {
           </Pressable>
           <Pressable onPress={async () => {
             if (!loginId.trim()) { setError('Enter your email first'); return; }
+            setLoading(true);
             try {
               await fetch(`${BASE_URL.replace('/api/v1', '')}/api/auth/forget-password`, {
                 method: 'POST',
@@ -684,15 +686,21 @@ export default function LandingScreen() {
                 body: JSON.stringify({ email: loginId.trim(), redirectTo: `${BASE_ORIGIN}/reset-password` }),
               });
               setError('');
-              Alert.alert('Password Reset', 'If an account exists with that email, you\'ll receive a reset link.');
+              setResetSent(true);
             } catch {
-              Alert.alert('Error', 'Could not send reset email. Try again.');
+              setError('Could not send reset email. Try again.');
             }
+            setLoading(false);
           }}>
             <Text variant="caption" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
-              Forgot password?
+              {resetSent ? 'Resend link' : 'Forgot password?'}
             </Text>
           </Pressable>
+          {resetSent && (
+            <Text variant="caption" color={c.accent} align="center">
+              Check your email for a reset link.
+            </Text>
+          )}
           <Pressable onPress={() => { setScreen('signUp'); setError(''); }}>
             <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
               Don't have an account? Sign up

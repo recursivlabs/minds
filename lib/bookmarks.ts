@@ -1,23 +1,20 @@
-import { Platform } from 'react-native';
+import { getItemSync, getItem, setItem } from './storage';
 
 const STORAGE_KEY = 'minds:bookmarks';
 
 let bookmarks: Set<string> = new Set();
 
-// Hydrate on load
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved) bookmarks = new Set(JSON.parse(saved));
-  } catch {}
-}
+// Sync hydrate on web
+const cached = getItemSync(STORAGE_KEY);
+if (cached) try { bookmarks = new Set(JSON.parse(cached)); } catch {}
+
+// Async hydrate on native
+getItem(STORAGE_KEY).then(saved => {
+  if (saved) try { bookmarks = new Set(JSON.parse(saved)); } catch {}
+});
 
 function persist() {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...bookmarks]));
-    } catch {}
-  }
+  setItem(STORAGE_KEY, JSON.stringify([...bookmarks]));
 }
 
 export function isBookmarked(postId: string): boolean {

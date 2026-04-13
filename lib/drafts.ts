@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { getItemSync, getItem, setItem } from './storage';
 
 const DRAFTS_KEY = 'minds:drafts';
 
@@ -10,38 +10,39 @@ interface Draft {
   savedAt: string;
 }
 
-function loadDrafts(): Draft[] {
-  if (Platform.OS !== 'web' || typeof window === 'undefined') return [];
-  try {
-    const saved = window.localStorage.getItem(DRAFTS_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch { return []; }
-}
+let draftsCache: Draft[] = [];
 
-function saveDrafts(drafts: Draft[]) {
-  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-  try { window.localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts)); } catch {}
+// Sync hydrate on web
+const cached = getItemSync(DRAFTS_KEY);
+if (cached) try { draftsCache = JSON.parse(cached); } catch {}
+
+// Async hydrate on native
+getItem(DRAFTS_KEY).then(saved => {
+  if (saved) try { draftsCache = JSON.parse(saved); } catch {}
+});
+
+function persistDrafts() {
+  setItem(DRAFTS_KEY, JSON.stringify(draftsCache));
 }
 
 export function getDrafts(): Draft[] {
-  return loadDrafts();
+  return draftsCache;
 }
 
 export function saveDraft(content: string, communityId?: string, communityName?: string): string {
-  const drafts = loadDrafts();
   const id = Date.now().toString();
-  drafts.unshift({ id, content, communityId, communityName, savedAt: new Date().toISOString() });
+  draftsCache.unshift({ id, content, communityId, communityName, savedAt: new Date().toISOString() });
   // Keep max 10 drafts
-  saveDrafts(drafts.slice(0, 10));
+  draftsCache = draftsCache.slice(0, 10);
+  persistDrafts();
   return id;
 }
 
 export function deleteDraft(id: string): void {
-  const drafts = loadDrafts().filter(d => d.id !== id);
-  saveDrafts(drafts);
+  draftsCache = draftsCache.filter(d => d.id !== id);
+  persistDrafts();
 }
 
 export function getLatestDraft(): Draft | null {
-  const drafts = loadDrafts();
-  return drafts[0] || null;
+  return draftsCache[0] || null;
 }
