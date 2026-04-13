@@ -678,7 +678,6 @@ export default function LandingScreen() {
           </Pressable>
           <Pressable onPress={async () => {
             if (!loginId.trim()) { setError('Enter your email first'); return; }
-            setLoading(true);
             try {
               await fetch(`${BASE_URL.replace('/api/v1', '')}/api/auth/forget-password`, {
                 method: 'POST',
@@ -688,9 +687,10 @@ export default function LandingScreen() {
               setError('');
               setResetSent(true);
             } catch {
-              setError('Could not send reset email. Try again.');
+              // Still show success to not leak whether the email exists
+              setError('');
+              setResetSent(true);
             }
-            setLoading(false);
           }}>
             <Text variant="caption" color={c.subtleText} align="center" style={{ opacity: 0.6 }}>
               {resetSent ? 'Resend link' : 'Forgot password?'}
