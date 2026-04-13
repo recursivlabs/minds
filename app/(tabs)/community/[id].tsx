@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
 import { Container } from '../../../components/Container';
@@ -42,24 +42,26 @@ export default function CommunityDetailScreen() {
     return () => { cancelled = true; };
   }, [id, sdk]);
 
-  // Load community posts — use community UUID from the loaded community data
-  React.useEffect(() => {
+  // Load community posts — refetch on initial load and when screen regains focus
+  const fetchPosts = React.useCallback(async () => {
     if (!sdk || !community?.id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        // Pass community_id as query param so server filters server-side
-        const res = await sdk.posts.list({
-          limit: 50,
-          organization_id: ORG_ID || undefined,
-          community_id: community.id,
-        } as any);
-        if (!cancelled) setPosts(res.data || []);
-      } catch (e) { /* community posts fetch failed — show empty state */ }
-      if (!cancelled) setPostsLoading(false);
-    })();
-    return () => { cancelled = true; };
+    try {
+      const res = await sdk.posts.list({
+        limit: 50,
+        organization_id: ORG_ID || undefined,
+        community_id: community.id,
+      } as any);
+      setPosts(res.data || []);
+    } catch (e) { /* community posts fetch failed — show empty state */ }
+    setPostsLoading(false);
   }, [sdk, community?.id]);
+
+  React.useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // Refetch posts when returning from create screen
+  useFocusEffect(React.useCallback(() => {
+    if (community?.id) fetchPosts();
+  }, [community?.id, fetchPosts]));
 
   const handleJoinLeave = async () => {
     if (!sdk || !community?.id) return;
