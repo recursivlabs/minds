@@ -322,62 +322,64 @@ export default function DiscoverScreen() {
 
   return (
     <Container safeTop padded={false}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.md,
-          borderBottomWidth: 0.5,
-          borderBottomColor: colors.borderSubtle,
-        }}
-      >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text variant="h3" style={{ flex: 1 }}>{followMode === 'followers' ? 'Followers' : followMode === 'following' ? 'Following' : 'Discover'}</Text>
-      </View>
-
-      {/* Search */}
-      <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
+      {/* Header + Search + Tabs — solid bg so content doesn't bleed through */}
+      <View style={{ backgroundColor: colors.bg, zIndex: 1 }}>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: colors.surface,
-            borderRadius: radius.md,
-            borderWidth: 0.5,
-            borderColor: colors.glassBorder,
-            paddingHorizontal: spacing.md,
-            gap: spacing.sm,
+            gap: spacing.md,
+            paddingHorizontal: spacing.xl,
+            paddingVertical: spacing.md,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.borderSubtle,
           }}
         >
-          <Ionicons name="search" size={18} color={colors.textMuted} />
-          <TextInput
-            placeholder="Search..."
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={{
-              flex: 1,
-              color: colors.text,
-              ...typography.body,
-              paddingVertical: 10,
-              ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
-            }}
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-            </Pressable>
-          )}
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </Pressable>
+          <Text variant="h3" style={{ flex: 1 }}>{followMode === 'followers' ? 'Followers' : followMode === 'following' ? 'Following' : 'Discover'}</Text>
         </View>
-      </View>
 
-      {/* Tabs */}
-      <TabBar tabs={TABS} active={activeTab} onChange={(k) => setActiveTab(k as DiscoverTab)} scrollable />
+        {/* Search */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.surface,
+              borderRadius: radius.md,
+              borderWidth: 0.5,
+              borderColor: colors.glassBorder,
+              paddingHorizontal: spacing.md,
+              gap: spacing.sm,
+            }}
+          >
+            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <TextInput
+              placeholder="Search..."
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={{
+                flex: 1,
+                color: colors.text,
+                ...typography.body,
+                paddingVertical: 10,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+              }}
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <TabBar tabs={TABS} active={activeTab} onChange={(k) => setActiveTab(k as DiscoverTab)} scrollable />
+      </View>
 
       {/* List */}
       {loading ? (
