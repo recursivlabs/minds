@@ -552,8 +552,8 @@ export default function ProfileScreen() {
                             throw new Error('No upload URL returned from server');
                           }
                         } catch (err: any) {
-                          // Avatar upload failed — alert shown below
-                          Alert.alert('Avatar Error', err?.message || 'Upload failed');
+                          console.error('Avatar upload error:', err);
+                          Alert.alert('Avatar Error', err?.message || String(err) || 'Upload failed. Check ALLOWED_ORIGINS on the API.');
                         }
                       }
                       await sdk.profiles.update({
