@@ -36,22 +36,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return 'dark';
   });
 
+  // Counter forces full tree re-render when theme toggles — ensures
+  // components using static `colors` import pick up the mutation
+  const [renderKey, setRenderKey] = React.useState(0);
+
   const toggle = React.useCallback(() => {
     setMode(prev => {
       const next = prev === 'dark' ? 'light' : 'dark';
       applyTheme(next);
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.localStorage.setItem(THEME_KEY, next);
+        // Update body background for web
+        document.body.style.backgroundColor = next === 'dark' ? '#0f0f0f' : '#f6f6f6';
       }
       return next;
     });
+    setRenderKey(k => k + 1);
   }, []);
 
   const colors = mode === 'dark' ? darkColors : lightColors as typeof darkColors;
 
   return (
     <ThemeContext.Provider value={{ mode, colors, toggle }}>
-      {children}
+      <React.Fragment key={renderKey}>
+        {children}
+      </React.Fragment>
     </ThemeContext.Provider>
   );
 }
