@@ -89,14 +89,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const sdk = createAuthedSdk(storedApiKey);
           try {
             await sdk.users.me();
-            setAuthedSdk(sdk);
-            setUser(JSON.parse(storedUser));
-            setOrgId(storedOrgId);
-            // Register push token in background
-            registerPushTokenBackground(sdk);
-          } catch {
-            await clearStorage();
+          } catch (err: any) {
+            // Only clear session on auth errors (401/403), not billing (402) or server errors (500)
+            const status = err?.statusCode || err?.status || 0;
+            if (status === 401 || status === 403) {
+              await clearStorage();
+              setIsLoading(false);
+              return;
+            }
           }
+          setAuthedSdk(sdk);
+          setUser(JSON.parse(storedUser));
+          setOrgId(storedOrgId);
+          registerPushTokenBackground(sdk);
         }
       } catch {
         await clearStorage();
