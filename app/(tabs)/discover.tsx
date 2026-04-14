@@ -30,13 +30,14 @@ function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; o
   );
 }
 
-type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents';
+type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents' | 'apps';
 
 const TABS: { key: DiscoverTab; label: string }[] = [
   { key: 'posts', label: 'Posts' },
   { key: 'people', label: 'People' },
   { key: 'communities', label: 'Communities' },
   { key: 'agents', label: 'Agents' },
+  { key: 'apps', label: 'Apps' },
 ];
 
 function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
@@ -217,6 +218,23 @@ export default function DiscoverScreen() {
   const { profiles, loading: profilesLoading } = useProfiles(50);
   const { results: searchResults, loading: searchLoading } = useSearchPosts(searchQuery);
 
+  // Fetch apps (projects with deployments)
+  const [apps, setApps] = React.useState<any[]>([]);
+  const [appsLoading, setAppsLoading] = React.useState(false);
+  React.useEffect(() => {
+    if (activeTab !== 'apps' || !sdk) return;
+    let cancelled = false;
+    setAppsLoading(true);
+    (async () => {
+      try {
+        const res = await sdk.projects.list({ limit: 50, organization_id: ORG_ID || undefined } as any);
+        if (!cancelled) setApps(res.data || []);
+      } catch {}
+      if (!cancelled) setAppsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, sdk]);
+
   // Search people via SDK when searching
   const [searchedPeople, setSearchedPeople] = React.useState<any[]>([]);
   const [searchPeopleLoading, setSearchPeopleLoading] = React.useState(false);
@@ -277,12 +295,16 @@ export default function DiscoverScreen() {
     if (activeTab === 'agents') {
       return filterByQuery(agents || [], ['name', 'bio', 'description']).map((a: any, i: number) => ({ type: 'agent', data: a, key: `a-${a.id || i}` }));
     }
+    if (activeTab === 'apps') {
+      return filterByQuery(apps || [], ['name', 'slug']).map((a: any, i: number) => ({ type: 'app', data: a, key: `app-${a.id || i}` }));
+    }
     return [];
   };
 
   const loading = activeTab === 'posts' ? (isSearching ? searchLoading : postsLoading)
     : activeTab === 'people' ? (followMode ? followListLoading : profilesLoading)
     : activeTab === 'communities' ? commLoading
+    : activeTab === 'apps' ? appsLoading
     : agentsLoading;
 
   const items = getData();
@@ -315,6 +337,36 @@ export default function DiscoverScreen() {
           agent={item.data}
           onPress={() => router.push(`/(tabs)/user/${item.data.username || item.data.id}` as any)}
         />
+      );
+    }
+    if (item.type === 'app') {
+      const app = item.data;
+      const deployUrl = app.slug ? `https://${app.slug}.on.recursiv.io` : null;
+      return (
+        <Pressable
+          onPress={() => deployUrl && (Platform.OS === 'web' ? window.open(deployUrl, '_blank') : import('react-native').then(m => m.Linking.openURL(deployUrl)))}
+          style={({ pressed }) => ({
+            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+            borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="rocket-outline" size={22} color={colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="bodyMedium" numberOfLines={1}>{app.name}</Text>
+              <Text variant="caption" color={colors.textMuted}>{app.slug}.on.recursiv.io</Text>
+            </View>
+            {deployUrl && <Ionicons name="open-outline" size={16} color={colors.textMuted} />}
+          </View>
+          {app.organization?.name && (
+            <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs, marginLeft: 56 }}>
+              by {app.organization.name}
+            </Text>
+          )}
+        </Pressable>
       );
     }
     return null;

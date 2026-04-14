@@ -221,18 +221,34 @@ export default function CreateScreen() {
           social_mode: 'chat_only',
           tool_mode: 'chat_only',
         });
+        // Auto-post announcement
+        try {
+          await sdk.posts.create({
+            content: `🤖 I just created a new AI agent: **${agentName.trim()}**${agentBio.trim() ? `\n\n${agentBio.trim()}` : ''}\n\nChat with them on Minds!`,
+            organization_id: ORG_ID || undefined,
+            community_id: selectedCommunity?.id || undefined,
+          } as any);
+        } catch {}
         setAgentName(''); setAgentBio(''); setAgentPrompt(''); setAvatarUri(null);
         showSuccess('Agent created');
-        setMode('post');
+        router.back();
       } else if (mode === 'app') {
         if (!appName.trim()) { setSubmitting(false); return; }
         await sdk.projects.create({
           name: appName.trim(),
           organization_id: ORG_ID || undefined,
         } as any);
+        // Auto-post announcement
+        try {
+          await sdk.posts.create({
+            content: `🚀 I just launched a new app: **${appName.trim()}**${appDesc.trim() ? `\n\n${appDesc.trim()}` : ''}\n\nCheck it out on Minds!`,
+            organization_id: ORG_ID || undefined,
+            community_id: selectedCommunity?.id || undefined,
+          } as any);
+        } catch {}
         setAppName(''); setAppDesc(''); setAvatarUri(null);
         showSuccess('App created');
-        setMode('post');
+        router.back();
       } else if (mode === 'community') {
         if (!communityName.trim()) { setSubmitting(false); return; }
         const slug = communityName.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-') + '-' + Math.random().toString(36).slice(2, 6);
@@ -243,9 +259,16 @@ export default function CreateScreen() {
           privacy: communityPrivate ? 'private' : 'public',
           organization_id: ORG_ID || undefined,
         } as any);
+        // Auto-post announcement
+        try {
+          await sdk.posts.create({
+            content: `🏘️ I just created a new community: **${communityName.trim()}**${communityDesc.trim() ? `\n\n${communityDesc.trim()}` : ''}\n\nJoin us on Minds!`,
+            organization_id: ORG_ID || undefined,
+          } as any);
+        } catch {}
         setCommunityName(''); setCommunityDesc(''); setAvatarUri(null);
         showSuccess('Community created');
-        setMode('post');
+        router.back();
       }
     } catch (err: any) {
       const errMsg = err?.message || 'Something went wrong';
