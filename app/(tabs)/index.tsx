@@ -44,6 +44,8 @@ export default function FeedScreen() {
     return <OnboardingFlow onComplete={completeOnboarding} />;
   }
 
+  const profileIncomplete = user && (!user.image && !user.bio);
+
   const feedContent = (
     <>
       {postsLoading && posts.length === 0 ? (
@@ -65,18 +67,38 @@ export default function FeedScreen() {
             />
           )}
           ListHeaderComponent={
-            <Pressable
-              onPress={() => router.push('/(tabs)/create')}
-              style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-                borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
-                backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-              })}
-            >
-              <Avatar uri={user?.image} name={user?.name} size="sm" />
-              <Text variant="body" color={colors.textMuted}>What's on your mind?</Text>
-            </Pressable>
+            <>
+              {profileIncomplete && (
+                <Pressable
+                  onPress={() => router.push('/(tabs)/profile')}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                    backgroundColor: colors.surface,
+                    borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                  }}
+                >
+                  <Ionicons name="person-circle-outline" size={28} color={colors.accent} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyMedium" color={colors.text}>Complete your profile</Text>
+                    <Text variant="caption" color={colors.textMuted}>Add a photo and bio so people can find you</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => router.push('/(tabs)/create')}
+                style={({ pressed }) => ({
+                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                  paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                  borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                  backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                })}
+              >
+                <Avatar uri={user?.image} name={user?.name} size="sm" />
+                <Text variant="body" color={colors.textMuted}>What's on your mind?</Text>
+              </Pressable>
+            </>
           }
           onRefresh={refresh}
           refreshing={refreshing}
