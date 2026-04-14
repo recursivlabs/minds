@@ -131,7 +131,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       preview: c.lastMessage?.content || c.last_message?.content || '',
     };
   });
-  const recentCommunities = (communities || []).slice(0, 3).map((c: any) => ({
+  const recentCommunities = (communities || []).filter((c: any) => c.is_member || c.isMember).slice(0, 3).map((c: any) => ({
     id: c.id,
     type: 'community' as const,
     name: c.name || 'Community',

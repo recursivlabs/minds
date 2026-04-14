@@ -355,7 +355,7 @@ export default function CreateScreen() {
                   left: spacing.xl,
                   right: spacing.xl,
                   maxWidth: 340,
-                  backgroundColor: colors.surfaceRaised,
+                  backgroundColor: colors.bg,
                   borderRadius: radius.lg,
                   borderWidth: 1,
                   borderColor: colors.border,
