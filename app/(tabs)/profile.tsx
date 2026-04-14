@@ -296,7 +296,7 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <View style={{ padding: spacing.xl, gap: spacing.md }}>
-                {communities.slice(0, 10).map((c: any) => (
+                {communities.filter((c: any) => c.is_member || c.isMember).slice(0, 10).map((c: any) => (
                   <Pressable
                     key={c.id}
                     onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
