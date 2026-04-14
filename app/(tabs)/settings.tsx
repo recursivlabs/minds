@@ -9,6 +9,7 @@ import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { getPreference, setPreference } from '../../lib/preferences';
 import { colors, spacing, radius } from '../../constants/theme';
+import { useTheme } from '../../lib/theme';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -115,6 +116,7 @@ function TwoFactorSetup() {
 export default function SettingsScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const { mode: themeMode, toggle: toggleTheme } = useTheme();
 
   const [loading, setLoading] = React.useState(true);
   const [sessions, setSessions] = React.useState<any[]>([]);
@@ -288,6 +290,15 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Appearance">
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
+            <Text variant="body">Dark mode</Text>
+            <Switch
+              value={themeMode === 'dark'}
+              onValueChange={toggleTheme}
+              trackColor={{ true: colors.accent, false: colors.glass }}
+              thumbColor={colors.text}
+            />
+          </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Language</Text>
             <Text variant="body" color={colors.textMuted}>English</Text>
