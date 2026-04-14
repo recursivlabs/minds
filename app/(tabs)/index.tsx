@@ -45,6 +45,7 @@ export default function FeedScreen() {
   }
 
   const profileIncomplete = user && (!user.image && !user.bio);
+  const [nudgeDismissed, setNudgeDismissed] = React.useState(false);
 
   const feedContent = (
     <>
@@ -68,23 +69,24 @@ export default function FeedScreen() {
           )}
           ListHeaderComponent={
             <>
-              {profileIncomplete && (
-                <Pressable
-                  onPress={() => router.push('/(tabs)/profile')}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-                    backgroundColor: colors.surface,
-                    borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
-                  }}
-                >
-                  <Ionicons name="person-circle-outline" size={28} color={colors.accent} />
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyMedium" color={colors.text}>Complete your profile</Text>
-                    <Text variant="caption" color={colors.textMuted}>Add a photo and bio so people can find you</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </Pressable>
+              {profileIncomplete && !nudgeDismissed && (
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                  paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                  backgroundColor: colors.surface,
+                  borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                }}>
+                  <Pressable onPress={() => router.push('/(tabs)/profile')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 }}>
+                    <Ionicons name="person-circle-outline" size={28} color={colors.accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodyMedium" color={colors.text}>Complete your profile</Text>
+                      <Text variant="caption" color={colors.textMuted}>Add a photo and bio so people can find you</Text>
+                    </View>
+                  </Pressable>
+                  <Pressable onPress={() => setNudgeDismissed(true)} hitSlop={12}>
+                    <Ionicons name="close" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </View>
               )}
               <Pressable
                 onPress={() => router.push('/(tabs)/create')}
