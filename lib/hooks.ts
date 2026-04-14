@@ -19,6 +19,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
   const [hasMore, setHasMore] = React.useState(true);
   const offsetRef = React.useRef(0);
   const followingIdsRef = React.useRef<Set<string> | null>(null);
+  const myCommunityIdsRef = React.useRef<Set<string> | null>(null);
 
   const fetchPosts = React.useCallback(async (refresh = false) => {
     const s = sdk || getSdk();
@@ -39,11 +40,28 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         }
       }
 
+      // Load user's communities for personalized "For You" feed
+      if (sort === 'score' && user?.id && !myCommunityIdsRef.current) {
+        try {
+          const commRes = await s.communities.list({ limit: 100, organization_id: ORG_ID || undefined } as any);
+          const joined = (commRes.data || []).filter((c: any) => c.is_member || c.isMember);
+          myCommunityIdsRef.current = new Set(joined.map((c: any) => c.id));
+        } catch {
+          myCommunityIdsRef.current = new Set();
+        }
+      }
+
       const res = await s.posts.list({ limit, offset: refresh ? 0 : offsetRef.current, organization_id: ORG_ID || undefined });
       let data = res.data || [];
 
       if (sort === 'score') {
-        data = [...data].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
+        // Boost posts from communities the user has joined
+        const myComms = myCommunityIdsRef.current;
+        data = [...data].sort((a: any, b: any) => {
+          const aBoost = myComms?.has(a.community_id) ? 5 : 0;
+          const bBoost = myComms?.has(b.community_id) ? 5 : 0;
+          return ((b.score || 0) + bBoost) - ((a.score || 0) + aBoost);
+        });
       } else if (sort === 'latest') {
         data = [...data].sort((a: any, b: any) =>
           new Date(b.createdAt || b.created_at || 0).getTime() -
@@ -92,6 +110,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
     setPosts(cached || []);
     offsetRef.current = 0;
     followingIdsRef.current = null;
+    myCommunityIdsRef.current = null;
     fetchPosts(true);
   }, [sort]);
 
