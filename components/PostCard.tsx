@@ -8,7 +8,7 @@ import { VoteButtons } from './VoteButtons';
 import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { useAuth } from '../lib/auth';
-import { BASE_ORIGIN } from '../lib/recursiv';
+import { BASE_ORIGIN, ORG_ID } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
@@ -409,15 +409,36 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
         <Pressable
           onPress={() => {
-            const quoteText = `\n\n> @${authorUsername}: ${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`;
-            router.push({
-              pathname: '/(tabs)/create',
-              params: {
-                communityId: post.communityId || post.community_id || '',
-                communityName: communityName || '',
-                quote: quoteText,
-              },
-            } as any);
+            if (Platform.OS === 'web') {
+              // Show repost menu
+              const choice = window.confirm('Quote this post? (OK = Quote with comment, Cancel = Repost without comment)');
+              if (choice) {
+                // Quote post — open create with embedded post reference
+                router.push({
+                  pathname: '/(tabs)/create',
+                  params: {
+                    communityId: post.communityId || post.community_id || '',
+                    communityName: communityName || '',
+                    quote: `Quoting @${authorUsername}:\n> ${content.slice(0, 300)}${content.length > 300 ? '...' : ''}`,
+                  },
+                } as any);
+              } else {
+                // Repost (remind) — create a post that references the original
+                if (sdk) {
+                  sdk.posts.create({
+                    content: `♻️ Reposted from @${authorUsername}\n\n${content.slice(0, 500)}`,
+                    organization_id: ORG_ID || undefined,
+                    community_id: post.communityId || post.community_id || undefined,
+                  } as any).then(() => toast.show('Reposted!', 'success')).catch(() => toast.show('Repost failed', 'error'));
+                }
+              }
+            } else {
+              Alert.alert('Share', 'How would you like to share?', [
+                { text: 'Quote', onPress: () => router.push({ pathname: '/(tabs)/create', params: { communityId: post.communityId || post.community_id || '', communityName: communityName || '', quote: `Quoting @${authorUsername}:\n> ${content.slice(0, 300)}` } } as any) },
+                { text: 'Repost', onPress: () => { if (sdk) sdk.posts.create({ content: `♻️ Reposted from @${authorUsername}\n\n${content.slice(0, 500)}`, organization_id: ORG_ID || undefined, community_id: post.communityId || post.community_id || undefined } as any).then(() => toast.show('Reposted!', 'success')).catch(() => toast.show('Repost failed', 'error')); } },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }
           }}
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}

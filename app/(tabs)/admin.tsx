@@ -648,14 +648,15 @@ export default function AdminScreen() {
 
   return (
     <Container safeTop padded={false}>
-      <ScreenHeader title="Admin" />
-
-      <TabBar
-        tabs={(['dashboard', 'users', 'content', 'reports', 'communities', 'invites', 'network'] as const).map(t => ({ key: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
-        active={tab}
-        onChange={(k) => setTab(k as Tab)}
-        scrollable
-      />
+      <View style={{ backgroundColor: colors.bg, zIndex: 1 }}>
+        <ScreenHeader title="Admin" />
+        <TabBar
+          tabs={(['dashboard', 'users', 'content', 'reports', 'communities', 'invites', 'network'] as const).map(t => ({ key: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+          active={tab}
+          onChange={(k) => setTab(k as Tab)}
+          scrollable
+        />
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['5xl'] }}>
         {tab === 'dashboard' && <DashboardTab sdk={sdk} />}
