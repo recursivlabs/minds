@@ -203,9 +203,24 @@ export default function CreateScreen() {
         if (draftRef.current) deleteDraft(draftRef.current);
         router.back();
       } else if (mode === 'blog') {
-        if (!blogTitle.trim() || !blogContent.trim() || !selectedCommunity) {
+        if (!blogTitle.trim() || !blogContent.trim()) {
           setSubmitting(false);
           return;
+        }
+        // Upload blog thumbnail if selected
+        let blogMediaUrls: string[] | undefined;
+        if (mediaUri) {
+          try {
+            const response = await fetch(mediaUri);
+            const blob = await response.blob();
+            const contentType = blob.type || 'image/jpeg';
+            const uploadRes = await sdk.uploads.getMediaUploadUrl({ content_type: contentType, content_length: blob.size });
+            const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+            if (uploadUrl) {
+              const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
+              if (putRes.ok) blogMediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
+            }
+          } catch {}
         }
         await sdk.posts.create({
           content: blogContent.trim(),
@@ -213,6 +228,7 @@ export default function CreateScreen() {
           content_format: 'markdown',
           organization_id: ORG_ID || undefined,
           community_id: selectedCommunity?.id || undefined,
+          media_urls: blogMediaUrls,
         } as any);
         if (draftRef.current) deleteDraft(draftRef.current);
         router.back();
@@ -432,21 +448,46 @@ export default function CreateScreen() {
           <MentionPicker query={mentionQuery} onSelect={insertMention} visible={showMentions} />
 
           {mode === 'blog' && (
-            <TextInput
-              placeholder="Title"
-              placeholderTextColor={colors.textMuted}
-              value={blogTitle}
-              onChangeText={setBlogTitle}
-              style={{
-                color: colors.text,
-                fontFamily: 'Geist-SemiBold',
-                fontSize: 22,
-                lineHeight: 28,
-                padding: 0,
-                marginBottom: spacing.lg,
-                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
-              }}
-            />
+            <>
+              <TextInput
+                placeholder="Title"
+                placeholderTextColor={colors.textMuted}
+                value={blogTitle}
+                onChangeText={setBlogTitle}
+                style={{
+                  color: colors.text,
+                  fontFamily: 'Geist-SemiBold',
+                  fontSize: 22,
+                  lineHeight: 28,
+                  padding: 0,
+                  marginBottom: spacing.md,
+                  ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
+                }}
+              />
+              <Pressable
+                onPress={handlePickImage}
+                style={{
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.glassBorder,
+                  borderRadius: radius.md,
+                  padding: mediaUri ? 0 : spacing.xl,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: spacing.lg,
+                  overflow: 'hidden',
+                }}
+              >
+                {mediaUri ? (
+                  <Image source={{ uri: mediaUri }} style={{ width: '100%', height: 180, borderRadius: radius.md }} resizeMode="cover" />
+                ) : (
+                  <View style={{ alignItems: 'center', gap: spacing.sm }}>
+                    <Ionicons name="image-outline" size={28} color={colors.textMuted} />
+                    <Text variant="caption" color={colors.textMuted}>Add cover image</Text>
+                  </View>
+                )}
+              </Pressable>
+            </>
           )}
 
           <View style={{ flexDirection: 'row', gap: spacing.md, flex: 1 }}>
