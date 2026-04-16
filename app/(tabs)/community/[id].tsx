@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, FlatList, Pressable, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
@@ -21,6 +21,9 @@ export default function CommunityDetailScreen() {
   const [isMember, setIsMember] = React.useState(false);
   const [joinLoading, setJoinLoading] = React.useState(false);
   const [showModMenu, setShowModMenu] = React.useState(false);
+  const [editMode, setEditMode] = React.useState(false);
+  const [editName, setEditName] = React.useState('');
+  const [editDesc, setEditDesc] = React.useState('');
   const [hasMore, setHasMore] = React.useState(true);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const offsetRef = React.useRef(0);
@@ -197,6 +200,43 @@ export default function CommunityDetailScreen() {
             {showModMenu && isCreator && (
               <View style={{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.borderSubtle }}>
                 <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.xs }}>Moderation</Text>
+                {editMode ? (
+                  <View style={{ gap: spacing.sm }}>
+                    <TextInput
+                      placeholder="Community name"
+                      placeholderTextColor={colors.textMuted}
+                      value={editName}
+                      onChangeText={setEditName}
+                      style={{ backgroundColor: colors.bg, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 10, color: colors.text, fontSize: 15, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+                    />
+                    <TextInput
+                      placeholder="Description"
+                      placeholderTextColor={colors.textMuted}
+                      value={editDesc}
+                      onChangeText={setEditDesc}
+                      multiline
+                      style={{ backgroundColor: colors.bg, borderWidth: 0.5, borderColor: colors.glassBorder, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 10, color: colors.text, fontSize: 15, minHeight: 60, textAlignVertical: 'top', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+                    />
+                    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                      <Button
+                        onPress={async () => {
+                          if (!sdk || !community?.id) return;
+                          try {
+                            await (sdk.communities as any).update(community.id, { name: editName.trim(), description: editDesc.trim() });
+                            setCommunity((prev: any) => prev ? { ...prev, name: editName.trim(), description: editDesc.trim() } : prev);
+                            setEditMode(false);
+                          } catch { Alert.alert('Error', 'Could not update community'); }
+                        }}
+                        size="sm"
+                      >Save</Button>
+                      <Button onPress={() => setEditMode(false)} variant="secondary" size="sm">Cancel</Button>
+                    </View>
+                  </View>
+                ) : (
+                  <Button onPress={() => { setEditName(community.name || ''); setEditDesc(community.description || ''); setEditMode(true); }} variant="ghost" size="sm">
+                    Edit Community
+                  </Button>
+                )}
                 <Button
                   onPress={async () => {
                     if (!sdk || !community?.id) return;
