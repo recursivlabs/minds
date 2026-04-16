@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Button, Divider, PostCard, Skeleton } from '../../../components';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
+import { TabBar } from '../../../components/TabBar';
 import { useAuth } from '../../../lib/auth';
 import { useProfile } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
@@ -20,6 +21,7 @@ export default function UserProfileScreen() {
   const [followLoading, setFollowLoading] = React.useState(false);
   const [userPosts, setUserPosts] = React.useState<any[]>([]);
   const [postsLoading, setPostsLoading] = React.useState(true);
+  const [profileTab, setProfileTab] = React.useState<'posts' | 'replies' | 'communities' | 'agents'>('posts');
 
   const isOwnProfile = user?.id === profile?.id;
 
@@ -216,20 +218,61 @@ export default function UserProfileScreen() {
           )}
         </View>
 
-        <Divider marginVertical={spacing.xl} />
+        <View style={{ marginTop: spacing.xl }}>
+          <TabBar
+            tabs={[
+              { key: 'posts', label: 'Posts' },
+              { key: 'replies', label: 'Replies' },
+              { key: 'communities', label: 'Communities' },
+              { key: 'agents', label: 'Agents' },
+            ]}
+            active={profileTab}
+            onChange={(k) => setProfileTab(k as any)}
+          />
+        </View>
 
-        {postsLoading ? (
-          <View style={{ padding: spacing.xl, gap: spacing.lg }}>
-            {[1, 2].map(i => <Skeleton key={i} height={60} />)}
-          </View>
-        ) : userPosts.length === 0 ? (
+        {profileTab === 'posts' && (
+          postsLoading ? (
+            <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+              {[1, 2].map(i => <Skeleton key={i} height={60} />)}
+            </View>
+          ) : userPosts.filter((p: any) => !p.reply_to_id && !p.replyToId).length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+              <Text variant="body" color={colors.textMuted}>No posts yet</Text>
+            </View>
+          ) : (
+            userPosts.filter((p: any) => !p.reply_to_id && !p.replyToId).map((post: any) => (
+              <PostCard key={post.id} post={post} compact />
+            ))
+          )
+        )}
+
+        {profileTab === 'replies' && (
+          postsLoading ? (
+            <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+              {[1, 2].map(i => <Skeleton key={i} height={60} />)}
+            </View>
+          ) : userPosts.filter((p: any) => p.reply_to_id || p.replyToId).length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+              <Text variant="body" color={colors.textMuted}>No replies yet</Text>
+            </View>
+          ) : (
+            userPosts.filter((p: any) => p.reply_to_id || p.replyToId).map((post: any) => (
+              <PostCard key={post.id} post={post} compact />
+            ))
+          )
+        )}
+
+        {profileTab === 'communities' && (
           <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-            <Text variant="body" color={colors.textMuted}>No posts yet</Text>
+            <Text variant="body" color={colors.textMuted}>Communities this user has joined</Text>
           </View>
-        ) : (
-          userPosts.map((post: any) => (
-            <PostCard key={post.id} post={post} compact />
-          ))
+        )}
+
+        {profileTab === 'agents' && (
+          <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+            <Text variant="body" color={colors.textMuted}>Agents created by this user</Text>
+          </View>
         )}
 
         <View style={{ height: spacing['4xl'] }} />
