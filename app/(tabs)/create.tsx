@@ -181,10 +181,18 @@ export default function CreateScreen() {
             });
             const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
             if (uploadUrl) {
-              await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
-              mediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
+              const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
+              if (!putRes.ok) {
+                console.error('Media upload PUT failed:', putRes.status, putRes.statusText);
+                Alert.alert('Upload Error', `Upload failed: ${putRes.status}`);
+              } else {
+                mediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
+              }
             }
-          } catch { Alert.alert('Image Upload', 'Image could not be uploaded. Post will be created without media.'); }
+          } catch (err: any) {
+            console.error('Media upload error:', err);
+            Alert.alert('Image Upload', err?.message || 'Image could not be uploaded. Post will be created without media.');
+          }
         }
         await sdk.posts.create({
           content: content.trim() || ' ',

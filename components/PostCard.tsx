@@ -58,16 +58,20 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
   // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {
-    const newVote = post.userReaction || post.user_reaction || post.userVote || post.user_vote || null;
-    if (newVote !== undefined) setUserVote(newVote);
-    const newScore = post.score ?? post.vote_count ?? post.voteCount ?? 0;
-    setScore(newScore);
     setCurrentContent(post.content || post.body || '');
     setEditContent(post.content || post.body || '');
     setIsEditing(false);
     setShowMenu(false);
     setIsDeleted(false);
   }, [post.id]);
+
+  // Sync vote state from server data — runs when post data updates (not just post.id)
+  React.useEffect(() => {
+    const serverVote = post.userReaction || post.user_reaction || post.userVote || post.user_vote || null;
+    const serverScore = post.score ?? post.vote_count ?? post.voteCount ?? 0;
+    setUserVote(serverVote);
+    setScore(serverScore);
+  }, [post.id, post.userReaction, post.user_reaction, post.score]);
 
   const author = post.author || post.user || {};
   const authorName = author.name || author.username || 'Anonymous';
@@ -122,8 +126,15 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         if (prevVote) await sdk.posts.unreact(post.id);
         await sdk.posts.react(post.id, type as any);
       }
+      // Update cache so other views of this post show correct vote
+      try {
+        const { setCache, getCached } = require('../lib/cache');
+        const cached = getCached(`post:${post.id}`);
+        if (cached) {
+          setCache(`post:${post.id}`, { ...cached, score: newScore, userReaction: newVote, user_reaction: newVote });
+        }
+      } catch {}
     } catch (err: any) {
-      // Vote failed — toast shown, state rolled back
       toast.show('Vote failed', 'error');
       setUserVote(prevVote);
       setScore(prevScore);
