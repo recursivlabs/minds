@@ -51,6 +51,7 @@ interface AuthContextValue {
   orgId: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  refreshUser: () => Promise<void>;
   sendOtp: (email: string) => Promise<void>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
@@ -133,6 +134,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgId(ORG_ID);
   }
 
+  const refreshUser = React.useCallback(async () => {
+    if (!authedSdk) return;
+    try {
+      const res = await authedSdk.users.me();
+      const me = (res as any).data || res;
+      if (me) {
+        const updated: User = {
+          id: me.id || user?.id || '',
+          name: me.name || user?.name || '',
+          email: me.email || user?.email || '',
+          username: me.username || user?.username || '',
+          image: me.image ?? user?.image ?? null,
+          bio: me.bio || me.briefdescription || user?.bio || '',
+        };
+        setUser(updated);
+        await storage.setItem(KEYS.user, JSON.stringify(updated));
+      }
+    } catch {}
+  }, [authedSdk, user]);
+
   const sendOtp = React.useCallback(async (email: string) => {
     await anonSdk.auth.sendOtp({ email });
   }, []);
@@ -199,13 +220,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       orgId,
       isLoading,
       isAuthenticated: !!user,
+      refreshUser,
       sendOtp,
       verifyOtp,
       signUp,
       signIn,
       signOut,
     }),
-    [user, authedSdk, orgId, isLoading, sendOtp, verifyOtp, signUp, signIn, signOut],
+    [user, authedSdk, orgId, isLoading, refreshUser, sendOtp, verifyOtp, signUp, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

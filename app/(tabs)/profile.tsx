@@ -68,7 +68,7 @@ function SavedPostsTab() {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { sdk, user, signOut } = useAuth();
+  const { sdk, user, signOut, refreshUser } = useAuth();
   const { profile, loading: profileLoading, refresh: refreshProfile } = useMyProfile();
   const { posts, loading: postsLoading } = usePosts('latest', 50);
   const { communities, loading: commLoading } = useCommunities(50);
@@ -562,6 +562,7 @@ export default function ProfileScreen() {
                         bio: editBio.trim(),
                       });
                       await refreshProfile();
+                      await refreshUser();
                       setShowEditProfile(false);
                     } catch {
                       Alert.alert('Error', 'Failed to update profile.');
