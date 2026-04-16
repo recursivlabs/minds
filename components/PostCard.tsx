@@ -355,6 +355,32 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </View>
       )}
 
+      {/* Tags */}
+      {post.tags && post.tags.length > 0 && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm }}>
+          {post.tags.slice(0, 5).map((tag: any) => {
+            const tagName = typeof tag === 'string' ? tag : tag.name || tag.slug;
+            if (!tagName) return null;
+            return (
+              <Pressable
+                key={tagName}
+                onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts', q: tagName } } as any)}
+                style={{
+                  paddingHorizontal: spacing.sm + 2,
+                  paddingVertical: 2,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.surface,
+                  borderWidth: 0.5,
+                  borderColor: colors.glassBorder,
+                }}
+              >
+                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>#{tagName}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
       {/* Action bar: vote, comment, more */}
       <View
         style={{

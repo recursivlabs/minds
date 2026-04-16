@@ -134,15 +134,15 @@ export const typography = {
   },
   body: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 24,
     fontFamily: 'Geist-Regular',
-    letterSpacing: 0,
+    letterSpacing: 0.1,
   },
   bodyMedium: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 24,
     fontFamily: 'Geist-SemiBold',
-    letterSpacing: 0,
+    letterSpacing: 0.1,
   },
   caption: {
     fontSize: 13,
