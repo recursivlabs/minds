@@ -30,10 +30,11 @@ function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; o
   );
 }
 
-type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents' | 'apps';
+type DiscoverTab = 'posts' | 'blogs' | 'people' | 'communities' | 'agents' | 'apps';
 
 const TABS: { key: DiscoverTab; label: string }[] = [
   { key: 'posts', label: 'Posts' },
+  { key: 'blogs', label: 'Blogs' },
   { key: 'people', label: 'People' },
   { key: 'communities', label: 'Communities' },
   { key: 'agents', label: 'Agents' },
@@ -292,6 +293,11 @@ export default function DiscoverScreen() {
     if (activeTab === 'communities') {
       return filterByQuery(communities || [], ['name', 'description']).map((c: any, i: number) => ({ type: 'community', data: c, key: `c-${c.id || i}` }));
     }
+    if (activeTab === 'blogs') {
+      const blogs = (posts || []).filter((p: any) => p.title);
+      const filtered = isSearching ? searchResults.filter((p: any) => p.title) : filterByQuery(blogs, ['title', 'content']);
+      return filtered.map((p: any, i: number) => ({ type: 'post', data: p, key: `b-${p.id || i}` }));
+    }
     if (activeTab === 'agents') {
       return filterByQuery(agents || [], ['name', 'bio', 'description']).map((a: any, i: number) => ({ type: 'agent', data: a, key: `a-${a.id || i}` }));
     }
@@ -301,7 +307,7 @@ export default function DiscoverScreen() {
     return [];
   };
 
-  const loading = activeTab === 'posts' ? (isSearching ? searchLoading : postsLoading)
+  const loading = activeTab === 'posts' || activeTab === 'blogs' ? (isSearching ? searchLoading : postsLoading)
     : activeTab === 'people' ? (followMode ? followListLoading : profilesLoading)
     : activeTab === 'communities' ? commLoading
     : activeTab === 'apps' ? appsLoading

@@ -81,7 +81,7 @@ export default function ProfileScreen() {
   const [editBio, setEditBio] = React.useState('');
   const [editSaving, setEditSaving] = React.useState(false);
   const [editAvatarUri, setEditAvatarUri] = React.useState<string | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'posts' | 'communities' | 'agents' | 'apps' | 'saved'>('posts');
+  const [activeTab, setActiveTab] = React.useState<'posts' | 'replies' | 'blogs' | 'communities' | 'agents' | 'apps' | 'saved'>('posts');
 
   const handlePickEditAvatar = async () => {
     try {
@@ -117,6 +117,8 @@ export default function ProfileScreen() {
 
   const TABS = [
     { key: 'posts' as const, label: 'Posts' },
+    { key: 'replies' as const, label: 'Replies' },
+    { key: 'blogs' as const, label: 'Blogs' },
     { key: 'communities' as const, label: 'Communities' },
     { key: 'agents' as const, label: 'Agents' },
     { key: 'apps' as const, label: 'Apps' },
@@ -266,7 +268,7 @@ export default function ProfileScreen() {
                   </View>
                 ))}
               </View>
-            ) : myPosts.length === 0 ? (
+            ) : myPosts.filter((p: any) => !p.reply_to_id && !p.replyToId && !p.title).length === 0 ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
                 <Ionicons name="newspaper-outline" size={40} color={colors.accent} />
                 <Text variant="h2" color={colors.text} align="center">Posts</Text>
@@ -274,7 +276,42 @@ export default function ProfileScreen() {
                 <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create a post</Button>
               </View>
             ) : (
-              myPosts.map((post: any) => (
+              myPosts.filter((p: any) => !p.reply_to_id && !p.replyToId && !p.title).map((post: any) => (
+                <PostCard key={post.id} post={post} compact />
+              ))
+            )}
+          </>
+        )}
+
+        {activeTab === 'replies' && (
+          <>
+            {postsLoading ? (
+              <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={50} />)}</View>
+            ) : myPosts.filter((p: any) => p.reply_to_id || p.replyToId).length === 0 ? (
+              <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+                <Text variant="body" color={colors.textMuted}>No replies yet</Text>
+              </View>
+            ) : (
+              myPosts.filter((p: any) => p.reply_to_id || p.replyToId).map((post: any) => (
+                <PostCard key={post.id} post={post} compact />
+              ))
+            )}
+          </>
+        )}
+
+        {activeTab === 'blogs' && (
+          <>
+            {postsLoading ? (
+              <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={50} />)}</View>
+            ) : myPosts.filter((p: any) => p.title).length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+                <Ionicons name="document-text-outline" size={40} color={colors.accent} />
+                <Text variant="h2" color={colors.text} align="center">Blogs</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>Write long-form content with markdown.</Text>
+                <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Write a blog</Button>
+              </View>
+            ) : (
+              myPosts.filter((p: any) => p.title).map((post: any) => (
                 <PostCard key={post.id} post={post} compact />
               ))
             )}
