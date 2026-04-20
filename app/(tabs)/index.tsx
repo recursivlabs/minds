@@ -18,6 +18,7 @@ export default function FeedScreen() {
   const { sdk, user } = useAuth();
   const { showOnboarding, completeOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = React.useState<FeedTab>('foryou');
+  const [nudgeDismissed, setNudgeDismissed] = React.useState(false);
 
   const sortMap = { foryou: 'score', latest: 'latest', following: 'following', trending: 'score' } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
@@ -39,13 +40,12 @@ export default function FeedScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && windowWidth > 1024;
 
-  // Onboarding check — MUST be after all hooks
+  // Onboarding check — must be after all hooks above this line
   if (showOnboarding) {
     return <OnboardingFlow onComplete={completeOnboarding} />;
   }
 
   const profileIncomplete = user && (!user.image && !user.bio);
-  const [nudgeDismissed, setNudgeDismissed] = React.useState(false);
 
   const feedContent = (
     <>
