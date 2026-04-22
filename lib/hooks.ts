@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useAuth } from './auth';
 import { getSdk, ORG_ID } from './recursiv';
-import { getCached, setCache, isFresh, invalidatePrefix } from './cache';
+import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations } from './cache';
 import { filterMuted } from './muted';
 
 /**
@@ -194,6 +194,18 @@ export function useCommunities(limit = 20) {
   React.useEffect(() => {
     if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     fetch();
+  }, [fetch]);
+
+  // Refetch when any `communities:*` cache entry is invalidated (e.g. the
+  // user joined or left a community on another screen) so the sidebar
+  // Recents list reflects the new membership without a logout/login cycle.
+  React.useEffect(() => {
+    const unsub = subscribeToInvalidations((key) => {
+      if (key.startsWith('communities:')) {
+        fetch();
+      }
+    });
+    return unsub;
   }, [fetch]);
 
   return { communities, loading, error, refresh: fetch };

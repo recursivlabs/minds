@@ -140,12 +140,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await authedSdk.users.me();
       const me = (res as any).data || res;
       if (me) {
+        // Cache-bust the avatar so React Native / the browser treat a new
+        // upload as a new resource. Server typically returns a stable URL
+        // per user (e.g. /avatars/<id>), so without the query param the
+        // <Image> layer reuses the cached blob and the old avatar keeps
+        // showing until a hard reload.
+        const rawImage = me.image ?? user?.image ?? null;
+        const cachedBusted = rawImage
+          ? `${rawImage}${rawImage.includes('?') ? '&' : '?'}v=${Date.now()}`
+          : null;
         const updated: User = {
           id: me.id || user?.id || '',
           name: me.name || user?.name || '',
           email: me.email || user?.email || '',
           username: me.username || user?.username || '',
-          image: me.image ?? user?.image ?? null,
+          image: cachedBusted,
           bio: me.bio || me.briefdescription || user?.bio || '',
         };
         setUser(updated);

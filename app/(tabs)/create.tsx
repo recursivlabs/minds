@@ -501,7 +501,13 @@ export default function CreateScreen() {
 
           <View style={{ flexDirection: 'row', gap: spacing.md, flex: 1 }}>
             {mode === 'post' && <Avatar uri={user?.image} name={user?.name} size="md" />}
-            <View style={{ flex: 1 }}>
+            <View style={{
+              flex: 1,
+              // Avatar 'md' is 40px tall, line-height is 24px — shift the
+              // first line ~8px down so placeholder/text reads centered with
+              // the avatar instead of glued to the top.
+              paddingTop: mode === 'post' ? 8 : 0,
+            }}>
               <TextInput
                 placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's on your mind? Use @ to mention people"}
                 placeholderTextColor={colors.textMuted}

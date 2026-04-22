@@ -69,14 +69,38 @@ export function setCache(key: string, data: any): void {
   schedulePersist();
 }
 
+// Simple pub-sub so data hooks can re-fetch when their cached entry is
+// invalidated — e.g. SideNav's `useCommunities` reacting to a join/leave
+// in the community screen without a full logout/login.
+type InvalidationListener = (key: string) => void;
+const listeners = new Set<InvalidationListener>();
+
+export function subscribeToInvalidations(listener: InvalidationListener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function notify(key: string) {
+  for (const fn of listeners) {
+    try { fn(key); } catch { /* ignore */ }
+  }
+}
+
 export function invalidate(key: string): void {
   store.delete(key);
   schedulePersist();
+  notify(key);
 }
 
 export function invalidatePrefix(prefix: string): void {
+  const removed: string[] = [];
   for (const key of store.keys()) {
-    if (key.startsWith(prefix)) store.delete(key);
+    if (key.startsWith(prefix)) {
+      store.delete(key);
+      removed.push(key);
+    }
   }
   schedulePersist();
+  for (const key of removed) notify(key);
+  if (removed.length === 0) notify(prefix); // still wake listeners
 }

@@ -22,13 +22,18 @@ export default function PostDetailScreen() {
   const [replyText, setReplyText] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
-  // Use replies from the post detail response (server returns them)
+  // Seed replies from the post detail response only when we first land on
+  // a post (or when we navigate to a different post id). Using [post] as
+  // the dep caused any post state update — including our own reply-count
+  // increment after posting a reply — to clobber the optimistic reply
+  // append with the stale server list. Depend on post?.id instead so this
+  // runs exactly once per post.
   React.useEffect(() => {
     if (!post) return;
-    const postReplies = post.replies || [];
-    setReplies(postReplies);
+    setReplies(post.replies || []);
     setRepliesLoading(false);
-  }, [post]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id]);
 
   const handleReply = async () => {
     if (!replyText.trim() || !sdk || !id) return;
