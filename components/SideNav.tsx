@@ -379,9 +379,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         <View style={{ gap: spacing.xs, marginTop: spacing.xl }}>
           {BOTTOM_ITEMS.map(renderNavItem)}
 
-          {/* User profile */}
+          {/* User profile — route directly to the canonical /user/<username>
+              URL so we never bounce through the /profile redirect page. */}
           <Pressable
-            onPress={() => router.push('/(tabs)/profile')}
+            onPress={() => {
+              const slug = user?.username || user?.id;
+              if (slug) router.push(`/(tabs)/user/${slug}` as any);
+              else router.push('/(tabs)/profile');
+            }}
             style={({ pressed }) => ({
               flexDirection: 'row' as const,
               alignItems: 'center' as const,
@@ -390,7 +395,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               paddingHorizontal: collapsed ? 0 : spacing.md,
               marginHorizontal: collapsed ? 0 : spacing.sm,
               borderRadius: radius.md,
-              backgroundColor: isActive('profile') ? colors.accentSubtle : 'transparent',
+              backgroundColor: (isActive('profile') || (user?.username && pathname?.includes(`/user/${user.username}`))) ? colors.accentSubtle : 'transparent',
               opacity: pressed ? 0.7 : 1,
               justifyContent: collapsed ? 'center' as const : 'flex-start' as const,
               marginTop: spacing.xs,

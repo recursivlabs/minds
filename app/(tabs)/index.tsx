@@ -98,7 +98,7 @@ export default function FeedScreen() {
                   backgroundColor: colors.surface,
                   borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
                 }}>
-                  <Pressable onPress={() => router.push('/(tabs)/profile')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 }}>
+                  <Pressable onPress={() => { const slug = user?.username || user?.id; router.push(slug ? `/(tabs)/user/${slug}` as any : '/(tabs)/profile'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 }}>
                     <Ionicons name="person-circle-outline" size={28} color={colors.accent} />
                     <View style={{ flex: 1 }}>
                       <Text variant="bodyMedium" color={colors.text}>Complete your profile</Text>
