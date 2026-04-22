@@ -7,7 +7,8 @@ import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { TabBar } from '../../components/TabBar';
 import { useAuth } from '../../lib/auth';
-import { ORG_ID } from '../../lib/recursiv';
+import { ORG_ID, BASE_URL } from '../../lib/recursiv';
+import { getItem } from '../../lib/storage';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
 type Tab = 'dashboard' | 'users' | 'content' | 'reports' | 'communities' | 'invites' | 'network';
@@ -393,10 +394,12 @@ function ReportsTab({ sdk }: { sdk: any }) {
   React.useEffect(() => {
     (async () => {
       try {
-        const apiKey = await sdk.client?.apiKey;
-        const baseUrl = sdk.client?.baseUrl;
-        if (baseUrl && apiKey) {
-          const res = await fetch(`${baseUrl}/reports`, {
+        // SDK's HttpClient keeps baseUrl private, so sdk.client?.baseUrl is
+        // undefined at runtime — use the shared BASE_URL constant and the
+        // stored API key directly.
+        const apiKey = await getItem('minds:api_key');
+        if (apiKey) {
+          const res = await fetch(`${BASE_URL}/reports`, {
             headers: { Authorization: `Bearer ${apiKey}` },
           });
           if (res.ok) {
