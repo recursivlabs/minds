@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Pressable, Image, Platform, Linking, TextInput, Alert } from 'react-native';
+import { View, Pressable, Image, Platform, Linking, TextInput, Alert, Modal, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -48,6 +48,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   );
   const [score, setScore] = React.useState(post.score ?? post.vote_count ?? post.voteCount ?? 0);
   const [showMenu, setShowMenu] = React.useState(false);
+  const [menuPos, setMenuPos] = React.useState<{ x: number; y: number } | null>(null);
   const [showReport, setShowReport] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(post.content || post.body || '');
@@ -144,7 +145,6 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
   const handleReport = async (reason: string, details: string) => {
     try {
-      // Try server reports endpoint (may not exist yet)
       const apiKey = await getItem('minds:api_key');
       const res = await fetch(`${BASE_ORIGIN}/api/v1/reports`, {
         method: 'POST',
@@ -159,12 +159,14 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           details,
         }),
       });
-      // Report submitted successfully or endpoint doesn't exist yet
-      // Either way, show confirmation to user
+      if (!res.ok) {
+        toast.show('Report failed', 'error');
+        return;
+      }
+      toast.show('Report submitted');
     } catch {
-      // Even if endpoint doesn't exist, show success — report is noted
+      toast.show('Report failed', 'error');
     }
-    toast.show('Report submitted');
   };
 
   const handleDelete = async () => {
@@ -430,37 +432,20 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              // Show repost menu
-              const choice = window.confirm('Quote this post? (OK = Quote with comment, Cancel = Repost without comment)');
-              if (choice) {
-                // Quote post — open create with embedded post reference
-                router.push({
-                  pathname: '/(tabs)/create',
-                  params: {
-                    communityId: post.communityId || post.community_id || '',
-                    communityName: communityName || '',
-                    quote: `Quoting @${authorUsername}:\n> ${content.slice(0, 300)}${content.length > 300 ? '...' : ''}`,
-                  },
-                } as any);
-              } else {
-                // Repost (remind) — create a post that references the original
-                if (sdk) {
-                  sdk.posts.create({
-                    content: `♻️ Reposted from @${authorUsername}\n\n${content.slice(0, 500)}`,
-                    organization_id: ORG_ID || undefined,
-                    community_id: post.communityId || post.community_id || undefined,
-                  } as any).then(() => toast.show('Reposted!', 'success')).catch(() => toast.show('Repost failed', 'error'));
-                }
-              }
-            } else {
-              Alert.alert('Share', 'How would you like to share?', [
-                { text: 'Quote', onPress: () => router.push({ pathname: '/(tabs)/create', params: { communityId: post.communityId || post.community_id || '', communityName: communityName || '', quote: `Quoting @${authorUsername}:\n> ${content.slice(0, 300)}` } } as any) },
-                { text: 'Repost', onPress: () => { if (sdk) sdk.posts.create({ content: `♻️ Reposted from @${authorUsername}\n\n${content.slice(0, 500)}`, organization_id: ORG_ID || undefined, community_id: post.communityId || post.community_id || undefined } as any).then(() => toast.show('Reposted!', 'success')).catch(() => toast.show('Repost failed', 'error')); } },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }
+          onPress={(e: any) => {
+            e?.stopPropagation?.();
+            // Minds-style "remind" — silently promote the post to your feed.
+            // No quote prompt, no "Reposted from" prefix, no emoji injection.
+            // Content is duplicated as-is so the remind renders as a clean
+            // post in the reposter's feed.
+            if (!sdk) return;
+            sdk.posts.create({
+              content,
+              organization_id: ORG_ID || undefined,
+              community_id: post.communityId || post.community_id || undefined,
+            } as any)
+              .then(() => toast.show('Reposted', 'success'))
+              .catch(() => toast.show('Repost failed', 'error'));
           }}
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
@@ -480,7 +465,21 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={saved ? colors.accent : colors.textMuted} />
         </Pressable>
 
-        <Pressable onPress={() => setShowMenu(!showMenu)} hitSlop={8} style={{ padding: 2 }}>
+        <Pressable
+          onPress={(e: any) => {
+            e?.stopPropagation?.();
+            // Capture the page-relative position of the ellipsis so the menu
+            // can render right next to it no matter where in the feed the
+            // user clicked. React Native Web gives us nativeEvent.pageX/pageY;
+            // native gives us pageX/pageY too.
+            const pageX = e?.nativeEvent?.pageX ?? 0;
+            const pageY = e?.nativeEvent?.pageY ?? 0;
+            setMenuPos({ x: pageX, y: pageY });
+            setShowMenu(true);
+          }}
+          hitSlop={8}
+          style={{ padding: 2 }}
+        >
           <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
         </Pressable>
       </View>
@@ -489,96 +488,95 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       {/* End avatar + content row */}
       </View>
 
-      {/* Backdrop overlay for menu */}
-      {showMenu && (
+      {/* Context menu — rendered in a React Native Modal so it always sits on
+          top of the feed (link previews, media, etc.) and pops up right next
+          to the ellipsis regardless of scroll position. */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
         <Pressable
           onPress={() => setShowMenu(false)}
-          style={{
-            ...(Platform.OS === 'web'
-              ? { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998 }
-              : { position: 'absolute', top: -1000, left: -1000, right: -1000, bottom: -1000, zIndex: 99998 }),
-          }}
-        />
-      )}
-      {/* Context menu */}
-      {showMenu && (
-        <View
-          style={{
-            ...(Platform.OS === 'web'
-              ? { position: 'fixed' as any, top: '30%', right: spacing['3xl'], maxWidth: 200 }
-              : { position: 'absolute', right: spacing.xl, bottom: spacing['5xl'] }),
-            backgroundColor: colors.surfaceRaised,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            padding: spacing.xs,
-            zIndex: 99999,
-            elevation: 999,
-            minWidth: 160,
-            ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)' } as any : {}),
-          }}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.15)' }}
         >
-          {isOwnPost && (
-            <Pressable
-              onPress={() => { setShowMenu(false); setEditContent(content); setIsEditing(true); }}
-              style={{ padding: spacing.md }}
-            >
-              <Text variant="body">Edit</Text>
-            </Pressable>
-          )}
-          {(isOwnPost || canModerate) && (
-            <Pressable
-              onPress={() => { setShowMenu(false); handleDelete(); }}
-              style={{ padding: spacing.md }}
-            >
-              <Text variant="body" color={colors.error}>Delete</Text>
-            </Pressable>
-          )}
-          {!isOwnPost && (
-            <Pressable
-              onPress={() => {
-                setShowMenu(false);
-                const authorId = author.id;
-                if (authorId) {
-                  const muted = toggleMute(authorId);
-                  toast.show(muted ? `Muted ${authorName}` : `Unmuted ${authorName}`);
-                }
-              }}
-              style={{ padding: spacing.md }}
-            >
-              <Text variant="body">{isMuted(author.id) ? 'Unmute' : 'Mute'}</Text>
-            </Pressable>
-          )}
-          <Pressable
-            onPress={() => { setShowMenu(false); setShowReport(true); }}
-            style={{ padding: spacing.md }}
-          >
-            <Text variant="body" color={colors.error}>Report</Text>
-          </Pressable>
-          <Pressable
-            onPress={async () => {
-              setShowMenu(false);
-              const url = `${BASE_ORIGIN}/post/${post.id}`;
-              try {
-                if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
-                  if (navigator.share) {
-                    await navigator.share({ title: post.title || 'Post on Minds', url });
-                  } else if (navigator.clipboard) {
-                    await navigator.clipboard.writeText(url);
-                    toast.show('Link copied');
-                  }
-                } else {
-                  const { Share } = require('react-native');
-                  await Share.share({ message: url });
-                }
-              } catch {}
-            }}
-            style={{ padding: spacing.md }}
-          >
-            <Text variant="body">Share</Text>
-          </Pressable>
-        </View>
-      )}
+          {(() => {
+            const MENU_WIDTH = 180;
+            const MENU_HEIGHT_EST = 220;
+            const screen = Dimensions.get('window');
+            const x = Math.min(Math.max(8, (menuPos?.x ?? 16) - MENU_WIDTH + 24), screen.width - MENU_WIDTH - 8);
+            const y = Math.min(Math.max(8, (menuPos?.y ?? 16) + 8), screen.height - MENU_HEIGHT_EST - 8);
+            return (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: y,
+                  left: x,
+                  width: MENU_WIDTH,
+                  backgroundColor: colors.surfaceRaised,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  padding: spacing.xs,
+                  ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)' } as any : { elevation: 12 }),
+                }}
+              >
+                {isOwnPost && (
+                  <Pressable onPress={() => { setShowMenu(false); setEditContent(content); setIsEditing(true); }} style={{ padding: spacing.md }}>
+                    <Text variant="body">Edit</Text>
+                  </Pressable>
+                )}
+                {(isOwnPost || canModerate) && (
+                  <Pressable onPress={() => { setShowMenu(false); handleDelete(); }} style={{ padding: spacing.md }}>
+                    <Text variant="body" color={colors.error}>Delete</Text>
+                  </Pressable>
+                )}
+                {!isOwnPost && (
+                  <Pressable
+                    onPress={() => {
+                      setShowMenu(false);
+                      const authorId = author.id;
+                      if (authorId) {
+                        const muted = toggleMute(authorId);
+                        toast.show(muted ? `Muted ${authorName}` : `Unmuted ${authorName}`);
+                      }
+                    }}
+                    style={{ padding: spacing.md }}
+                  >
+                    <Text variant="body">{isMuted(author.id) ? 'Unmute' : 'Mute'}</Text>
+                  </Pressable>
+                )}
+                <Pressable onPress={() => { setShowMenu(false); setShowReport(true); }} style={{ padding: spacing.md }}>
+                  <Text variant="body" color={colors.error}>Report</Text>
+                </Pressable>
+                <Pressable
+                  onPress={async () => {
+                    setShowMenu(false);
+                    const url = `${BASE_ORIGIN}/post/${post.id}`;
+                    try {
+                      if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
+                        if (navigator.share) {
+                          await navigator.share({ title: post.title || 'Post on Minds', url });
+                        } else if (navigator.clipboard) {
+                          await navigator.clipboard.writeText(url);
+                          toast.show('Link copied');
+                        }
+                      } else {
+                        const { Share } = require('react-native');
+                        await Share.share({ message: url });
+                      }
+                    } catch {}
+                  }}
+                  style={{ padding: spacing.md }}
+                >
+                  <Text variant="body">Share</Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+        </Pressable>
+      </Modal>
 
       <ReportModal
         visible={showReport}
