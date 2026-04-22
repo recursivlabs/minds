@@ -150,6 +150,9 @@ export default function ProfileScreen() {
                 }}
                 variant="secondary"
                 size="sm"
+                // Match the 36px square of the adjacent settings icon button
+                // so the two controls align on the action row.
+                style={{ height: 36, minHeight: 36 }}
               >
                 Edit Profile
               </Button>
@@ -158,8 +161,8 @@ export default function ProfileScreen() {
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: radius.md,
-                  backgroundColor: colors.surface,
+                  borderRadius: radius.sm, // match Button's radius.sm
+                  backgroundColor: colors.glass, // match Button variant="secondary"
                   borderWidth: 0.5,
                   borderColor: colors.glassBorder,
                   alignItems: 'center',

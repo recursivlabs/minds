@@ -7,6 +7,7 @@ import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
+import { invalidatePrefix } from '../../../lib/cache';
 import { colors, spacing, radius } from '../../../constants/theme';
 
 export default function CommunityDetailScreen() {
@@ -99,6 +100,11 @@ export default function CommunityDetailScreen() {
     try {
       if (wasMember) await sdk.communities.leave(community.id);
       else await sdk.communities.join(community.id);
+      // Invalidate cached community lists so the SideNav "Recents" picks up
+      // the new membership state on its next mount / refresh. Without this,
+      // re-joining a community wouldn't add it back to the sidebar until
+      // the next cache TTL or a full logout/login cycle.
+      invalidatePrefix('communities:');
     } catch {
       setIsMember(wasMember);
     }
@@ -296,7 +302,10 @@ export default function CommunityDetailScreen() {
               <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300 }}>
                 Be the first to post in this community.
               </Text>
-              <Button onPress={() => router.push('/(tabs)/create')} size="sm">
+              <Button
+                onPress={() => router.push({ pathname: '/(tabs)/create', params: { communityId: community?.id, communityName: community?.name } } as any)}
+                size="sm"
+              >
                 Create Post
               </Button>
             </View>

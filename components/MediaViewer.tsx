@@ -16,6 +16,57 @@ interface MediaItem {
   url: string;
   type?: string;
   id?: string;
+  width?: number;
+  height?: number;
+}
+
+const MAX_IMAGE_HEIGHT = 500;
+const MIN_IMAGE_HEIGHT = 200;
+
+function PostImage({ uri, onPress, badge, initialWidth, initialHeight }: {
+  uri: string;
+  onPress: () => void;
+  badge?: React.ReactNode;
+  initialWidth?: number;
+  initialHeight?: number;
+}) {
+  const [size, setSize] = React.useState<{ w: number; h: number } | null>(
+    initialWidth && initialHeight ? { w: initialWidth, h: initialHeight } : null
+  );
+
+  React.useEffect(() => {
+    if (size) return;
+    let cancelled = false;
+    Image.getSize(
+      uri,
+      (w, h) => { if (!cancelled) setSize({ w, h }); },
+      () => { if (!cancelled) setSize({ w: 16, h: 9 }); },
+    );
+    return () => { cancelled = true; };
+  }, [uri, size]);
+
+  const aspectRatio = size ? size.w / size.h : 16 / 9;
+
+  return (
+    <Pressable onPress={onPress}>
+      <View style={{
+        width: '100%',
+        aspectRatio,
+        maxHeight: MAX_IMAGE_HEIGHT,
+        minHeight: MIN_IMAGE_HEIGHT,
+        borderRadius: radius.md,
+        backgroundColor: colors.surfaceHover,
+        overflow: 'hidden',
+      }}>
+        <Image
+          source={{ uri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
+        />
+        {badge}
+      </View>
+    </Pressable>
+  );
 }
 
 interface Props {
@@ -86,28 +137,25 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
           }
 
           // Image
+          const badge = displayItems.length > 1 ? (
+            <View style={{
+              position: 'absolute', top: spacing.sm, right: spacing.sm,
+              backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm,
+              paddingHorizontal: spacing.sm, paddingVertical: 2,
+            }}>
+              <Text variant="caption" color="#fff" style={{ fontSize: 11 }}>{i + 1}/{displayItems.length}</Text>
+            </View>
+          ) : null;
+
           return (
-            <Pressable key={i} onPress={() => openLightbox(i)}>
-              <Image
-                source={{ uri: item.url }}
-                style={{
-                  width: '100%',
-                  height: 250,
-                  borderRadius: radius.md,
-                  backgroundColor: colors.surfaceHover,
-                }}
-                resizeMode="cover"
-              />
-              {displayItems.length > 1 && (
-                <View style={{
-                  position: 'absolute', top: spacing.sm, right: spacing.sm,
-                  backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm,
-                  paddingHorizontal: spacing.sm, paddingVertical: 2,
-                }}>
-                  <Text variant="caption" color="#fff" style={{ fontSize: 11 }}>{i + 1}/{displayItems.length}</Text>
-                </View>
-              )}
-            </Pressable>
+            <PostImage
+              key={i}
+              uri={item.url}
+              onPress={() => openLightbox(i)}
+              badge={badge}
+              initialWidth={item.width}
+              initialHeight={item.height}
+            />
           );
         })}
       </View>
