@@ -9,6 +9,7 @@ import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { usePost } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
+import { setCache, invalidate } from '../../../lib/cache';
 import { colors, spacing, radius, typography } from '../../../constants/theme';
 
 export default function PostDetailScreen() {
@@ -48,11 +49,32 @@ export default function PostDetailScreen() {
         organization_id: ORG_ID || undefined,
       });
       if (res.data) {
-        setReplies(prev => [
-          ...prev,
-          { ...res.data, author: { name: user?.name, username: user?.username, image: user?.image } },
-        ]);
-        setPost((prev: any) => prev ? { ...prev, replyCount: (prev.replyCount || prev.reply_count || 0) + 1 } : prev);
+        const newReply = {
+          ...res.data,
+          author: { id: user?.id, name: user?.name, username: user?.username, image: user?.image },
+        };
+        setReplies(prev => {
+          const next = [...prev, newReply];
+          // Persist the updated post+replies back to cache so a page refresh
+          // (or navigating back into this post) doesn't bounce to the stale
+          // server copy and make the new reply appear to vanish.
+          setPost((prevPost: any) => {
+            if (!prevPost) return prevPost;
+            const updated = {
+              ...prevPost,
+              replies: next,
+              replyCount: (prevPost.replyCount || prevPost.reply_count || 0) + 1,
+              reply_count: (prevPost.reply_count || prevPost.replyCount || 0) + 1,
+            };
+            setCache(`post:${id}`, updated);
+            return updated;
+          });
+          return next;
+        });
+        // Drop any stale feed cache so reply_count in the feed matches reality
+        // after the user navigates back.
+        invalidate('posts:latest:20');
+        invalidate('posts:latest:50');
       }
     } catch { Alert.alert('Error', 'Failed to post reply.'); }
     finally { setSubmitting(false); }

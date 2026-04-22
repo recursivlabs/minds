@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,6 +70,17 @@ export default function CreateScreen() {
   );
   const [showCommunityPicker, setShowCommunityPicker] = React.useState(false);
   const { communities } = useCommunities(30);
+
+  // Keep selectedCommunity in sync with incoming params. Expo Router reuses
+  // the Create screen across navigations, so the initial useState above only
+  // applies on first mount — subsequent "Create Post" from inside a community
+  // wouldn't update the selection otherwise.
+  React.useEffect(() => {
+    if (params.communityId && selectedCommunity?.id !== params.communityId) {
+      setSelectedCommunity({ id: params.communityId, name: params.communityName || 'Community' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.communityId, params.communityName]);
 
   // Agent state
   const [agentName, setAgentName] = React.useState('');
@@ -391,67 +403,74 @@ export default function CreateScreen() {
               <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
             </Pressable>
 
-            {showCommunityPicker && (
-              <>
+            <Modal
+              visible={showCommunityPicker}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowCommunityPicker(false)}
+            >
+              {/* Native Modal renders into its own top-level layer so sibling
+                  elements in the compose form can't bleed through. */}
+              <Pressable
+                onPress={() => setShowCommunityPicker(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: 'rgba(0,0,0,0.75)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: spacing.xl,
+                }}
+              >
                 <Pressable
-                  onPress={() => setShowCommunityPicker(false)}
+                  onPress={(e) => e.stopPropagation()}
                   style={{
-                    position: 'fixed' as any,
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    zIndex: 99998,
-                    // Dim the screen behind the picker so underlying content
-                    // isn't visible through the menu.
-                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    width: '100%',
+                    maxWidth: 420,
+                    maxHeight: '80%' as any,
+                    backgroundColor: colors.surfaceRaised,
+                    borderRadius: radius.lg,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    overflow: 'hidden',
+                    ...(Platform.OS === 'web' ? { boxShadow: '0 24px 64px rgba(0,0,0,0.8)' } as any : {}),
                   }}
-                />
-                <View style={{
-                  position: 'fixed' as any,
-                  top: 140,
-                  left: spacing.xl,
-                  right: spacing.xl,
-                  maxWidth: 340,
-                  // Solid raised surface so nothing bleeds through.
-                  backgroundColor: colors.surfaceRaised,
-                  borderRadius: radius.lg,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  zIndex: 999999,
-                  maxHeight: 400,
-                  ...(Platform.OS === 'web' ? { boxShadow: '0 16px 64px rgba(0,0,0,0.95)', overflowY: 'auto' } as any : {}),
-                }}>
+                >
                   <View style={{ padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }}>
                     <Text variant="label" color={colors.textSecondary}>Choose a community</Text>
                   </View>
-                  {(communities || []).length === 0 && (
-                    <View style={{ padding: spacing.xl, alignItems: 'center', gap: spacing.sm }}>
-                      <Text variant="body" color={colors.textMuted} align="center">No communities yet</Text>
-                      <Pressable onPress={() => { setShowCommunityPicker(false); setMode('community' as any); }}>
-                        <Text variant="caption" color={colors.accent}>Create one</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                  {(communities || []).map((c: any) => (
-                    <Pressable
-                      key={c.id}
-                      onPress={() => { setSelectedCommunity(c); setShowCommunityPicker(false); }}
-                      style={({ pressed }) => ({
-                        flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                        paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-                        backgroundColor: selectedCommunity?.id === c.id ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
-                        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
-                      })}
-                    >
-                      <Avatar uri={c.image || c.avatar} name={c.name} size="sm" />
-                      <View style={{ flex: 1 }}>
-                        <Text variant="body" color={selectedCommunity?.id === c.id ? colors.accent : colors.text} numberOfLines={1}>{c.name}</Text>
-                        {c.description && <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{c.description}</Text>}
+                  <ScrollView style={{ maxHeight: 400 }}>
+                    {(communities || []).length === 0 ? (
+                      <View style={{ padding: spacing.xl, alignItems: 'center', gap: spacing.sm }}>
+                        <Text variant="body" color={colors.textMuted} align="center">No communities yet</Text>
+                        <Pressable onPress={() => { setShowCommunityPicker(false); setMode('community' as any); }}>
+                          <Text variant="caption" color={colors.accent}>Create one</Text>
+                        </Pressable>
                       </View>
-                      {selectedCommunity?.id === c.id && <Ionicons name="checkmark" size={16} color={colors.accent} />}
-                    </Pressable>
-                  ))}
-                </View>
-              </>
-            )}
+                    ) : (
+                      (communities || []).map((c: any) => (
+                        <Pressable
+                          key={c.id}
+                          onPress={() => { setSelectedCommunity(c); setShowCommunityPicker(false); }}
+                          style={({ pressed }) => ({
+                            flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                            paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+                            backgroundColor: selectedCommunity?.id === c.id ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
+                            borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+                          })}
+                        >
+                          <Avatar uri={c.image || c.avatar} name={c.name} size="sm" />
+                          <View style={{ flex: 1 }}>
+                            <Text variant="body" color={selectedCommunity?.id === c.id ? colors.accent : colors.text} numberOfLines={1}>{c.name}</Text>
+                            {c.description && <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{c.description}</Text>}
+                          </View>
+                          {selectedCommunity?.id === c.id && <Ionicons name="checkmark" size={16} color={colors.accent} />}
+                        </Pressable>
+                      ))
+                    )}
+                  </ScrollView>
+                </Pressable>
+              </Pressable>
+            </Modal>
           </View>
 
           <MentionPicker query={mentionQuery} onSelect={insertMention} visible={showMentions} />
