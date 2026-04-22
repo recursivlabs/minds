@@ -9,7 +9,10 @@ import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
 import { registerShortcut } from '../../lib/keyboard';
+import { getItem, setItem } from '../../lib/storage';
 import { colors, spacing } from '../../constants/theme';
+
+const PROFILE_NUDGE_DISMISSED_KEY = 'minds:profileNudge:dismissed';
 
 type FeedTab = 'foryou' | 'latest' | 'following' | 'trending';
 
@@ -18,7 +21,23 @@ export default function FeedScreen() {
   const { sdk, user } = useAuth();
   const { showOnboarding, completeOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = React.useState<FeedTab>('foryou');
-  const [nudgeDismissed, setNudgeDismissed] = React.useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = React.useState(true); // start true to avoid flash before storage read
+
+  // Load persisted nudge dismissal so it stays dismissed across refreshes.
+  React.useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      const stored = await getItem(`${PROFILE_NUDGE_DISMISSED_KEY}:${user.id}`);
+      setNudgeDismissed(stored === 'true');
+    })();
+  }, [user?.id]);
+
+  const dismissNudge = React.useCallback(() => {
+    setNudgeDismissed(true);
+    if (user?.id) {
+      setItem(`${PROFILE_NUDGE_DISMISSED_KEY}:${user.id}`, 'true');
+    }
+  }, [user?.id]);
 
   const sortMap = { foryou: 'score', latest: 'latest', following: 'following', trending: 'score' } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
@@ -45,7 +64,10 @@ export default function FeedScreen() {
     return <OnboardingFlow onComplete={completeOnboarding} />;
   }
 
-  const profileIncomplete = user && (!user.image && !user.bio);
+  // Show nudge when EITHER avatar or bio is missing (not both). Auto-hides
+  // when profile is fully populated, regardless of whether the user
+  // previously dismissed.
+  const profileIncomplete = Boolean(user && (!user.image || !user.bio?.trim()));
 
   const feedContent = (
     <>
@@ -83,7 +105,7 @@ export default function FeedScreen() {
                       <Text variant="caption" color={colors.textMuted}>Add a photo and bio so people can find you</Text>
                     </View>
                   </Pressable>
-                  <Pressable onPress={() => setNudgeDismissed(true)} hitSlop={12}>
+                  <Pressable onPress={dismissNudge} hitSlop={12}>
                     <Ionicons name="close" size={18} color={colors.textMuted} />
                   </Pressable>
                 </View>

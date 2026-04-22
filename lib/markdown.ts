@@ -51,8 +51,10 @@ export type MarkdownSegment =
 export function parseMarkdownSegments(text: string): MarkdownSegment[] {
   if (!text) return [];
   const segments: MarkdownSegment[] = [];
-  // Simple regex-based tokenizer
-  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(?:^|\s)(#([a-zA-Z0-9_]+))|(\n)/g;
+  // Simple regex-based tokenizer.
+  // Order matters: markdown link `[text](url)` is matched before the bare URL
+  // pattern so that URLs inside markdown brackets aren't double-linkified.
+  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(?:^|\s)(#([a-zA-Z0-9_]+))|(\n)|(\bhttps?:\/\/[^\s<>()\[\]"']+)/g;
   let lastIndex = 0;
   let match;
 
@@ -72,7 +74,7 @@ export function parseMarkdownSegments(text: string): MarkdownSegment[] {
       // Code
       segments.push({ type: 'code', text: match[6] });
     } else if (match[7]) {
-      // Link
+      // Markdown link [text](url)
       segments.push({ type: 'link', text: match[8], url: match[9] });
     } else if (match[10]) {
       // Hashtag
@@ -80,6 +82,17 @@ export function parseMarkdownSegments(text: string): MarkdownSegment[] {
     } else if (match[12]) {
       // Line break
       segments.push({ type: 'break' });
+    } else if (match[13]) {
+      // Bare URL — strip common trailing punctuation so sentences render cleanly
+      let url = match[13];
+      let trailing = '';
+      const trailers = ['.', ',', ';', ':', '!', '?', ')', ']'];
+      while (url.length > 0 && trailers.includes(url[url.length - 1])) {
+        trailing = url[url.length - 1] + trailing;
+        url = url.slice(0, -1);
+      }
+      segments.push({ type: 'link', text: url, url });
+      if (trailing) segments.push({ type: 'text', text: trailing });
     }
 
     lastIndex = match.index + match[0].length;

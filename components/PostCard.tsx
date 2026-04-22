@@ -240,13 +240,32 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               );
             case 'hashtag':
               return (
-                <Text key={i} variant="body" color={colors.accent} onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts', q: `#${(seg as any).tag}` } } as any)}>
+                <Text
+                  key={i}
+                  variant="body"
+                  color={colors.accent}
+                  onPress={(e: any) => {
+                    // Prevent click from bubbling up to the outer post Pressable
+                    // and navigating away from the hashtag filter.
+                    e?.stopPropagation?.();
+                    router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts', q: `#${(seg as any).tag}` } } as any);
+                  }}
+                >
                   {seg.text}
                 </Text>
               );
             case 'link':
               return (
-                <Text key={i} variant="body" color={colors.accent} onPress={() => Linking.openURL(seg.url)} style={{ textDecorationLine: 'underline' }}>
+                <Text
+                  key={i}
+                  variant="body"
+                  color={colors.accent}
+                  onPress={(e: any) => {
+                    e?.stopPropagation?.();
+                    Linking.openURL(seg.url);
+                  }}
+                  style={{ textDecorationLine: 'underline' }}
+                >
                   {seg.text}
                 </Text>
               );
@@ -267,9 +286,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
   return (
     <Pressable
-      onPress={() => !isEditing && router.push(`/(tabs)/post/${post.id}` as any)}
+      // Guard against click-through when the overflow menu is open. On web,
+      // clicks on menu items (mute / report / share) bubble up through
+      // nested Pressables and would otherwise trigger post navigation.
+      onPress={() => !isEditing && !showMenu && router.push(`/(tabs)/post/${post.id}` as any)}
       style={({ pressed, hovered }: any) => ({
-        backgroundColor: pressed && !isEditing ? colors.surfaceHover : (hovered && !isEditing) ? 'rgba(255,255,255,0.03)' : 'transparent',
+        backgroundColor: pressed && !isEditing && !showMenu ? colors.surfaceHover : (hovered && !isEditing && !showMenu) ? 'rgba(255,255,255,0.03)' : 'transparent',
         borderBottomWidth: 1,
         borderBottomColor: colors.borderSubtle,
         paddingHorizontal: spacing.xl,

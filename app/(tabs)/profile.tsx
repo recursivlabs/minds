@@ -229,13 +229,14 @@ export default function ProfileScreen() {
             </Text>
           )}
 
-          {/* Stats — clickable */}
+          {/* Stats — clickable; routes to the public profile tabs for the
+              follower / following lists (same component, reused). */}
           <View style={{ flexDirection: 'row', gap: spacing['2xl'], marginTop: spacing.xl }}>
-            <Pressable onPress={() => { if (user?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'following', userId: user.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Pressable onPress={() => { if (user?.username) router.push(`/(tabs)/user/${user.username}?tab=following` as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followingCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Following</Text>
             </Pressable>
-            <Pressable onPress={() => { if (user?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'followers', userId: user.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Pressable onPress={() => { if (user?.username) router.push(`/(tabs)/user/${user.username}?tab=followers` as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followerCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Followers</Text>
             </Pressable>
