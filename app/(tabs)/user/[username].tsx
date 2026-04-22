@@ -13,7 +13,7 @@ import { ORG_ID } from '../../../lib/recursiv';
 import { colors, spacing } from '../../../constants/theme';
 
 export default function UserProfileScreen() {
-  const { username } = useLocalSearchParams<{ username: string }>();
+  const { username, tab: initialTab } = useLocalSearchParams<{ username: string; tab?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sdk, user } = useAuth();
@@ -21,7 +21,13 @@ export default function UserProfileScreen() {
   const [followLoading, setFollowLoading] = React.useState(false);
   const [userPosts, setUserPosts] = React.useState<any[]>([]);
   const [postsLoading, setPostsLoading] = React.useState(true);
-  const [profileTab, setProfileTab] = React.useState<'posts' | 'replies' | 'communities' | 'agents'>('posts');
+  const ALLOWED_TABS = ['posts', 'replies', 'communities', 'agents', 'followers', 'following'] as const;
+  type ProfileTab = typeof ALLOWED_TABS[number];
+  const validInitialTab: ProfileTab = (ALLOWED_TABS as readonly string[]).includes(initialTab || '') ? (initialTab as ProfileTab) : 'posts';
+  const [profileTab, setProfileTab] = React.useState<ProfileTab>(validInitialTab);
+  const [followersList, setFollowersList] = React.useState<any[] | null>(null);
+  const [followingList, setFollowingList] = React.useState<any[] | null>(null);
+  const [relationsLoading, setRelationsLoading] = React.useState(false);
 
   const isOwnProfile = user?.id === profile?.id;
 
@@ -30,7 +36,42 @@ export default function UserProfileScreen() {
     setUserPosts([]);
     setPostsLoading(true);
     setFollowLoading(false);
+    setFollowersList(null);
+    setFollowingList(null);
   }, [username]);
+
+  // Lazy-load followers / following when the user opens those tabs.
+  React.useEffect(() => {
+    if (!profile?.id || !sdk) return;
+    if (profileTab !== 'followers' && profileTab !== 'following') return;
+
+    const needsLoad =
+      (profileTab === 'followers' && followersList === null) ||
+      (profileTab === 'following' && followingList === null);
+    if (!needsLoad) return;
+
+    let cancelled = false;
+    setRelationsLoading(true);
+    (async () => {
+      try {
+        const res = profileTab === 'followers'
+          ? await sdk.profiles.followers(profile.id, { limit: 100 })
+          : await sdk.profiles.following(profile.id, { limit: 100 });
+        const list = (res.data || []) as any[];
+        if (cancelled) return;
+        if (profileTab === 'followers') setFollowersList(list);
+        else setFollowingList(list);
+      } catch {
+        if (!cancelled) {
+          if (profileTab === 'followers') setFollowersList([]);
+          else setFollowingList([]);
+        }
+      } finally {
+        if (!cancelled) setRelationsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profileTab, profile?.id, sdk, followersList, followingList]);
 
   React.useEffect(() => {
     if (!profile?.id || !sdk) return;
@@ -61,14 +102,25 @@ export default function UserProfileScreen() {
     if (!sdk || !profile?.id) return;
     setFollowLoading(true);
     const wasFollowing = isFollowing;
+    // Optimistic update — flip immediately so the button shows the new state.
     setIsFollowing(!wasFollowing);
     setFollowerOffset(prev => wasFollowing ? prev - 1 : prev + 1);
     try {
       if (wasFollowing) await sdk.profiles.unfollow(profile.id);
       else await sdk.profiles.follow(profile.id);
-    } catch {
+    } catch (err: any) {
+      // Surface the error instead of silently reverting — users couldn't tell
+      // whether the click registered otherwise.
+      console.error('toggle_follow_failed', err);
       setIsFollowing(wasFollowing);
       setFollowerOffset(prev => wasFollowing ? prev + 1 : prev - 1);
+      const message = err?.message || `Could not ${wasFollowing ? 'unfollow' : 'follow'} — try again.`;
+      if (Platform.OS === 'web') {
+        // eslint-disable-next-line no-alert
+        (typeof window !== 'undefined' ? window : globalThis).alert?.(message);
+      } else {
+        Alert.alert('Follow failed', message);
+      }
     } finally {
       setFollowLoading(false);
     }
@@ -137,11 +189,11 @@ export default function UserProfileScreen() {
           )}
 
           <View style={{ flexDirection: 'row', gap: spacing['2xl'], marginTop: spacing.xl }}>
-            <Pressable onPress={() => { if (profile?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'following', userId: profile.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Pressable onPress={() => setProfileTab('following')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followingCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Following</Text>
             </Pressable>
-            <Pressable onPress={() => { if (profile?.id) router.push({ pathname: '/(tabs)/discover', params: { tab: 'people', mode: 'followers', userId: profile.id } } as any); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Pressable onPress={() => setProfileTab('followers')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Text variant="bodyMedium">{followerCount}</Text>
               <Text variant="caption" color={colors.textMuted}>Followers</Text>
             </Pressable>
@@ -223,6 +275,8 @@ export default function UserProfileScreen() {
             tabs={[
               { key: 'posts', label: 'Posts' },
               { key: 'replies', label: 'Replies' },
+              { key: 'followers', label: 'Followers' },
+              { key: 'following', label: 'Following' },
               { key: 'communities', label: 'Communities' },
               { key: 'agents', label: 'Agents' },
             ]}
@@ -259,6 +313,76 @@ export default function UserProfileScreen() {
           ) : (
             userPosts.filter((p: any) => p.reply_to_id || p.replyToId).map((post: any) => (
               <PostCard key={post.id} post={post} compact />
+            ))
+          )
+        )}
+
+        {profileTab === 'followers' && (
+          relationsLoading && followersList === null ? (
+            <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+              {[1, 2, 3].map(i => <Skeleton key={i} height={60} />)}
+            </View>
+          ) : !followersList || followersList.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+              <Text variant="body" color={colors.textMuted}>No followers yet</Text>
+            </View>
+          ) : (
+            followersList.map((u: any) => (
+              <Pressable
+                key={u.id}
+                onPress={() => router.push(`/(tabs)/user/${u.username}` as any)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                  paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                  backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                  borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                })}
+              >
+                <Avatar uri={u.image} name={u.name} size="sm" />
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodyMedium" color={colors.text} numberOfLines={1}>{u.name || u.username}</Text>
+                  {u.bio ? (
+                    <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{u.bio}</Text>
+                  ) : (
+                    <Text variant="caption" color={colors.textMuted}>@{u.username}</Text>
+                  )}
+                </View>
+              </Pressable>
+            ))
+          )
+        )}
+
+        {profileTab === 'following' && (
+          relationsLoading && followingList === null ? (
+            <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+              {[1, 2, 3].map(i => <Skeleton key={i} height={60} />)}
+            </View>
+          ) : !followingList || followingList.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+              <Text variant="body" color={colors.textMuted}>Not following anyone yet</Text>
+            </View>
+          ) : (
+            followingList.map((u: any) => (
+              <Pressable
+                key={u.id}
+                onPress={() => router.push(`/(tabs)/user/${u.username}` as any)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                  paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                  backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                  borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                })}
+              >
+                <Avatar uri={u.image} name={u.name} size="sm" />
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodyMedium" color={colors.text} numberOfLines={1}>{u.name || u.username}</Text>
+                  {u.bio ? (
+                    <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{u.bio}</Text>
+                  ) : (
+                    <Text variant="caption" color={colors.textMuted}>@{u.username}</Text>
+                  )}
+                </View>
+              </Pressable>
             ))
           )
         )}

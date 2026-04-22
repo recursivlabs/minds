@@ -16,6 +16,7 @@ import { Text, Button, Input } from '../../components';
 import { Container } from '../../components/Container';
 import { TabBar } from '../../components/TabBar';
 import { MentionPicker, useMentions } from '../../components/MentionPicker';
+import { LinkPreview } from '../../components/LinkPreview';
 import { getLatestDraft, saveDraft, deleteDraft } from '../../lib/drafts';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
@@ -394,7 +395,14 @@ export default function CreateScreen() {
               <>
                 <Pressable
                   onPress={() => setShowCommunityPicker(false)}
-                  style={{ position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998 }}
+                  style={{
+                    position: 'fixed' as any,
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    zIndex: 99998,
+                    // Dim the screen behind the picker so underlying content
+                    // isn't visible through the menu.
+                    backgroundColor: 'rgba(0,0,0,0.55)',
+                  }}
                 />
                 <View style={{
                   position: 'fixed' as any,
@@ -402,7 +410,8 @@ export default function CreateScreen() {
                   left: spacing.xl,
                   right: spacing.xl,
                   maxWidth: 340,
-                  backgroundColor: colors.bg,
+                  // Solid raised surface so nothing bleeds through.
+                  backgroundColor: colors.surfaceRaised,
                   borderRadius: radius.lg,
                   borderWidth: 1,
                   borderColor: colors.border,
@@ -535,6 +544,12 @@ export default function CreateScreen() {
               </Pressable>
             </View>
           )}
+
+          {/* Live link preview as the user types a URL — mirrors how the
+              post will render after submit. */}
+          {mode === 'post' && !mediaUri && content ? (
+            <LinkPreview content={content} />
+          ) : null}
 
           {tags.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
