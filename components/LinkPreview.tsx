@@ -9,7 +9,14 @@ const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
 
 function extractFirstUrl(text: string): string | null {
   const match = text.match(URL_REGEX);
-  return match ? match[0] : null;
+  if (!match) return null;
+  // Strip common trailing punctuation that shouldn't be part of the URL.
+  let url = match[0];
+  const trailers = ['.', ',', ';', ':', '!', '?', ')', ']'];
+  while (url.length > 0 && trailers.includes(url[url.length - 1])) {
+    url = url.slice(0, -1);
+  }
+  return url;
 }
 
 function getDomain(url: string): string {
@@ -71,9 +78,18 @@ interface Props {
 }
 
 /**
- * Extracts the first URL from post content (or accepts a url prop directly) and
- * renders a rich preview card with OG image, title, description, favicon, and
- * domain. Falls back to a simple domain pill if OG metadata is unavailable.
+ * X-style rich link preview.
+ *
+ * With an OG image: renders a hero card — big image at top (1.91:1 aspect,
+ * matching the OG standard), a small domain pill overlaid on the bottom-left
+ * of the image, then a clean title/description block below.
+ *
+ * Without an image: renders a compact horizontal card — a tiny favicon tile
+ * on the left, domain + title on the right. No fixed heights, no borders
+ * competing with the post itself.
+ *
+ * Renders nothing on null / 404 previews so a post with a bare URL doesn't
+ * get a useless pill at the bottom.
  */
 export const LinkPreview = React.memo(function LinkPreview({ content, url: urlProp }: Props) {
   const url = urlProp ?? (content ? extractFirstUrl(content) : null);
@@ -118,76 +134,142 @@ export const LinkPreview = React.memo(function LinkPreview({ content, url: urlPr
   const image = preview?.image;
   const favicon = preview?.favicon;
 
-  // If we haven't loaded yet, or no OG data, fall back to a slim domain card
-  // so the UI doesn't flash between two sizes.
-  if (!loaded || (!title && !description && !image)) {
+  // Still loading — render nothing so the card pops in cleanly once metadata
+  // is ready. (Avoids the flash of a loading pill.)
+  if (!loaded) return null;
+
+  // Hero card: big image, domain pill overlaid on bottom-left, text beneath.
+  if (image) {
     return (
       <Pressable
         onPress={handlePress}
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
+        style={({ pressed, hovered }: any) => ({
           marginTop: spacing.md,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
           backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-          borderRadius: radius.md,
-          borderWidth: 1,
+          borderRadius: radius.xl,
+          borderWidth: 0.5,
           borderColor: colors.borderSubtle,
+          overflow: 'hidden',
+          ...(Platform.OS === 'web'
+            ? {
+                transition: 'border-color 0.15s ease, background-color 0.15s ease',
+                borderColor: hovered ? colors.border : colors.borderSubtle,
+                cursor: 'pointer',
+              } as any
+            : {}),
         })}
       >
-        <Ionicons name="link-outline" size={16} color={colors.accent} />
-        <View style={{ flex: 1 }}>
-          <Text variant="caption" color={colors.accent} numberOfLines={1}>{domain}</Text>
-          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 11 }}>{url}</Text>
+        <View style={{ position: 'relative', width: '100%' }}>
+          <Image
+            source={{ uri: image }}
+            style={{
+              width: '100%',
+              aspectRatio: 1.91,
+              backgroundColor: colors.surfaceRaised,
+            }}
+            resizeMode="cover"
+          />
+          {/* Domain pill overlaid on the image */}
+          <View
+            style={{
+              position: 'absolute',
+              left: spacing.md,
+              bottom: spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.xs,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 3,
+              backgroundColor: 'rgba(0,0,0,0.65)',
+              borderRadius: radius.sm,
+              ...(Platform.OS === 'web' ? { backdropFilter: 'blur(6px)' } as any : {}),
+            }}
+          >
+            {favicon ? (
+              <Image source={{ uri: favicon }} style={{ width: 12, height: 12, borderRadius: 2 }} />
+            ) : (
+              <Ionicons name="link" size={11} color="#fff" />
+            )}
+            <Text variant="caption" color="#fff" numberOfLines={1} style={{ fontSize: 11 }}>
+              {preview?.siteName || domain}
+            </Text>
+          </View>
         </View>
-        <Ionicons name="open-outline" size={14} color={colors.textMuted} />
+        <View style={{ padding: spacing.lg, gap: 2 }}>
+          {title ? (
+            <Text variant="bodyMedium" color={colors.text} numberOfLines={2} style={{ lineHeight: 21 }}>
+              {title}
+            </Text>
+          ) : null}
+          {description ? (
+            <Text variant="caption" color={colors.textMuted} numberOfLines={2} style={{ marginTop: 4 }}>
+              {description}
+            </Text>
+          ) : null}
+        </View>
       </Pressable>
     );
   }
 
-  return (
-    <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => ({
-        marginTop: spacing.md,
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.borderSubtle,
-        overflow: 'hidden',
-      })}
-    >
-      {image ? (
-        <Image
-          source={{ uri: image }}
-          style={{ width: '100%', height: 200, backgroundColor: colors.surfaceRaised }}
-          resizeMode="cover"
-        />
-      ) : null}
-      <View style={{ padding: spacing.lg, gap: spacing.xs }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+  // No image — compact horizontal card. Favicon tile on the left, text on
+  // the right. Keeps bare-URL posts looking intentional instead of empty.
+  if (title || description) {
+    return (
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed, hovered }: any) => ({
+          flexDirection: 'row',
+          gap: spacing.md,
+          marginTop: spacing.md,
+          backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+          borderRadius: radius.lg,
+          borderWidth: 0.5,
+          borderColor: colors.borderSubtle,
+          overflow: 'hidden',
+          ...(Platform.OS === 'web'
+            ? {
+                transition: 'border-color 0.15s ease',
+                borderColor: hovered ? colors.border : colors.borderSubtle,
+                cursor: 'pointer',
+              } as any
+            : {}),
+        })}
+      >
+        <View
+          style={{
+            width: 72,
+            alignSelf: 'stretch',
+            backgroundColor: colors.surfaceRaised,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           {favicon ? (
-            <Image source={{ uri: favicon }} style={{ width: 14, height: 14, borderRadius: 3 }} />
+            <Image source={{ uri: favicon }} style={{ width: 24, height: 24, borderRadius: 4 }} />
           ) : (
-            <Ionicons name="link-outline" size={14} color={colors.textMuted} />
+            <Ionicons name="link" size={20} color={colors.textMuted} />
           )}
-          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
+        </View>
+        <View style={{ flex: 1, paddingVertical: spacing.md, paddingRight: spacing.md, gap: 2 }}>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 11 }}>
             {preview?.siteName || domain}
           </Text>
+          {title ? (
+            <Text variant="bodyMedium" color={colors.text} numberOfLines={1}>
+              {title}
+            </Text>
+          ) : null}
+          {description ? (
+            <Text variant="caption" color={colors.textMuted} numberOfLines={1}>
+              {description}
+            </Text>
+          ) : null}
         </View>
-        {title ? (
-          <Text variant="bodyMedium" color={colors.text} numberOfLines={2}>
-            {title}
-          </Text>
-        ) : null}
-        {description ? (
-          <Text variant="caption" color={colors.textMuted} numberOfLines={2}>
-            {description}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
-  );
+      </Pressable>
+    );
+  }
+
+  // No OG data at all — server couldn't fetch or page has no metadata.
+  // Render nothing; the URL is already clickable inline in the post body.
+  return null;
 });
