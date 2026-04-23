@@ -2,7 +2,7 @@ import * as React from 'react';
 import { View, ScrollView, Pressable, Platform, Alert, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
+import { Text, Button, Input, Card, Skeleton, Divider, Avatar } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { TabBar } from '../../components/TabBar';
