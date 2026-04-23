@@ -55,7 +55,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [editSaving, setEditSaving] = React.useState(false);
   const [currentContent, setCurrentContent] = React.useState(post.content || post.body || '');
   const [isDeleted, setIsDeleted] = React.useState(false);
-  const [saved, setSaved] = React.useState(isBookmarked(post.id));
+  // Bookmark state is keyed by the original (non-repost) post id so a repost
+  // and the original share a single saved-state.
+  const bookmarkedId = (post.reposted_from || post.repostedFrom)?.id || post.id;
+  const [saved, setSaved] = React.useState(isBookmarked(bookmarkedId));
 
   // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {
@@ -74,20 +77,33 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
     setScore(serverScore);
   }, [post.id, post.userReaction, post.user_reaction, post.score]);
 
-  const author = post.author || post.user || {};
+  // X-style repost: when post.reposted_from is present, display the original
+  // as the card body with a small "@<reposter> reposted" header above. The
+  // repost row itself owns the share/delete actions and its author is shown
+  // only in the header. All other interactions (vote, reply, save, report)
+  // target the original post.
+  const repostedFrom = post.reposted_from || post.repostedFrom || null;
+  const reposter = repostedFrom ? (post.author || post.user || {}) : null;
+  const reposterName = reposter ? (reposter.name || reposter.username || 'Someone') : null;
+  const displayPost = repostedFrom || post;
+
+  const author = displayPost.author || displayPost.user || {};
   const authorName = author.name || author.username || 'Anonymous';
   const authorUsername = author.username || author.id || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
-  const content = currentContent || '';
-  const rawMedia = post.media;
-  const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || post.image || post.thumbnail || null;
-  const replyCount = post.replyCount || post.reply_count || post.comments_count || 0;
-  const isNsfw = (post.tags || []).some((t: any) =>
+  const content = repostedFrom ? (displayPost.content || '') : (currentContent || '');
+  const rawMedia = displayPost.media;
+  const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || displayPost.image || displayPost.thumbnail || null;
+  const replyCount = displayPost.replyCount || displayPost.reply_count || displayPost.comments_count || 0;
+  const isNsfw = (displayPost.tags || []).some((t: any) =>
     typeof t === 'string' ? t.toLowerCase() === 'nsfw' : t?.name?.toLowerCase() === 'nsfw'
   );
-  const createdAt = post.createdAt || post.created_at || new Date().toISOString();
+  const createdAt = displayPost.createdAt || displayPost.created_at || new Date().toISOString();
   const isOwnPost = user?.id && (author.id === user.id);
-  const communityId = post.communityId || post.community_id;
+  // The ID used for all actions that target the content — vote, reply, nav.
+  // Reposts forward these to the original post.
+  const actionPostId = repostedFrom ? displayPost.id : post.id;
+  const communityId = displayPost.communityId || displayPost.community_id;
   const communityName = React.useMemo(() => {
     if (!communityId) return null;
     const communities = getCached('communities:30') || getCached('communities:50') || getCached('communities:10') || getCached('communities:100') || [];
@@ -118,28 +134,28 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
     setUserVote(newVote);
     setScore(newScore);
-    onVoteChange?.(post.id, newScore, newVote);
+    onVoteChange?.(actionPostId, newScore, newVote);
 
     try {
       if (wasVoted) {
-        await sdk.posts.unreact(post.id);
+        await sdk.posts.unreact(actionPostId);
       } else {
-        if (prevVote) await sdk.posts.unreact(post.id);
-        await sdk.posts.react(post.id, type as any);
+        if (prevVote) await sdk.posts.unreact(actionPostId);
+        await sdk.posts.react(actionPostId, type as any);
       }
       // Update cache so other views of this post show correct vote
       try {
         const { setCache, getCached } = require('../lib/cache');
-        const cached = getCached(`post:${post.id}`);
+        const cached = getCached(`post:${actionPostId}`);
         if (cached) {
-          setCache(`post:${post.id}`, { ...cached, score: newScore, userReaction: newVote, user_reaction: newVote });
+          setCache(`post:${actionPostId}`, { ...cached, score: newScore, userReaction: newVote, user_reaction: newVote });
         }
       } catch {}
     } catch (err: any) {
       toast.show('Vote failed', 'error');
       setUserVote(prevVote);
       setScore(prevScore);
-      onVoteChange?.(post.id, prevScore, prevVote);
+      onVoteChange?.(actionPostId, prevScore, prevVote);
     }
   };
 
@@ -154,7 +170,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         },
         body: JSON.stringify({
           target_type: 'post',
-          target_id: post.id,
+          target_id: actionPostId,
           reason,
           details,
         }),
@@ -291,7 +307,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       // Guard against click-through when the overflow menu is open. On web,
       // clicks on menu items (mute / report / share) bubble up through
       // nested Pressables and would otherwise trigger post navigation.
-      onPress={() => !isEditing && !showMenu && router.push(`/(tabs)/post/${post.id}` as any)}
+      onPress={() => !isEditing && !showMenu && router.push(`/(tabs)/post/${actionPostId}` as any)}
       style={({ pressed, hovered }: any) => ({
         backgroundColor: pressed && !isEditing && !showMenu ? colors.surfaceHover : (hovered && !isEditing && !showMenu) ? 'rgba(255,255,255,0.03)' : 'transparent',
         borderBottomWidth: 1,
@@ -302,6 +318,23 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease', cursor: isEditing ? 'default' : 'pointer' } as any : {}),
       })}
     >
+      {/* Repost header — small muted "@<reposter> reposted" row above the
+          original post body, X-style. Clicking it jumps to the reposter's
+          profile. */}
+      {repostedFrom && reposter && (
+        <Pressable
+          onPress={(e: any) => {
+            e?.stopPropagation?.();
+            const slug = reposter.username || reposter.id;
+            if (slug) router.push(`/(tabs)/user/${slug}` as any);
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm, marginLeft: 28 }}
+          hitSlop={4}
+        >
+          <Ionicons name="repeat-outline" size={12} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{reposterName} reposted</Text>
+        </Pressable>
+      )}
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
       {/* Avatar column */}
       <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)} style={{ paddingTop: 2 }}>
@@ -423,7 +456,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         />
 
         <Pressable
-          onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
+          onPress={() => router.push(`/(tabs)/post/${actionPostId}` as any)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
           hitSlop={8}
         >
@@ -434,15 +467,14 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <Pressable
           onPress={(e: any) => {
             e?.stopPropagation?.();
-            // Minds-style "remind" — silently promote the post to your feed.
-            // No quote prompt, no "Reposted from" prefix, no emoji injection.
-            // Content is duplicated as-is so the remind renders as a clean
-            // post in the reposter's feed.
+            // X-style repost: create a post with reposted_from_id pointing at
+            // the original. No content on the repost row — the feed inlines
+            // the original with a "@<reposter> reposted" header.
             if (!sdk) return;
             sdk.posts.create({
-              content,
+              content: '',
+              reposted_from_id: actionPostId,
               organization_id: ORG_ID || undefined,
-              community_id: post.communityId || post.community_id || undefined,
             } as any)
               .then(() => toast.show('Reposted', 'success'))
               .catch(() => toast.show('Repost failed', 'error'));
@@ -455,7 +487,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
         <Pressable
           onPress={() => {
-            const nowSaved = toggleBookmark(post.id);
+            const nowSaved = toggleBookmark(actionPostId);
             setSaved(nowSaved);
             toast.show(nowSaved ? 'Saved' : 'Removed from saved');
           }}
@@ -553,7 +585,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                 <Pressable
                   onPress={async () => {
                     setShowMenu(false);
-                    const url = `${BASE_ORIGIN}/post/${post.id}`;
+                    const url = `${BASE_ORIGIN}/post/${actionPostId}`;
                     try {
                       if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
                         if (navigator.share) {
