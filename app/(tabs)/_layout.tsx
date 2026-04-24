@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { spacing } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import { isOnboardingComplete } from '../../lib/onboarding';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
@@ -13,6 +14,20 @@ export default function TabLayout() {
   const sidebar = useSidebarState();
   const { colors } = useTheme();
   const { sdk } = useAuth();
+  const router = useRouter();
+
+  // Onboarding gate: new authenticated users without a completed onboarding
+  // pass get pushed to /onboarding before they ever see the tab bar.
+  React.useEffect(() => {
+    if (!sdk) return;
+    let cancelled = false;
+    (async () => {
+      const done = await isOnboardingComplete();
+      if (cancelled) return;
+      if (!done) router.replace('/onboarding' as any);
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, router]);
 
   // Poll unread notification count
   const [unreadCount, setUnreadCount] = React.useState(0);
