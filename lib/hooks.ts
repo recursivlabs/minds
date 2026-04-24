@@ -8,7 +8,7 @@ import { filterMuted } from './muted';
  * Fetch posts from the feed.
  * All calls scoped to the Minds org.
  */
-export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limit = 20) {
+export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = 'latest', limit = 20) {
   const { sdk, user } = useAuth();
   const cacheKey = `posts:${sort}:${limit}`;
   const cached = getCached(cacheKey);
@@ -51,7 +51,16 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         }
       }
 
-      const res = await s.posts.list({ limit, offset: refresh ? 0 : offsetRef.current, organization_id: ORG_ID || undefined });
+      // 'personal' = the user's private brief feed authored by their
+      // personal AI agent. The server scopes via audience_user_id.
+      const listParams: Record<string, any> = {
+        limit,
+        offset: refresh ? 0 : offsetRef.current,
+        organization_id: ORG_ID || undefined,
+      };
+      if (sort === 'personal') listParams.audience_user_id = 'me';
+
+      const res = await s.posts.list(listParams as any);
       let data = res.data || [];
 
       if (sort === 'score') {

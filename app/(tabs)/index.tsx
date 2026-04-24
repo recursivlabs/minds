@@ -39,7 +39,7 @@ export default function FeedScreen() {
     }
   }, [user?.id]);
 
-  const sortMap = { foryou: 'score', latest: 'latest', following: 'following', trending: 'score' } as const;
+  const sortMap = { foryou: 'personal', latest: 'latest', following: 'following', trending: 'score' } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
   // Keyboard shortcuts
@@ -144,10 +144,10 @@ export default function FeedScreen() {
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], gap: spacing['2xl'] }}>
                 <Ionicons name={activeTab === 'following' ? 'people-outline' : 'newspaper-outline'} size={40} color={colors.accent} />
                 <Text variant="h2" color={colors.text} align="center">
-                  {activeTab === 'following' ? 'Following' : activeTab === 'foryou' ? 'Welcome to Minds' : 'Latest'}
+                  {activeTab === 'following' ? 'Following' : activeTab === 'foryou' ? 'Your agent is warming up' : 'Latest'}
                 </Text>
                 <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
-                  {activeTab === 'following' ? 'Follow people to see their posts here.' : 'No posts yet. Be the first.'}
+                  {activeTab === 'following' ? 'Follow people to see their posts here.' : activeTab === 'foryou' ? 'Pull to refresh and your agent will curate fresh links from the open web.' : 'No posts yet. Be the first.'}
                 </Text>
                 <Button onPress={() => router.push(activeTab === 'following' ? '/(tabs)/explore' : '/(tabs)/create')} size="sm">
                   {activeTab === 'following' ? 'Discover people' : 'Create a post'}
