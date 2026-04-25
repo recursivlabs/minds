@@ -97,7 +97,25 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const authorName = author.name || author.username || 'Anonymous';
   const authorUsername = author.username || author.id || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
-  const content = repostedFrom ? (displayPost.content || '') : (currentContent || '');
+  const rawContent = repostedFrom ? (displayPost.content || '') : (currentContent || '');
+  const externalUrl: string | undefined = displayPost.external_url || displayPost.externalUrl;
+  // Strip lines that contain just the external_url — the LinkPreview
+  // card already shows it, so it's noise in the body. Tolerates minor
+  // whitespace differences and trailing slashes.
+  const content = externalUrl
+    ? rawContent
+        .split('\n')
+        .filter((line: string) => {
+          const t = line.trim();
+          if (!t) return true;
+          if (t === externalUrl) return false;
+          if (t.replace(/\/+$/, '') === externalUrl.replace(/\/+$/, '')) return false;
+          return true;
+        })
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    : rawContent;
   const rawMedia = displayPost.media;
   const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || displayPost.image || displayPost.thumbnail || null;
   const replyCount = displayPost.replyCount || displayPost.reply_count || displayPost.comments_count || 0;

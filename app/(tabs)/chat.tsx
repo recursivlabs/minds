@@ -26,6 +26,29 @@ export default function ChatScreen() {
     }
   }, [params.id]);
 
+  // Ensure the user has a DM with their personal agent. Idempotent —
+  // chat.dm() is get-or-create. Runs on first chat-tab mount; if the
+  // user signed up before we wired the building-screen seed, this back-
+  // fills the missing conversation so the agent appears in the list.
+  React.useEffect(() => {
+    if (!sdk) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await sdk.agents.list({ limit: 50 });
+        const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
+        if (!personal || cancelled) return;
+        await sdk.chat.dm({ user_id: personal.id });
+        if (cancelled) return;
+        // Refresh the conversation list to surface the freshly-created DM.
+        refresh();
+      } catch {
+        // Backfill blip is non-fatal.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk]);
+
   if (activeConvoId) {
     return (
       <ConversationView

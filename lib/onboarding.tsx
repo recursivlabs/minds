@@ -55,6 +55,7 @@ const OnboardingContext = React.createContext<OnboardingContextValue | null>(nul
 
 const ONBOARDING_COMPLETE_KEY = 'minds:onboarding:complete';
 const ONBOARDING_PREFS_KEY = 'minds:onboarding:preferences';
+const LAST_CURATE_AT_KEY = 'minds:lastCurateAt';
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<OnboardingState>(DEFAULT_STATE);
@@ -103,6 +104,22 @@ export async function savePreferences(prefs: {
   paste_sources?: Record<string, unknown>;
 }) {
   await setItem(ONBOARDING_PREFS_KEY, JSON.stringify(prefs));
+}
+
+/**
+ * Store the timestamp of the last successful curator run so the home
+ * feed can show "Updated 5m ago" and the user knows when their agent
+ * last fetched fresh content.
+ */
+export async function markCuratedNow() {
+  await setItem(LAST_CURATE_AT_KEY, String(Date.now()));
+}
+
+export async function loadLastCuratedAt(): Promise<number | null> {
+  const v = await getItem(LAST_CURATE_AT_KEY);
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 export async function loadPreferences(): Promise<{

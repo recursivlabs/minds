@@ -1,10 +1,9 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header, FeedTabs, PostCard, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
 import { FeedSkeletons } from '../../components/PostSkeleton';
-import { OnboardingFlow, useOnboarding } from '../../components/Onboarding';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
@@ -19,7 +18,6 @@ type FeedTab = 'foryou' | 'latest' | 'following' | 'trending';
 export default function FeedScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
-  const { showOnboarding, completeOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = React.useState<FeedTab>('foryou');
   const [nudgeDismissed, setNudgeDismissed] = React.useState(true); // start true to avoid flash before storage read
 
@@ -42,6 +40,18 @@ export default function FeedScreen() {
   const sortMap = { foryou: 'personal', latest: 'latest', following: 'following', trending: 'score' } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
+  // Tap the Feed tab while already on Feed → scroll the list to the top.
+  // Standard X / Twitter / Instagram behavior.
+  const listRef = React.useRef<FlatList<any> | null>(null);
+  const navigation = useNavigation();
+  React.useEffect(() => {
+    const unsub = (navigation as any).addListener?.('tabPress', () => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+    return unsub;
+  }, [navigation]);
+
+
   // Keyboard shortcuts
   React.useEffect(() => {
     const unsubs = [
@@ -59,11 +69,6 @@ export default function FeedScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && windowWidth > 1024;
 
-  // Onboarding check — must be after all hooks above this line
-  if (showOnboarding) {
-    return <OnboardingFlow onComplete={completeOnboarding} />;
-  }
-
   // Show nudge when EITHER avatar or bio is missing (not both). Auto-hides
   // when profile is fully populated, regardless of whether the user
   // previously dismissed.
@@ -75,6 +80,7 @@ export default function FeedScreen() {
         <FeedSkeletons count={5} />
       ) : (
         <FlatList
+          ref={listRef}
           data={posts}
           keyExtractor={(item) => item.id}
           initialNumToRender={8}

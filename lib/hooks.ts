@@ -3,7 +3,7 @@ import { useAuth } from './auth';
 import { getSdk, ORG_ID } from './recursiv';
 import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations } from './cache';
 import { filterMuted } from './muted';
-import { loadPreferences } from './onboarding';
+import { loadPreferences, markCuratedNow } from './onboarding';
 
 /**
  * Fetch posts from the feed.
@@ -180,6 +180,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
           },
           paste_sources: prefs.paste_sources || {},
         });
+        await markCuratedNow();
       }
     } catch {
       // Curator blip is non-fatal; we still re-fetch below.

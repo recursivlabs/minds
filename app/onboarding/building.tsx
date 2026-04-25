@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Text } from '../../components/Text';
 import { Container } from '../../components/Container';
-import { useOnboarding, markOnboardingComplete, savePreferences } from '../../lib/onboarding';
+import { useOnboarding, markOnboardingComplete, savePreferences, markCuratedNow } from '../../lib/onboarding';
 import { useAuth } from '../../lib/auth';
 import { colors, spacing } from '../../constants/theme';
 
@@ -87,6 +87,7 @@ export default function BuildingScreen() {
             preferences: mindsPreferences,
             paste_sources: state.pasteSources,
           });
+          await markCuratedNow();
         } else if (typeof ensurePersonal !== 'function') {
           // Backend not deployed yet — wait the natural 25 seconds so
           // the loading UI doesn't snap to home instantly.
@@ -98,7 +99,7 @@ export default function BuildingScreen() {
         // so this is idempotent — re-onboarding won't duplicate it.
         if (agentId && (sdk as any)?.chat?.dm) {
           try {
-            await (sdk as any).chat.dm({ recipient_id: agentId });
+            await (sdk as any).chat.dm({ user_id: agentId });
           } catch {
             // DM-seed blip is non-fatal.
           }
