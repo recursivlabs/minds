@@ -6,6 +6,7 @@ import { Text } from '../../components/Text';
 import { Container } from '../../components/Container';
 import { useOnboarding, markOnboardingComplete, savePreferences, markCuratedNow } from '../../lib/onboarding';
 import { useAuth } from '../../lib/auth';
+import { buildCuratorRequest, MINDS_PERSONAL_AGENT_SYSTEM_PROMPT } from '../../lib/curator';
 import { colors, spacing } from '../../constants/theme';
 
 const STATUS_LINES = [
@@ -43,11 +44,12 @@ export default function BuildingScreen() {
   }, [pulseAnim]);
 
   // Two-step onboarding completion:
-  //   1. agents.ensurePersonal — platform primitive, creates the user's
-  //      personal agent (idempotent) and stores their preferences.
-  //   2. minds.curateFeed — Minds-specific curator that fetches RSS,
-  //      annotates via LLM, and inserts audience-scoped posts.
-  // The client stitches them; the server keeps the two concerns clean.
+  //   1. agents.ensurePersonal — Recursiv platform primitive, creates
+  //      the user's personal agent + stores their preferences.
+  //   2. curator.run — Recursiv platform primitive, runs the supplied
+  //      sources + prompt and inserts audience-scoped posts. Minds-
+  //      specific config (RSS map, persona instructions, system prompt)
+  //      is assembled locally via buildCuratorRequest.
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -62,31 +64,35 @@ export default function BuildingScreen() {
           agent_avatar: state.agentAvatar,
         };
 
-        // Persist preferences so pull-to-refresh on the home feed can
-        // re-trigger curation later without sending the user back through
-        // onboarding.
         await savePreferences({
           ...mindsPreferences,
           paste_sources: state.pasteSources as any,
         });
 
         const ensurePersonal = (sdk as any)?.agents?.ensurePersonal;
-        const curateFeed = (sdk as any)?.minds?.curateFeed;
+        const runCurator = (sdk as any)?.curator?.run;
 
         let agentId: string | undefined;
         if (typeof ensurePersonal === 'function') {
           const ensured = await ensurePersonal.call((sdk as any).agents, {
             preferences: mindsPreferences,
-            overrides: state.agentName ? { name: state.agentName } : undefined,
+            overrides: {
+              name: state.agentName || undefined,
+              system_prompt: MINDS_PERSONAL_AGENT_SYSTEM_PROMPT,
+            },
           });
           agentId = ensured?.data?.agent_id;
         }
 
-        if (typeof curateFeed === 'function') {
-          await curateFeed.call((sdk as any).minds, {
-            preferences: mindsPreferences,
-            paste_sources: state.pasteSources,
+        if (typeof runCurator === 'function') {
+          const request = buildCuratorRequest({
+            agentName: state.agentName || undefined,
+            interests: state.interests,
+            vibes: state.vibes,
+            persona: state.persona as any,
+            pasteSources: state.pasteSources as any,
           });
+          await runCurator.call((sdk as any).curator, request);
           await markCuratedNow();
         } else if (typeof ensurePersonal !== 'function') {
           // Backend not deployed yet — wait the natural 25 seconds so

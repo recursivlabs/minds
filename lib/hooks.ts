@@ -4,6 +4,7 @@ import { getSdk, ORG_ID } from './recursiv';
 import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations } from './cache';
 import { filterMuted } from './muted';
 import { loadPreferences, markCuratedNow } from './onboarding';
+import { buildCuratorRequest } from './curator';
 
 /**
  * Fetch posts from the feed.
@@ -140,14 +141,14 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
 
   // User-initiated pull-to-refresh on the personal feed actually asks
   // the agent for fresh content: ensures the personal agent exists,
-  // runs the Minds curator (RSS → LLM → audience-scoped post inserts),
-  // then re-fetches. Only call this from explicit user gestures so the
-  // curator runs at most once per pull, not on every focus.
+  // builds the Minds-flavoured curator request locally, calls the
+  // generic Recursiv curator primitive, then re-fetches. Only triggered
+  // on explicit user gestures — focus refreshes stay silent.
   const recurate = React.useCallback(async () => {
     if (sort !== 'personal') return fetchPosts(true);
     const s = sdk || getSdk();
     const ensurePersonal = (s as any)?.agents?.ensurePersonal;
-    const curate = (s as any)?.minds?.curateFeed;
+    const runCurator = (s as any)?.curator?.run;
     try {
       const stored = await loadPreferences();
       const prefs = stored || {
@@ -169,17 +170,15 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
           overrides: prefs.agent_name ? { name: prefs.agent_name } : undefined,
         });
       }
-      if (typeof curate === 'function') {
-        await curate.call((s as any).minds, {
-          preferences: {
-            interests: prefs.interests,
-            free_text_interests: prefs.free_text_interests,
-            vibes: prefs.vibes,
-            persona: prefs.persona,
-            agent_name: prefs.agent_name,
-          },
-          paste_sources: prefs.paste_sources || {},
+      if (typeof runCurator === 'function') {
+        const request = buildCuratorRequest({
+          agentName: prefs.agent_name || undefined,
+          interests: prefs.interests,
+          vibes: prefs.vibes,
+          persona: prefs.persona as any,
+          pasteSources: prefs.paste_sources as any,
         });
+        await runCurator.call((s as any).curator, request);
         await markCuratedNow();
       }
     } catch {
