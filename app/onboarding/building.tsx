@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Text } from '../../components/Text';
 import { Container } from '../../components/Container';
-import { useOnboarding, markOnboardingComplete } from '../../lib/onboarding';
+import { useOnboarding, markOnboardingComplete, savePreferences } from '../../lib/onboarding';
 import { useAuth } from '../../lib/auth';
 import { colors, spacing } from '../../constants/theme';
 
@@ -42,31 +42,66 @@ export default function BuildingScreen() {
     ).start();
   }, [pulseAnim]);
 
-  // Submit the onboarding payload + bootstrap the feed. Stubbed to a
-  // delay for now; once `sdk.agents.bootstrap` lands on the backend
-  // this calls it and waits for the curated posts to be created.
+  // Two-step onboarding completion:
+  //   1. agents.ensurePersonal — platform primitive, creates the user's
+  //      personal agent (idempotent) and stores their preferences.
+  //   2. minds.curateFeed — Minds-specific curator that fetches RSS,
+  //      annotates via LLM, and inserts audience-scoped posts.
+  // The client stitches them; the server keeps the two concerns clean.
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       const start = Date.now();
       try {
-        const bootstrap = (sdk as any)?.agents?.bootstrap;
-        if (typeof bootstrap === 'function') {
-          await bootstrap.call((sdk as any).agents, {
-            preferences: {
-              interests: state.interests,
-              free_text_interests: state.freeTextInterests,
-              vibes: state.vibes,
-              persona: state.persona,
-              agent_name: state.agentName,
-              agent_avatar: state.agentAvatar,
-            },
-            connections: state.pasteSources,
+        const mindsPreferences = {
+          interests: state.interests,
+          free_text_interests: state.freeTextInterests,
+          vibes: state.vibes,
+          persona: state.persona,
+          agent_name: state.agentName,
+          agent_avatar: state.agentAvatar,
+        };
+
+        // Persist preferences so pull-to-refresh on the home feed can
+        // re-trigger curation later without sending the user back through
+        // onboarding.
+        await savePreferences({
+          ...mindsPreferences,
+          paste_sources: state.pasteSources as any,
+        });
+
+        const ensurePersonal = (sdk as any)?.agents?.ensurePersonal;
+        const curateFeed = (sdk as any)?.minds?.curateFeed;
+
+        let agentId: string | undefined;
+        if (typeof ensurePersonal === 'function') {
+          const ensured = await ensurePersonal.call((sdk as any).agents, {
+            preferences: mindsPreferences,
+            overrides: state.agentName ? { name: state.agentName } : undefined,
           });
-        } else {
-          // Backend bootstrap method not deployed yet — wait the natural
-          // 25 seconds so the loading UI doesn't snap to home instantly.
+          agentId = ensured?.data?.agent_id;
+        }
+
+        if (typeof curateFeed === 'function') {
+          await curateFeed.call((sdk as any).minds, {
+            preferences: mindsPreferences,
+            paste_sources: state.pasteSources,
+          });
+        } else if (typeof ensurePersonal !== 'function') {
+          // Backend not deployed yet — wait the natural 25 seconds so
+          // the loading UI doesn't snap to home instantly.
           await new Promise((r) => setTimeout(r, 25_000));
+        }
+
+        // Seed a DM with the personal agent so the Chat tab has the
+        // user's first conversation ready to go. dm() is get-or-create
+        // so this is idempotent — re-onboarding won't duplicate it.
+        if (agentId && (sdk as any)?.chat?.dm) {
+          try {
+            await (sdk as any).chat.dm({ recipient_id: agentId });
+          } catch {
+            // DM-seed blip is non-fatal.
+          }
         }
       } catch {
         // Bootstrap blip is non-fatal for onboarding completion.

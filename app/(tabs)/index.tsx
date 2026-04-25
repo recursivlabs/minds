@@ -40,7 +40,7 @@ export default function FeedScreen() {
   }, [user?.id]);
 
   const sortMap = { foryou: 'personal', latest: 'latest', following: 'following', trending: 'score' } as const;
-  const { posts, setPosts, loading: postsLoading, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
+  const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -124,7 +124,7 @@ export default function FeedScreen() {
               </Pressable>
             </>
           }
-          onRefresh={refresh}
+          onRefresh={recurate}
           refreshing={refreshing}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
@@ -149,9 +149,11 @@ export default function FeedScreen() {
                 <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
                   {activeTab === 'following' ? 'Follow people to see their posts here.' : activeTab === 'foryou' ? 'Pull to refresh and your agent will curate fresh links from the open web.' : 'No posts yet. Be the first.'}
                 </Text>
-                <Button onPress={() => router.push(activeTab === 'following' ? '/(tabs)/explore' : '/(tabs)/create')} size="sm">
-                  {activeTab === 'following' ? 'Discover people' : 'Create a post'}
-                </Button>
+                <View style={{ alignSelf: 'center' }}>
+                  <Button onPress={() => router.push(activeTab === 'following' ? '/(tabs)/explore' : '/(tabs)/create')} size="sm">
+                    {activeTab === 'following' ? 'Discover people' : 'Write a post'}
+                  </Button>
+                </View>
               </View>
             ) : null
           }
@@ -176,18 +178,6 @@ export default function FeedScreen() {
         feedContent
       )}
 
-      <Pressable
-        onPress={() => router.push('/(tabs)/create')}
-        style={({ pressed }) => ({
-          position: 'absolute', bottom: spacing.xl, right: spacing.xl,
-          width: 56, height: 56, borderRadius: 28,
-          backgroundColor: pressed ? colors.accentHover : colors.accent,
-          alignItems: 'center', justifyContent: 'center',
-          elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 8,
-        })}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
     </Container>
   );
 }

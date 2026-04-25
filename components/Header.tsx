@@ -95,22 +95,11 @@ export function Header({ showBack, title }: Props) {
         <Pressable
           hitSlop={8}
           onPress={() => {
-            // Notifications - no-op for now, navigates when ready
+            const slug = user?.username || user?.id;
+            router.push(slug ? (`/(tabs)/user/${slug}` as any) : ('/(tabs)/profile' as any));
           }}
-          style={{ position: 'relative' }}
         >
-          <Ionicons name="notifications-outline" size={20} color={colors.textMuted} />
-          <View
-            style={{
-              position: 'absolute',
-              top: -2,
-              right: -4,
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: colors.accent,
-            }}
-          />
+          <Avatar uri={user?.image} name={user?.name} size="sm" />
         </Pressable>
       </View>
     </View>

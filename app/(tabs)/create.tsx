@@ -528,12 +528,12 @@ export default function CreateScreen() {
               paddingTop: mode === 'post' ? 8 : 0,
             }}>
               <TextInput
-                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's on your mind? Use @ to mention people"}
+                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's on your mind?"}
                 placeholderTextColor={colors.textMuted}
                 value={mode === 'blog' ? blogContent : content}
                 onChangeText={mode === 'blog' ? setBlogContent : setContent}
                 multiline
-                autoFocus={mode !== 'blog'}
+                autoFocus={false}
                 onKeyPress={(e: any) => {
                   if (mode !== 'blog' && Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
                     e.preventDefault();

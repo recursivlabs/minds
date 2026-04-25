@@ -2,9 +2,11 @@ import * as React from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { View, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import { ORG_ID } from '../../lib/recursiv';
 import { isOnboardingComplete } from '../../lib/onboarding';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
@@ -15,6 +17,7 @@ export default function TabLayout() {
   const { colors } = useTheme();
   const { sdk } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Onboarding gate: new authenticated users without a completed onboarding
   // pass get pushed to /onboarding before they ever see the tab bar.
@@ -24,7 +27,7 @@ export default function TabLayout() {
     (async () => {
       const done = await isOnboardingComplete();
       if (cancelled) return;
-      if (!done) router.replace('/onboarding' as any);
+      if (!done) router.replace('/onboarding/agent' as any);
     })();
     return () => { cancelled = true; };
   }, [sdk, router]);
@@ -36,7 +39,7 @@ export default function TabLayout() {
     let active = true;
     const check = async () => {
       try {
-        const res = await sdk.notifications.list({ limit: 20 });
+        const res = await sdk.notifications.list({ limit: 20, organization_id: ORG_ID || undefined });
         if (active) {
           const unread = (res.data || []).filter((n: any) => !n.read && !n.is_read).length;
           setUnreadCount(unread);
@@ -96,9 +99,9 @@ export default function TabLayout() {
           borderTopColor: 'rgba(255,255,255,0.06)',
           borderTopWidth: 0.5,
           elevation: 0,
-          height: 56,
-          paddingBottom: 6,
-          paddingTop: 4,
+          height: 56 + insets.bottom,
+          paddingBottom: insets.bottom + 6,
+          paddingTop: 6,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
@@ -107,6 +110,7 @@ export default function TabLayout() {
           fontWeight: '400',
           letterSpacing: 0.2,
         },
+        tabBarIconStyle: { marginTop: 0 },
       }}
     >
       <Tabs.Screen
@@ -121,7 +125,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Discover',
+          title: 'Search',
           tabBarIcon: ({ color }) => (
             <Ionicons name="search-outline" size={22} color={color} />
           ),
@@ -146,15 +150,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="person-outline" size={22} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="notifications"
         options={{
           title: 'Alerts',
@@ -165,6 +160,8 @@ export default function TabLayout() {
           tabBarBadgeStyle: { backgroundColor: colors.error || '#ef4444', fontSize: 10 },
         }}
       />
+      {/* Profile moved to the header avatar — not a primary tab. */}
+      <Tabs.Screen name="profile" options={{ href: null }} />
       <Tabs.Screen name="wallet" options={{ href: null }} />
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton } from '../../components';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing } from '../../constants/theme';
 
 function timeAgo(dateStr: string): string {
@@ -27,7 +28,7 @@ export default function NotificationsScreen() {
     (async () => {
       if (!sdk) { setLoading(false); return; }
       try {
-        const res = await sdk.notifications.list({ limit: 30 });
+        const res = await sdk.notifications.list({ limit: 30, organization_id: ORG_ID || undefined });
         setNotifications(res.data || []);
       } catch {}
       finally { setLoading(false); }

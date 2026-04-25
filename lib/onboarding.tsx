@@ -54,6 +54,7 @@ interface OnboardingContextValue {
 const OnboardingContext = React.createContext<OnboardingContextValue | null>(null);
 
 const ONBOARDING_COMPLETE_KEY = 'minds:onboarding:complete';
+const ONBOARDING_PREFS_KEY = 'minds:onboarding:preferences';
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<OnboardingState>(DEFAULT_STATE);
@@ -86,6 +87,39 @@ export async function markOnboardingComplete() {
 export async function isOnboardingComplete(): Promise<boolean> {
   const v = await getItem(ONBOARDING_COMPLETE_KEY);
   return v === '1';
+}
+
+/**
+ * Persist the user's curator preferences so the home feed's pull-to-
+ * refresh can re-trigger curation with the same shape they chose during
+ * onboarding (without making them go through onboarding again).
+ */
+export async function savePreferences(prefs: {
+  interests: string[];
+  free_text_interests: string;
+  vibes: string[];
+  persona: string;
+  agent_name?: string;
+  paste_sources?: Record<string, unknown>;
+}) {
+  await setItem(ONBOARDING_PREFS_KEY, JSON.stringify(prefs));
+}
+
+export async function loadPreferences(): Promise<{
+  interests: string[];
+  free_text_interests: string;
+  vibes: string[];
+  persona: string;
+  agent_name?: string;
+  paste_sources?: Record<string, unknown>;
+} | null> {
+  const v = await getItem(ONBOARDING_PREFS_KEY);
+  if (!v) return null;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
 }
 
 /** 24 onboarding interest tags. Mirrors the server-side MINDS_INTEREST_SOURCES map. */

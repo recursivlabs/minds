@@ -363,6 +363,15 @@ export default function LandingScreen() {
   const [loading, setLoading] = React.useState(false);
   const [resetSent, setResetSent] = React.useState(false);
 
+  // Redirect authenticated users into the app. Must be in an effect —
+  // calling router.replace() during render triggers a "setState while
+  // rendering a different component" warning.
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, router]);
+
   // Show nothing while restoring session (prevents landing page flash)
   if (isLoading) {
     return (
@@ -375,7 +384,6 @@ export default function LandingScreen() {
   }
 
   if (isAuthenticated) {
-    router.replace('/(tabs)');
     return null;
   }
 

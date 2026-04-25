@@ -3,6 +3,7 @@ import { useAuth } from './auth';
 import { getSdk, ORG_ID } from './recursiv';
 import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations } from './cache';
 import { filterMuted } from './muted';
+import { loadPreferences } from './onboarding';
 
 /**
  * Fetch posts from the feed.
@@ -21,12 +22,12 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   const followingIdsRef = React.useRef<Set<string> | null>(null);
   const myCommunityIdsRef = React.useRef<Set<string> | null>(null);
 
-  const fetchPosts = React.useCallback(async (refresh = false) => {
+  const fetchPosts = React.useCallback(async (refresh = false, silent = false) => {
     const s = sdk || getSdk();
     if (!s) return;
     try {
       if (refresh) {
-        setRefreshing(true);
+        if (!silent) setRefreshing(true);
         offsetRef.current = 0;
       }
 
@@ -53,12 +54,19 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
 
       // 'personal' = the user's private brief feed authored by their
       // personal AI agent. The server scopes via audience_user_id.
+      // Personal-feed posts are user-scoped, not org-scoped, so we
+      // intentionally omit organization_id when requesting personal —
+      // otherwise the curator-inserted posts (no organization_id) get
+      // filtered out by the server's org_id filter.
       const listParams: Record<string, any> = {
         limit,
         offset: refresh ? 0 : offsetRef.current,
-        organization_id: ORG_ID || undefined,
       };
-      if (sort === 'personal') listParams.audience_user_id = 'me';
+      if (sort === 'personal') {
+        listParams.audience_user_id = 'me';
+      } else if (ORG_ID) {
+        listParams.organization_id = ORG_ID;
+      }
 
       const res = await s.posts.list(listParams as any);
       let data = res.data || [];
@@ -123,12 +131,67 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
     fetchPosts(true);
   }, [sort]);
 
-  const refresh = React.useCallback(() => fetchPosts(true), [fetchPosts]);
+  // Silent re-fetch — used by tab focus, polling, and any background
+  // freshness check. Just re-queries the post list. Does NOT trigger
+  // the curator (which is a 10-20s RSS + LLM round-trip and shouldn't
+  // fire on every tab switch). Passes silent=true so the FlatList's
+  // RefreshControl doesn't flash a stuck inset on focus.
+  const refresh = React.useCallback(() => fetchPosts(true, true), [fetchPosts]);
+
+  // User-initiated pull-to-refresh on the personal feed actually asks
+  // the agent for fresh content: ensures the personal agent exists,
+  // runs the Minds curator (RSS → LLM → audience-scoped post inserts),
+  // then re-fetches. Only call this from explicit user gestures so the
+  // curator runs at most once per pull, not on every focus.
+  const recurate = React.useCallback(async () => {
+    if (sort !== 'personal') return fetchPosts(true);
+    const s = sdk || getSdk();
+    const ensurePersonal = (s as any)?.agents?.ensurePersonal;
+    const curate = (s as any)?.minds?.curateFeed;
+    try {
+      const stored = await loadPreferences();
+      const prefs = stored || {
+        interests: ['ai', 'tech', 'startups', 'science'],
+        free_text_interests: '',
+        vibes: ['news'],
+        persona: 'curious',
+        agent_name: undefined,
+        paste_sources: {},
+      };
+      if (typeof ensurePersonal === 'function') {
+        await ensurePersonal.call((s as any).agents, {
+          preferences: {
+            interests: prefs.interests,
+            free_text_interests: prefs.free_text_interests,
+            vibes: prefs.vibes,
+            persona: prefs.persona,
+          },
+          overrides: prefs.agent_name ? { name: prefs.agent_name } : undefined,
+        });
+      }
+      if (typeof curate === 'function') {
+        await curate.call((s as any).minds, {
+          preferences: {
+            interests: prefs.interests,
+            free_text_interests: prefs.free_text_interests,
+            vibes: prefs.vibes,
+            persona: prefs.persona,
+            agent_name: prefs.agent_name,
+          },
+          paste_sources: prefs.paste_sources || {},
+        });
+      }
+    } catch {
+      // Curator blip is non-fatal; we still re-fetch below.
+    }
+    return fetchPosts(true);
+  }, [fetchPosts, sort, sdk]);
+
   const loadMore = React.useCallback(() => {
     if (hasMore && !loading && !refreshing) fetchPosts(false);
   }, [fetchPosts, hasMore, loading, refreshing]);
 
-  return { posts, setPosts, loading, error, refreshing, refresh, loadMore, hasMore };
+  return { posts, setPosts, loading, error, refreshing, refresh, recurate, loadMore, hasMore };
 }
 
 /**
@@ -367,7 +430,7 @@ export function useConversations() {
   const fetch = React.useCallback(async () => {
     if (!sdk) return;
     try {
-      const res = await sdk.chat.conversations({ limit: 50 });
+      const res = await sdk.chat.conversations({ limit: 50, organization_id: ORG_ID || undefined });
       const data = res.data || [];
       setConversations(data);
       setCache(cacheKey, data);

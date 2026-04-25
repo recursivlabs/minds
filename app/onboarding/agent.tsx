@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, TextInput, Pressable, Platform } from 'react-native';
+import { View, TextInput, Pressable, Platform, ScrollView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Text } from '../../components/Text';
@@ -58,9 +58,20 @@ export default function AgentScreen() {
     router.push('/onboarding/interests');
   };
 
+  const handleSkip = () => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync();
+    if (!state.agentName.trim()) update({ agentName: 'Agent' });
+    router.push('/onboarding/interests');
+  };
+
   return (
     <Container safeTop safeBottom padded>
-      <View style={{ flex: 1, paddingTop: spacing['3xl'] }}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingTop: spacing['3xl'], paddingBottom: spacing['2xl'] }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         <View style={{ alignItems: 'center', marginBottom: spacing['2xl'] }}>
           <View
             style={{
@@ -130,13 +141,20 @@ export default function AgentScreen() {
             <PresetAvatar key={i} index={i} selected={state.agentAvatar === i} onPress={() => update({ agentAvatar: i })} />
           ))}
         </View>
-      </View>
 
-      <View style={{ paddingBottom: spacing.xl }}>
-        <Button onPress={handleContinue} fullWidth size="lg" disabled={!state.agentName.trim()}>
-          Continue
-        </Button>
-      </View>
+        <View style={{ flex: 1 }} />
+
+        <View style={{ paddingBottom: spacing.xl, gap: spacing.md }}>
+          <Button onPress={handleContinue} fullWidth size="lg" disabled={!state.agentName.trim()}>
+            Continue
+          </Button>
+          <Pressable onPress={handleSkip} hitSlop={12} style={{ alignItems: 'center', paddingVertical: spacing.sm }}>
+            <Text variant="bodyMedium" color={colors.textMuted}>
+              Skip for now
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </Container>
   );
 }

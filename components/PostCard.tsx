@@ -60,6 +60,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const bookmarkedId = (post.reposted_from || post.repostedFrom)?.id || post.id;
   const [saved, setSaved] = React.useState(isBookmarked(bookmarkedId));
 
+  // Repost-by-me toggle: tracks the id of the viewer's own repost of
+  // this original (if any) so they can undo it. In-memory only — after
+  // a reload, the server-side `viewer_reposted_id` flag (TBD) will
+  // restore this. For now the toggle works within the session.
+  const [myRepostId, setMyRepostId] = React.useState<string | null>(null);
+
   // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {
     setCurrentContent(post.content || post.body || '');
@@ -467,22 +473,40 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <Pressable
           onPress={(e: any) => {
             e?.stopPropagation?.();
-            // X-style repost: create a post with reposted_from_id pointing at
-            // the original. No content on the repost row — the feed inlines
-            // the original with a "@<reposter> reposted" header.
             if (!sdk) return;
+            // Toggle: if the viewer already reposted this post in the
+            // current session, undo it. Otherwise create the repost.
+            if (myRepostId) {
+              const idToDelete = myRepostId;
+              setMyRepostId(null);
+              sdk.posts.delete(idToDelete)
+                .then(() => toast.show('Repost removed', 'success'))
+                .catch(() => {
+                  setMyRepostId(idToDelete);
+                  toast.show('Could not undo repost', 'error');
+                });
+              return;
+            }
             sdk.posts.create({
               content: '',
               reposted_from_id: actionPostId,
               organization_id: ORG_ID || undefined,
             } as any)
-              .then(() => toast.show('Reposted', 'success'))
+              .then((res: any) => {
+                const newId = res?.data?.id || res?.id;
+                if (newId) setMyRepostId(newId);
+                toast.show('Reposted', 'success');
+              })
               .catch(() => toast.show('Repost failed', 'error'));
           }}
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
         >
-          <Ionicons name="repeat-outline" size={16} color={colors.textMuted} />
+          <Ionicons
+            name={myRepostId ? 'repeat' : 'repeat-outline'}
+            size={16}
+            color={myRepostId ? colors.accent : colors.textMuted}
+          />
         </Pressable>
 
         <Pressable
