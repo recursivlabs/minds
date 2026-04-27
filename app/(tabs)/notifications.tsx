@@ -194,7 +194,13 @@ export default function NotificationsScreen() {
         <FlatList
           data={groupedNotifications}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            const t = (item.targetType || item.target_type || '').toLowerCase();
+            // Visual hierarchy: high-signal alerts (mentions, replies,
+            // agent-sourced, DMs) get full padding + emphasis; low-signal
+            // (likes/reactions) collapse to a slimmer row.
+            const highSignal = item._agentSourced || t.includes('mention') || t.includes('reply') || t.includes('comment') || t.includes('message') || t.includes('dm');
+            return (
             <Pressable
               onPress={() => handlePress(item)}
               style={({ pressed }) => ({
@@ -202,7 +208,7 @@ export default function NotificationsScreen() {
                 alignItems: 'center',
                 gap: spacing.md,
                 paddingHorizontal: spacing.xl,
-                paddingVertical: spacing.lg,
+                paddingVertical: highSignal ? spacing.lg : spacing.md,
                 backgroundColor: pressed ? colors.surfaceHover
                   : item._agentSourced ? 'rgba(212,168,68,0.06)'
                   : item.status === 'unread' ? 'rgba(212,168,68,0.03)' : 'transparent',
@@ -260,7 +266,8 @@ export default function NotificationsScreen() {
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
               )}
             </Pressable>
-          )}
+            );
+          }}
           ListEmptyComponent={null}
           showsVerticalScrollIndicator={false}
         />

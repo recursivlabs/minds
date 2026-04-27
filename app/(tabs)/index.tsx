@@ -50,6 +50,40 @@ export default function FeedScreen() {
   } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
+  // Fresh-since-last-visit: track when the user last opened the feed,
+  // then count posts created since that moment for a small "new
+  // content" dot on the For You tab. Stored in AsyncStorage so it
+  // persists across app launches. Updated when the user opens the feed
+  // (we mark "now" as last-visit on tab focus).
+  const [lastVisitAt, setLastVisitAt] = React.useState<number | null>(null);
+  const FEED_LAST_VISIT_KEY = 'minds:feed:lastVisitAt';
+  React.useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    (async () => {
+      const stored = await getItem(`${FEED_LAST_VISIT_KEY}:${user.id}`);
+      if (!active) return;
+      const ts = stored ? Number(stored) : null;
+      setLastVisitAt(Number.isFinite(ts as any) ? (ts as any) : null);
+      // Mark this open as "now" — only after we've read the previous
+      // value, so the count below reflects posts since the LAST visit
+      // not this one.
+      setItem(`${FEED_LAST_VISIT_KEY}:${user.id}`, String(Date.now()));
+    })();
+    return () => { active = false; };
+  }, [user?.id]);
+
+  const freshCounts = React.useMemo(() => {
+    if (!lastVisitAt) return undefined;
+    const since = lastVisitAt;
+    const count = (posts || []).filter((p: any) => {
+      const ts = new Date(p.createdAt || p.created_at || 0).getTime();
+      return ts > since;
+    }).length;
+    if (count === 0) return undefined;
+    return { [sortMap[activeTab] === 'personal' ? 'foryou' : activeTab]: count } as any;
+  }, [posts, lastVisitAt, activeTab]);
+
   // Tap the Feed tab while already on Feed → scroll the list to the top.
   // Standard X / Twitter / Instagram behavior.
   const listRef = React.useRef<FlatList<any> | null>(null);
@@ -182,7 +216,7 @@ export default function FeedScreen() {
   return (
     <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>
       <Header />
-      <FeedTabs active={activeTab} onChange={setActiveTab} />
+      <FeedTabs active={activeTab} onChange={setActiveTab} unread={freshCounts} />
 
       {isDesktopWeb ? (
         <View style={{ flex: 1, flexDirection: 'row', paddingHorizontal: spacing.xl }}>

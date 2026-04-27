@@ -62,6 +62,9 @@ export default function CreateScreen() {
 
   // Post state
   const [content, setContent] = React.useState(params.quote || '');
+  const [autosaveFlash, setAutosaveFlash] = React.useState(false);
+  const POST_CHAR_LIMIT = 5000;
+  const charsRemaining = POST_CHAR_LIMIT - content.length;
   const [isNsfw, setIsNsfw] = React.useState(false);
   const [showTags, setShowTags] = React.useState(false);
   const [tags, setTags] = React.useState<string[]>([]);
@@ -78,6 +81,23 @@ export default function CreateScreen() {
   // the Create screen across navigations, so the initial useState above only
   // applies on first mount — subsequent "Create Post" from inside a community
   // wouldn't update the selection otherwise.
+  // Debounced autosave: while the user types, save the draft every
+  // ~1.2s of idle. Flashes a small "Saved" indicator so the user knows
+  // their work is preserved even if they navigate away accidentally.
+  React.useEffect(() => {
+    if (!content.trim()) return;
+    const timer = setTimeout(() => {
+      try {
+        const id = saveDraft(content, selectedCommunity?.id, selectedCommunity?.name);
+        draftRef.current = (id as any) || draftRef.current;
+        setAutosaveFlash(true);
+        const hide = setTimeout(() => setAutosaveFlash(false), 1500);
+        return () => clearTimeout(hide);
+      } catch {}
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [content, selectedCommunity?.id]);
+
   React.useEffect(() => {
     if (params.communityId && selectedCommunity?.id !== params.communityId) {
       setSelectedCommunity({ id: params.communityId, name: params.communityName || 'Community' });
@@ -361,25 +381,42 @@ export default function CreateScreen() {
           <Text variant="body" color={colors.textSecondary}>Cancel</Text>
         </Pressable>
 
-        <Pressable
-          onPress={handleSubmit}
-          disabled={!canSubmit || submitting}
-          style={{
-            paddingHorizontal: spacing.xl,
-            paddingVertical: spacing.sm,
-            borderRadius: radius.full,
-            backgroundColor: canSubmit ? colors.accent : colors.surfaceHover,
-            opacity: submitting ? 0.6 : 1,
-          }}
-        >
-          {submitting ? (
-            <ActivityIndicator color={colors.textInverse} size="small" />
-          ) : (
-            <Text variant="bodyMedium" color={canSubmit ? colors.textInverse : colors.textMuted}>
-              {submitLabel}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          {/* Autosave indicator + character count, lighting up only
+              when relevant. Saved-flash = 1.5s pulse after debounced
+              save. Char count goes red below 0. */}
+          {autosaveFlash && mode === 'post' && (
+            <Text variant="caption" color={colors.textMuted}>Saved</Text>
+          )}
+          {mode === 'post' && content.length > POST_CHAR_LIMIT - 240 && (
+            <Text
+              variant="caption"
+              color={charsRemaining < 0 ? colors.error : charsRemaining < 60 ? colors.accent : colors.textMuted}
+              style={{ fontVariant: ['tabular-nums'] as any }}
+            >
+              {charsRemaining}
             </Text>
           )}
-        </Pressable>
+          <Pressable
+            onPress={handleSubmit}
+            disabled={!canSubmit || submitting || charsRemaining < 0}
+            style={{
+              paddingHorizontal: spacing.xl,
+              paddingVertical: spacing.sm,
+              borderRadius: radius.full,
+              backgroundColor: (canSubmit && charsRemaining >= 0) ? colors.accent : colors.surfaceHover,
+              opacity: submitting ? 0.6 : 1,
+            }}
+          >
+            {submitting ? (
+              <ActivityIndicator color={colors.textInverse} size="small" />
+            ) : (
+              <Text variant="bodyMedium" color={(canSubmit && charsRemaining >= 0) ? colors.textInverse : colors.textMuted}>
+                {submitLabel}
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {/*

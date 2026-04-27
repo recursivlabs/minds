@@ -287,8 +287,24 @@ export default function DiscoverScreen() {
 
   const items = getData();
 
-  const renderItem = ({ item }: { item: { type: string; data: any; key: string } }) => {
+  const renderItem = ({ item, index }: { item: { type: string; data: any; key: string }; index: number }) => {
     if (item.type === 'post') {
+      // First post in the Posts tab is rendered as a "lead" card —
+      // larger padding, non-compact mode, accent badge above. Mixed-
+      // size hierarchy is what separates a Discover from a flat list.
+      const isLead = activeTab === 'posts' && index === 0 && !isSearching;
+      if (isLead) {
+        return (
+          <View style={{ borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle }}>
+            <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg }}>
+              <View style={{ alignSelf: 'flex-start', backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4, marginBottom: spacing.sm }}>
+                <Text variant="caption" color={colors.accent} style={{ fontSize: 10, letterSpacing: 0.5 }}>TRENDING NOW</Text>
+              </View>
+            </View>
+            <PostCard post={item.data} />
+          </View>
+        );
+      }
       return <PostCard post={item.data} compact />;
     }
     if (item.type === 'person') {

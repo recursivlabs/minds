@@ -60,8 +60,9 @@ export default function ChatScreen() {
   // chat.dm() is get-or-create. Runs on first chat-tab mount; if the
   // user signed up before we wired the building-screen seed, this back-
   // fills the missing conversation so the agent appears in the list.
-  // Skipped entirely when the user has flipped off their AI agent in
-  // Settings — they get a clean human-only chat list.
+  // When the conversation is fresh (created=true), the agent posts a
+  // welcome via chat.sendAsAgent so the chat list isn't empty on first
+  // open. Skipped entirely when the user has flipped off AI in Settings.
   React.useEffect(() => {
     if (!sdk) return;
     if (!getPreference('aiEnabled')) return;
@@ -71,8 +72,25 @@ export default function ChatScreen() {
         const list = await sdk.agents.list({ limit: 50 });
         const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
         if (!personal || cancelled) return;
-        await sdk.chat.dm({ user_id: personal.id });
+        const dmRes = await sdk.chat.dm({ user_id: personal.id });
         if (cancelled) return;
+        const conversationId = dmRes.data?.id;
+        const isNew = (dmRes.data as any)?.created === true;
+        // Only post a welcome on FRESH conversations (avoid spamming the
+        // welcome every chat-tab mount). sendAsAgent is the platform
+        // primitive that lets owned agents post into their own DMs.
+        if (isNew && conversationId && (sdk as any)?.chat?.sendAsAgent) {
+          try {
+            const ownerName = (user?.name || '').split(' ')[0] || 'there';
+            await (sdk as any).chat.sendAsAgent({
+              agent_id: personal.id,
+              conversation_id: conversationId,
+              content: `Hey ${ownerName} — I'm ${personal.name || 'your agent'}. I read the open web on your behalf and bring you things worth your attention. Tap the For You tab to see what I found, or just ask me here. Try /find or /summarize.`,
+            });
+          } catch {
+            // Welcome blip non-fatal.
+          }
+        }
         // Refresh the conversation list to surface the freshly-created DM.
         refresh();
       } catch {
