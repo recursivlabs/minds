@@ -174,13 +174,46 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
         });
       }
       if (typeof runCurator === 'function') {
-        const request = buildCuratorRequest({
+        const request: any = buildCuratorRequest({
           agentName: prefs.agent_name || undefined,
           interests: prefs.interests,
           vibes: prefs.vibes,
           persona: prefs.persona as any,
           pasteSources: prefs.paste_sources as any,
         });
+
+        // Magical-retention layer: also have the agent text the user
+        // a brief about what it just found, posted into the user's
+        // existing DM with the personal agent. We look up the agent
+        // and the existing DM so the brief lands in the chat tab.
+        try {
+          const list = await (s as any).agents.list({ limit: 50 });
+          const personal = (list?.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
+          if (personal) {
+            const dmRes = await (s as any).chat.dm({ user_id: personal.id });
+            const conversationId = dmRes?.data?.id;
+            if (conversationId) {
+              const personaName = (prefs.persona || 'curious') as string;
+              request.post_brief_to = {
+                conversation_id: conversationId,
+                prompt_template: [
+                  `You are ${prefs.agent_name || personal.name || 'a personal AI agent'}, a personal curator agent on Minds for {{owner_name}}.`,
+                  `Your voice is ${personaName}.`,
+                  '',
+                  `Write a 2-3 sentence message to {{owner_name}} introducing what you just found for them today. Reference the most interesting 1-2 items by what they're about (not the URLs). End with one inviting question or hook so they reply. Plain prose. No bullet lists. No "I hope this finds you well." No preamble. Use first-person — you're texting them.`,
+                  '',
+                  'You just curated these items for them:',
+                  '{{posts}}',
+                ].join('\n'),
+                max_items: 3,
+              };
+            }
+          }
+        } catch {
+          // Brief is best-effort — curator still runs even if we can't
+          // wire the DM target.
+        }
+
         await runCurator.call((s as any).curator, request);
         await markCuratedNow();
       }

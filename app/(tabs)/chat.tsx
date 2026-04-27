@@ -72,25 +72,13 @@ export default function ChatScreen() {
         const list = await sdk.agents.list({ limit: 50 });
         const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
         if (!personal || cancelled) return;
-        const dmRes = await sdk.chat.dm({ user_id: personal.id });
+        await sdk.chat.dm({ user_id: personal.id });
         if (cancelled) return;
-        const conversationId = dmRes.data?.id;
-        const isNew = (dmRes.data as any)?.created === true;
-        // Only post a welcome on FRESH conversations (avoid spamming the
-        // welcome every chat-tab mount). sendAsAgent is the platform
-        // primitive that lets owned agents post into their own DMs.
-        if (isNew && conversationId && (sdk as any)?.chat?.sendAsAgent) {
-          try {
-            const ownerName = (user?.name || '').split(' ')[0] || 'there';
-            await (sdk as any).chat.sendAsAgent({
-              agent_id: personal.id,
-              conversation_id: conversationId,
-              content: `Hey ${ownerName} — I'm ${personal.name || 'your agent'}. I read the open web on your behalf and bring you things worth your attention. Tap the For You tab to see what I found, or just ask me here. Try /find or /summarize.`,
-            });
-          } catch {
-            // Welcome blip non-fatal.
-          }
-        }
+        // The agent's actual welcome message is composed by the
+        // curator's post_brief_to during onboarding/refresh — that's
+        // a richer message than a hardcoded greeting and references
+        // the items the agent just curated. Backfilling this DM here
+        // is just to ensure the conversation exists in the chat list.
         // Refresh the conversation list to surface the freshly-created DM.
         refresh();
       } catch {

@@ -98,14 +98,42 @@ export default function BuildingScreen() {
           agentId = ensured?.data?.agent_id;
         }
 
+        // Pre-create the agent DM so we can pass its conversation_id
+        // to the curator. The curator's brief composition will land
+        // there as the user's first message from their agent — the
+        // first "felt magic" moment.
+        let agentDmId: string | undefined;
+        if (agentId && (sdk as any)?.chat?.dm) {
+          try {
+            const dmRes = await (sdk as any).chat.dm({ user_id: agentId });
+            agentDmId = dmRes?.data?.id;
+          } catch {}
+        }
+
         if (typeof runCurator === 'function') {
-          const request = buildCuratorRequest({
+          const request: any = buildCuratorRequest({
             agentName: state.agentName || undefined,
             interests: state.interests,
             vibes: state.vibes,
             persona: state.persona as any,
             pasteSources: state.pasteSources as any,
           });
+          if (agentDmId) {
+            const personaName = (state.persona || 'curious') as string;
+            request.post_brief_to = {
+              conversation_id: agentDmId,
+              prompt_template: [
+                `You are ${state.agentName || 'a personal AI agent'}, a personal curator agent on Minds for {{owner_name}}.`,
+                `Your voice is ${personaName}.`,
+                '',
+                `This is your VERY FIRST message to {{owner_name}}. Greet them warmly and briefly (1 short sentence). Then in 2-3 sentences total, introduce what you just found for them — reference the most interesting 1-2 items by what they're about (not the URLs). End with one inviting question. Plain prose. No bullet lists. No "I hope this finds you well." No preamble. First-person.`,
+                '',
+                'You just curated these items for them:',
+                '{{posts}}',
+              ].join('\n'),
+              max_items: 3,
+            };
+          }
           await runCurator.call((sdk as any).curator, request);
           await markCuratedNow();
         } else if (typeof ensurePersonal !== 'function') {
@@ -114,10 +142,10 @@ export default function BuildingScreen() {
           await new Promise((r) => setTimeout(r, 25_000));
         }
 
-        // Seed a DM with the personal agent so the Chat tab has the
-        // user's first conversation ready to go. dm() is get-or-create
-        // so this is idempotent — re-onboarding won't duplicate it.
-        if (agentId && (sdk as any)?.chat?.dm) {
+        // Skip the basic welcome message — the curator brief above is
+        // the agent's first message now. (Kept this guard intact in
+        // case the brief failed.)
+        if (agentId && agentDmId === undefined && (sdk as any)?.chat?.dm) {
           try {
             await (sdk as any).chat.dm({ user_id: agentId });
           } catch {
