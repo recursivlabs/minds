@@ -326,6 +326,25 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title="AI">
+          <View style={{ paddingVertical: spacing.xs }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, paddingRight: spacing.lg }}>
+                <Text variant="body">Use my personal AI agent</Text>
+                <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, lineHeight: 18 }}>
+                  Off: clean Minds with no AI mediation. For You falls back to chronological. Agent hidden from chat. You can still post, follow, comment, and DM.
+                </Text>
+              </View>
+              <Switch
+                value={getPreference('aiEnabled')}
+                onValueChange={v => { setPreference('aiEnabled', v); }}
+                trackColor={{ true: colors.accent, false: colors.glass }}
+                thumbColor={colors.text}
+              />
+            </View>
+          </View>
+        </Section>
+
         <Section title="Notifications">
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Replies to my posts</Text>

@@ -35,6 +35,42 @@ export default function NotificationsScreen() {
     })();
   }, [sdk]);
 
+  // Group similar notifications targeting the same post / user within
+  // the last 24h so the list reads "Sarah and 2 others reacted" instead
+  // of three separate rows. Reduces visual noise and matches what good
+  // notification surfaces (Instagram, X) ship.
+  const groupedNotifications = React.useMemo(() => {
+    const buckets = new Map<string, any[]>();
+    const result: any[] = [];
+    const DAY = 24 * 3600 * 1000;
+    for (const n of notifications) {
+      const key = `${n.targetType || n.target_type}-${n.targetId || n.target_id}`;
+      const ts = new Date(n.createdAt || n.created_at || 0).getTime();
+      if (Date.now() - ts < DAY && (n.targetType || n.target_type) && (n.targetId || n.target_id)) {
+        const arr = buckets.get(key) || [];
+        arr.push(n);
+        buckets.set(key, arr);
+      } else {
+        result.push(n);
+      }
+    }
+    for (const [, arr] of buckets) {
+      if (arr.length === 1) {
+        result.push(arr[0]);
+      } else {
+        const newest = arr[0];
+        result.push({
+          ...newest,
+          _groupedCount: arr.length,
+          _groupedTitle: newest.title ? `${newest.title} and ${arr.length - 1} other${arr.length - 1 !== 1 ? 's' : ''}` : `${arr.length} new ${arr.length === 1 ? 'notification' : 'notifications'}`,
+        });
+      }
+    }
+    // Sort newest first
+    result.sort((a, b) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime());
+    return result;
+  }, [notifications]);
+
   const handlePress = (notif: any) => {
     // Mark as read
     if (notif.id && notif.status === 'unread' && sdk) {
@@ -119,7 +155,7 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={groupedNotifications}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <Pressable
@@ -158,9 +194,9 @@ export default function NotificationsScreen() {
               )}
               <View style={{ flex: 1 }}>
                 <Text variant="body" numberOfLines={2} style={{ fontSize: 14 }}>
-                  {item.title || item.body || 'New notification'}
+                  {item._groupedTitle || item.title || item.body || 'New notification'}
                 </Text>
-                {item.body && item.title && (
+                {item.body && (item._groupedTitle || item.title) && (
                   <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ marginTop: 2 }}>
                     {item.body}
                   </Text>

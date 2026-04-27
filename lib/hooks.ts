@@ -5,6 +5,7 @@ import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidation
 import { filterMuted } from './muted';
 import { loadPreferences, markCuratedNow } from './onboarding';
 import { buildCuratorRequest } from './curator';
+import { getPreference } from './preferences';
 
 /**
  * Fetch posts from the feed.
@@ -143,9 +144,11 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   // the agent for fresh content: ensures the personal agent exists,
   // builds the Minds-flavoured curator request locally, calls the
   // generic Recursiv curator primitive, then re-fetches. Only triggered
-  // on explicit user gestures — focus refreshes stay silent.
+  // on explicit user gestures — focus refreshes stay silent. When the
+  // user has disabled AI in Settings we never call the curator and just
+  // re-fetch chronologically.
   const recurate = React.useCallback(async () => {
-    if (sort !== 'personal') return fetchPosts(true);
+    if (sort !== 'personal' || !getPreference('aiEnabled')) return fetchPosts(true);
     const s = sdk || getSdk();
     const ensurePersonal = (s as any)?.agents?.ensurePersonal;
     const runCurator = (s as any)?.curator?.run;

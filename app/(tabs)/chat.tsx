@@ -7,6 +7,7 @@ import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
+import { getPreference } from '../../lib/preferences';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 import { getCached, setCache } from '../../lib/cache';
 
@@ -30,8 +31,11 @@ export default function ChatScreen() {
   // chat.dm() is get-or-create. Runs on first chat-tab mount; if the
   // user signed up before we wired the building-screen seed, this back-
   // fills the missing conversation so the agent appears in the list.
+  // Skipped entirely when the user has flipped off their AI agent in
+  // Settings — they get a clean human-only chat list.
   React.useEffect(() => {
     if (!sdk) return;
+    if (!getPreference('aiEnabled')) return;
     let cancelled = false;
     (async () => {
       try {
@@ -219,7 +223,17 @@ export default function ChatScreen() {
                     </View>
                     {time ? (
                       <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
-                        {new Date(time).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        {(() => {
+                          // iMessage-style relative time: now / 5m / 2h /
+                          // Wed (this week) / Apr 21 (older).
+                          const t = new Date(time);
+                          const diff = Math.floor((Date.now() - t.getTime()) / 1000);
+                          if (diff < 60) return 'now';
+                          if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+                          if (diff < 86_400) return `${Math.floor(diff / 3600)}h`;
+                          if (diff < 7 * 86_400) return t.toLocaleDateString([], { weekday: 'short' });
+                          return t.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                        })()}
                       </Text>
                     ) : null}
                   </View>

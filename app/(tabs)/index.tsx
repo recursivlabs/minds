@@ -7,6 +7,7 @@ import { FeedSkeletons } from '../../components/PostSkeleton';
 import { ORG_ID } from '../../lib/recursiv';
 import { useAuth } from '../../lib/auth';
 import { usePosts } from '../../lib/hooks';
+import { getPreference } from '../../lib/preferences';
 import { registerShortcut } from '../../lib/keyboard';
 import { getItem, setItem } from '../../lib/storage';
 import { colors, spacing } from '../../constants/theme';
@@ -37,7 +38,16 @@ export default function FeedScreen() {
     }
   }, [user?.id]);
 
-  const sortMap = { foryou: 'personal', latest: 'latest', following: 'following', trending: 'score' } as const;
+  // For You uses the personal-agent curator feed. When the user has
+  // disabled AI in Settings, fall back to chronological so they still
+  // see content but no agent surfaces.
+  const aiEnabled = getPreference('aiEnabled');
+  const sortMap = {
+    foryou: aiEnabled ? 'personal' : 'latest',
+    latest: 'latest',
+    following: 'following',
+    trending: 'score',
+  } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
   // Tap the Feed tab while already on Feed → scroll the list to the top.

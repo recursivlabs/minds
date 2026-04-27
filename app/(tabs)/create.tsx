@@ -25,21 +25,24 @@ import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
+// Consumer Create surface: Post is the only first-class mode. Community
+// stays as a reachable mode via ?mode=community deep-link from Discover's
+// "+ Start a community" button — but the mode tab bar is hidden. Blog /
+// Agent / App authoring deferred to the Pro-tier upsell email campaign;
+// those branches stay typed only to avoid touching too much during this
+// pass.
 type Mode = 'post' | 'blog' | 'agent' | 'app' | 'community';
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'post', label: 'Post' },
-  { key: 'blog', label: 'Blog' },
-  { key: 'agent', label: 'Agent' },
-  { key: 'app', label: 'App' },
-  { key: 'community', label: 'Community' },
 ];
 
 export default function CreateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string }>();
+  const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string; mode?: string }>();
   const { sdk, user } = useAuth();
-  const [mode, setMode] = React.useState<Mode>('post');
+  const initialMode: Mode = (params.mode === 'community' || params.mode === 'blog' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
+  const [mode, setMode] = React.useState<Mode>(initialMode);
 
   // Restore draft on mount
   const draftRef = React.useRef<string | null>(null);
@@ -178,7 +181,11 @@ export default function CreateScreen() {
     setSubmitting(true);
     try {
       if (mode === 'post') {
-        if ((!content.trim() && !mediaUri) || !selectedCommunity) {
+        // Community is optional. Default = global / public timeline,
+        // matching legacy Minds behavior and modern social conventions
+        // (Twitter, TikTok don't require communities). If a community
+        // is selected, post goes there; otherwise it's public.
+        if (!content.trim() && !mediaUri) {
           setSubmitting(false);
           return;
         }
@@ -316,8 +323,8 @@ export default function CreateScreen() {
     }
   };
 
-  const canSubmit = mode === 'post' ? ((content.trim().length > 0 || !!mediaUri) && !!selectedCommunity)
-    : mode === 'blog' ? (blogTitle.trim().length > 0 && blogContent.trim().length > 0 && !!selectedCommunity)
+  const canSubmit = mode === 'post' ? (content.trim().length > 0 || !!mediaUri)
+    : mode === 'blog' ? (blogTitle.trim().length > 0 && blogContent.trim().length > 0)
     : mode === 'agent' ? (agentName.trim().length > 0 && agentBio.trim().length > 0)
     : mode === 'app' ? (appName.trim().length > 0 && appDesc.trim().length > 0)
     : (communityName.trim().length > 0 && communityDesc.trim().length > 0);
@@ -375,30 +382,35 @@ export default function CreateScreen() {
         </Pressable>
       </View>
 
-      {/* Mode switcher */}
-      <TabBar tabs={MODES} active={mode} onChange={(k) => setMode(k as Mode)} />
+      {/*
+        Mode switcher hidden on Create. Post is the only first-class mode here.
+        Agent / App / Community creation moved to dedicated routes:
+          - /agent (agent edit/create)
+          - /apps (app catalog)
+          - /communities (community discovery + create)
+        Keep the modes list around so navigation by ?mode= deep-links still
+        works, but don't surface a 5-tab kitchen sink at the top of compose.
+      */}
 
       {/* Content area */}
       {(mode === 'post' || mode === 'blog') ? (
         <View style={{ flex: 1, padding: spacing.xl }}>
-          {/* Community picker */}
+          {/* Community picker — optional. Default audience is global,
+              matching legacy Minds + modern social conventions. */}
           <View style={{ marginBottom: spacing.md, position: 'relative' }}>
-            {!selectedCommunity && content.trim().length > 0 && (
-              <Text variant="caption" color={colors.error} style={{ marginBottom: spacing.xs }}>Choose a community to post in</Text>
-            )}
             <Pressable
               onPress={() => setShowCommunityPicker(!showCommunityPicker)}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
                 paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-                backgroundColor: selectedCommunity ? colors.accentSubtle : (!selectedCommunity && content.trim().length > 0) ? colors.errorMuted : colors.surface,
+                backgroundColor: selectedCommunity ? colors.accentSubtle : colors.surface,
                 borderRadius: radius.full, alignSelf: 'flex-start',
-                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : (!selectedCommunity && content.trim().length > 0) ? colors.error + '40' : colors.glassBorder,
+                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : colors.glassBorder,
               }}
             >
-              <Ionicons name={selectedCommunity ? 'people' : 'add-circle-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
+              <Ionicons name={selectedCommunity ? 'people' : 'globe-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
               <Text variant="caption" color={selectedCommunity ? colors.accent : colors.textMuted} style={{ fontSize: 13 }}>
-                {selectedCommunity ? selectedCommunity.name : 'Choose a community'}
+                {selectedCommunity ? selectedCommunity.name : 'Public · pick a community (optional)'}
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
             </Pressable>

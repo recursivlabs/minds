@@ -97,6 +97,45 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const authorName = author.name || author.username || 'Anonymous';
   const authorUsername = author.username || author.id || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
+
+  // For agent-curated posts (author is the user's personal AI agent +
+  // there's an external_url), the visual byline should be the SOURCE
+  // (Anthropic, NYT, ESPN) rather than the agent — otherwise every
+  // single post in the feed reads "M · M · M". The agent's voice still
+  // appears in the body content.
+  const isAgentCurated = !!(author.isAi || author.is_ai) && !!(displayPost.external_url || displayPost.externalUrl);
+  const externalUrlForByline = displayPost.external_url || displayPost.externalUrl || '';
+  const sourceFromUrl = (() => {
+    if (!externalUrlForByline) return null;
+    try {
+      const host = new URL(externalUrlForByline).hostname.replace(/^www\./, '');
+      // Prettify common patterns: "anthropic.com" → "Anthropic", "news.ycombinator.com" → "Hacker News"
+      const parts = host.split('.');
+      const root = parts.length >= 2 ? parts[parts.length - 2] : host;
+      const known: Record<string, string> = {
+        ycombinator: 'Hacker News',
+        nytimes: 'NYT',
+        wsj: 'WSJ',
+        ft: 'FT',
+        bloomberg: 'Bloomberg',
+        techmeme: 'Techmeme',
+        theverge: 'The Verge',
+        arstechnica: 'Ars Technica',
+        anthropic: 'Anthropic',
+        openai: 'OpenAI',
+        github: 'GitHub',
+        stratechery: 'Stratechery',
+        substack: 'Substack',
+      };
+      return { host, name: known[root] || (root.charAt(0).toUpperCase() + root.slice(1)) };
+    } catch {
+      return null;
+    }
+  })();
+  const bylineName = isAgentCurated && sourceFromUrl ? sourceFromUrl.name : authorName;
+  const bylineFaviconUrl = isAgentCurated && sourceFromUrl
+    ? `https://www.google.com/s2/favicons?domain=${sourceFromUrl.host}&sz=64`
+    : null;
   const rawContent = repostedFrom ? (displayPost.content || '') : (currentContent || '');
   const externalUrl: string | undefined = displayPost.external_url || displayPost.externalUrl;
   // Strip lines that contain just the external_url — the LinkPreview
@@ -360,18 +399,55 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </Pressable>
       )}
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
-      {/* Avatar column */}
-      <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)} style={{ paddingTop: 2 }}>
-        <Avatar uri={authorAvatar} name={authorName} size="sm" />
+      {/* Avatar column — favicon for agent-curated posts (source-led),
+          else the author avatar. */}
+      <Pressable
+        onPress={() => {
+          if (isAgentCurated && externalUrlForByline) {
+            Linking.openURL(externalUrlForByline);
+            return;
+          }
+          router.push(`/(tabs)/user/${authorUsername}` as any);
+        }}
+        style={{ paddingTop: 2 }}
+      >
+        {isAgentCurated && bylineFaviconUrl ? (
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              borderWidth: 0.5,
+              borderColor: colors.borderSubtle,
+            }}
+          >
+            <Image source={{ uri: bylineFaviconUrl }} style={{ width: 20, height: 20 }} />
+          </View>
+        ) : (
+          <Avatar uri={authorAvatar} name={authorName} size="sm" />
+        )}
       </Pressable>
 
       {/* Content column */}
       <View style={{ flex: 1 }}>
-      {/* Author name + badges + time + community */}
+      {/* Source/author byline + time + via-agent attribution */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, flexWrap: 'wrap' }}>
-        <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Text variant="label">{authorName}</Text>
-          {getBadges(author).map(b => <Badge key={b} type={b} size="sm" />)}
+        <Pressable
+          onPress={() => {
+            if (isAgentCurated && externalUrlForByline) {
+              Linking.openURL(externalUrlForByline);
+              return;
+            }
+            router.push(`/(tabs)/user/${authorUsername}` as any);
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
+        >
+          <Text variant="label">{bylineName}</Text>
+          {!isAgentCurated && getBadges(author).map(b => <Badge key={b} type={b} size="sm" />)}
         </Pressable>
         {communityName && (
           <>
@@ -382,6 +458,16 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           </>
         )}
         <Text variant="caption" color={colors.textMuted}>{timeAgo(createdAt)}</Text>
+        {isAgentCurated && (
+          <Pressable
+            onPress={(e: any) => {
+              e?.stopPropagation?.();
+              router.push(`/(tabs)/user/${authorUsername}` as any);
+            }}
+          >
+            <Text variant="caption" color={colors.textMuted}>via {authorName}</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Content */}

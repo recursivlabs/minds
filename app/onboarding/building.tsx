@@ -7,6 +7,7 @@ import { Container } from '../../components/Container';
 import { useOnboarding, markOnboardingComplete, savePreferences, markCuratedNow } from '../../lib/onboarding';
 import { useAuth } from '../../lib/auth';
 import { buildCuratorRequest, MINDS_PERSONAL_AGENT_SYSTEM_PROMPT } from '../../lib/curator';
+import { getPreference } from '../../lib/preferences';
 import { colors, spacing } from '../../constants/theme';
 
 const STATUS_LINES = [
@@ -68,6 +69,19 @@ export default function BuildingScreen() {
           ...mindsPreferences,
           paste_sources: state.pasteSources as any,
         });
+
+        // Honour the AI-off master toggle. If the user disabled AI in
+        // Settings before completing onboarding (or during it via a
+        // future "no thanks" path), skip agent provisioning + curator
+        // entirely and finish onboarding clean.
+        if (!getPreference('aiEnabled')) {
+          await new Promise((r) => setTimeout(r, 1500));
+          if (cancelled) return;
+          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await markOnboardingComplete();
+          router.replace('/(tabs)');
+          return;
+        }
 
         const ensurePersonal = (sdk as any)?.agents?.ensurePersonal;
         const runCurator = (sdk as any)?.curator?.run;

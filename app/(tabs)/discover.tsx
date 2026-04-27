@@ -30,15 +30,13 @@ function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; o
   );
 }
 
-type DiscoverTab = 'posts' | 'blogs' | 'people' | 'communities' | 'agents' | 'apps';
+type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents';
 
 const TABS: { key: DiscoverTab; label: string }[] = [
   { key: 'posts', label: 'Posts' },
-  { key: 'blogs', label: 'Blogs' },
   { key: 'people', label: 'People' },
   { key: 'communities', label: 'Communities' },
   { key: 'agents', label: 'Agents' },
-  { key: 'apps', label: 'Apps' },
 ];
 
 function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
@@ -219,23 +217,6 @@ export default function DiscoverScreen() {
   const { profiles, loading: profilesLoading } = useProfiles(50);
   const { results: searchResults, loading: searchLoading } = useSearchPosts(searchQuery);
 
-  // Fetch apps (projects with deployments)
-  const [apps, setApps] = React.useState<any[]>([]);
-  const [appsLoading, setAppsLoading] = React.useState(false);
-  React.useEffect(() => {
-    if (activeTab !== 'apps' || !sdk) return;
-    let cancelled = false;
-    setAppsLoading(true);
-    (async () => {
-      try {
-        const res = await sdk.projects.list({ limit: 50, organization_id: ORG_ID || undefined } as any);
-        if (!cancelled) setApps(res.data || []);
-      } catch {}
-      if (!cancelled) setAppsLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [activeTab, sdk]);
-
   // Search people via SDK when searching
   const [searchedPeople, setSearchedPeople] = React.useState<any[]>([]);
   const [searchPeopleLoading, setSearchPeopleLoading] = React.useState(false);
@@ -293,24 +274,15 @@ export default function DiscoverScreen() {
     if (activeTab === 'communities') {
       return filterByQuery(communities || [], ['name', 'description']).map((c: any, i: number) => ({ type: 'community', data: c, key: `c-${c.id || i}` }));
     }
-    if (activeTab === 'blogs') {
-      const blogs = (posts || []).filter((p: any) => p.title);
-      const filtered = isSearching ? searchResults.filter((p: any) => p.title) : filterByQuery(blogs, ['title', 'content']);
-      return filtered.map((p: any, i: number) => ({ type: 'post', data: p, key: `b-${p.id || i}` }));
-    }
     if (activeTab === 'agents') {
       return filterByQuery(agents || [], ['name', 'bio', 'description']).map((a: any, i: number) => ({ type: 'agent', data: a, key: `a-${a.id || i}` }));
-    }
-    if (activeTab === 'apps') {
-      return filterByQuery(apps || [], ['name', 'slug']).map((a: any, i: number) => ({ type: 'app', data: a, key: `app-${a.id || i}` }));
     }
     return [];
   };
 
-  const loading = activeTab === 'posts' || activeTab === 'blogs' ? (isSearching ? searchLoading : postsLoading)
+  const loading = activeTab === 'posts' ? (isSearching ? searchLoading : postsLoading)
     : activeTab === 'people' ? (followMode ? followListLoading : profilesLoading)
     : activeTab === 'communities' ? commLoading
-    : activeTab === 'apps' ? appsLoading
     : agentsLoading;
 
   const items = getData();
@@ -467,19 +439,48 @@ export default function DiscoverScreen() {
               <ActivityIndicator color={colors.accent} />
             </View>
           ) : null}
-          ListHeaderComponent={items.length > 0 ? (
-            <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
-              <Text variant="caption" color={colors.textMuted}>
-                {isSearching
-                  ? `${items.length} result${items.length !== 1 ? 's' : ''}`
-                  : activeTab === 'posts' ? `${items.length} trending posts`
-                  : activeTab === 'people' ? `${items.length} people on the network`
-                  : activeTab === 'communities' ? `${items.length} communities to join`
-                  : `${items.length} agents you can chat with`
-                }
-              </Text>
-            </View>
-          ) : null}
+          ListHeaderComponent={
+            <>
+              {/* Per-tab "+ New X" affordance. Communities and Agents
+                  get inline create entry points so users discover the
+                  creation flow at the same place they discover existing
+                  ones. Posts/People don't need this — Posts uses the
+                  Create tab; following People is the discover action. */}
+              {activeTab === 'communities' && !isSearching && (
+                <Pressable
+                  onPress={() => router.push('/(tabs)/create?mode=community' as any)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                    borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+                    backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+                  })}
+                >
+                  <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="add" size={22} color={colors.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyMedium" color={colors.accent}>Start a community</Text>
+                    <Text variant="caption" color={colors.textMuted}>Gather people around a shared interest</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+              )}
+              {items.length > 0 && (
+                <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
+                  <Text variant="caption" color={colors.textMuted}>
+                    {isSearching
+                      ? `${items.length} result${items.length !== 1 ? 's' : ''}`
+                      : activeTab === 'posts' ? `${items.length} trending posts`
+                      : activeTab === 'people' ? `${items.length} people on the network`
+                      : activeTab === 'communities' ? `${items.length} communities to join`
+                      : `${items.length} agents you can chat with`
+                    }
+                  </Text>
+                </View>
+              )}
+            </>
+          }
           ListEmptyComponent={
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
               <Ionicons
