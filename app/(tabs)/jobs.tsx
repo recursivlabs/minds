@@ -27,7 +27,7 @@ export default function JobsScreen() {
     setLoading(true);
     try {
       const res = await sdk.jobs.list();
-      setJobs(Array.isArray(res) ? res : res?.jobs || []);
+      setJobs((res as any)?.data || []);
     } catch { setJobs([]); }
     setLoading(false);
   }, [sdk]);

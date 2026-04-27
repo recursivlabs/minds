@@ -404,7 +404,7 @@ export function useProfile(username: string) {
         if (!cancelled && res?.data) {
           setProfile(res.data);
           setCache(cacheKey, res.data);
-          if (!res.data.isAgent) {
+          if (!(res.data as any).isAgent) {
             try {
               const followRes = await s.profiles.isFollowing(res.data.id);
               setIsFollowing(followRes.data?.is_following ?? false);
@@ -666,7 +666,7 @@ export function useSearch(query: string) {
         // Search in parallel
         const [postRes, profileRes, commRes] = await Promise.allSettled([
           s.posts.search({ q: query, limit: 10, organization_id: ORG_ID || undefined }),
-          s.profiles.search ? s.profiles.search({ query, limit: 10 }) : Promise.reject('no search'),
+          s.profiles.search ? s.profiles.search({ q: query, limit: 10 }) : Promise.reject('no search'),
           s.communities.list({ limit: 50, organization_id: ORG_ID || undefined }),
         ]);
 

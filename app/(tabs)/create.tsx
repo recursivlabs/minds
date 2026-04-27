@@ -219,7 +219,7 @@ export default function CreateScreen() {
               content_type: contentType,
               content_length: blob.size,
             });
-            const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+            const uploadUrl = uploadRes.data?.upload_url || (uploadRes.data as any)?.url;
             if (uploadUrl) {
               const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
               if (!putRes.ok) {
@@ -255,7 +255,7 @@ export default function CreateScreen() {
             const blob = await response.blob();
             const contentType = blob.type || 'image/jpeg';
             const uploadRes = await sdk.uploads.getMediaUploadUrl({ content_type: contentType, content_length: blob.size });
-            const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+            const uploadUrl = uploadRes.data?.upload_url || (uploadRes.data as any)?.url;
             if (uploadUrl) {
               const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
               if (putRes.ok) blogMediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];

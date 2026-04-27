@@ -26,8 +26,8 @@ export default function InvitesScreen() {
         sdk.inviteCodes.myCodes().catch(() => []),
         sdk.inviteCodes.leaderboard(10).catch(() => []),
       ]);
-      setCodes(Array.isArray(myCodes) ? myCodes : myCodes?.codes || []);
-      setLeaderboard(Array.isArray(lb) ? lb : lb?.entries || []);
+      setCodes(((myCodes as any)?.data?.codes || (myCodes as any)?.data) ?? []);
+      setLeaderboard((lb as any)?.data || []);
     } catch {}
     setLoading(false);
   }, [sdk]);

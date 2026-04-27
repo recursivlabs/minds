@@ -546,7 +546,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             try {
               const agentRes = await sdk.agents.chat(otherId, { message: messageText });
               const agentData = agentRes?.data || agentRes;
-              const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
+              const reply = (agentData as any)?.content || (agentData as any)?.message || (agentData as any)?.response || (typeof agentData === 'string' ? agentData : null);
               if (reply) {
                 setMessages(prev => [...prev, {
                   id: 'agent-' + Date.now(),

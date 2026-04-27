@@ -45,7 +45,7 @@ export default function EmailScreen() {
     setLoading(true);
     try {
       const res = await sdk.email.listCampaigns();
-      setCampaigns(Array.isArray(res) ? res : res?.campaigns || []);
+      setCampaigns((res as any)?.data || []);
     } catch { setCampaigns([]); }
     setLoading(false);
   }, [sdk]);
@@ -83,7 +83,7 @@ export default function EmailScreen() {
       await sdk.email[`${action}Campaign`](id);
       await openDetail(id);
       await load();
-    } catch { msg(`Failed to ${action} campaign.`); }
+    } catch { showError(`Failed to ${action} campaign.`); }
     setActionLoading('');
   };
 

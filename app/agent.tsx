@@ -52,7 +52,7 @@ export default function AgentScreen() {
         if (personal) {
           setAgentId(personal.id);
           setName(personal.name || stored?.agent_name || 'Agent');
-          setSystemPrompt(personal.ai_system_prompt || personal.aiSystemPrompt || DEFAULT_SYSTEM_PROMPT);
+          setSystemPrompt((personal as any).ai_system_prompt || (personal as any).aiSystemPrompt || DEFAULT_SYSTEM_PROMPT);
         } else {
           setName(stored?.agent_name || 'Agent');
           setSystemPrompt(DEFAULT_SYSTEM_PROMPT);

@@ -43,11 +43,10 @@ export default function BillingScreen() {
     try {
       const returnUrl = Platform.OS === 'web' ? window.location.href : 'minds://billing';
       const result = await sdk.billing.createPortalSession({
-        owner_type: 'organization',
         owner_id: ORG_ID,
         return_url: returnUrl,
-      });
-      const url = result?.url || result;
+      } as any);
+      const url = (result as any)?.data?.url || (result as any)?.url || result;
       if (url && typeof url === 'string') {
         if (Platform.OS === 'web') window.open(url, '_blank');
         else Linking.openURL(url);
