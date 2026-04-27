@@ -516,7 +516,24 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </NSFWOverlay>
       ) : (
         <View>
-          {renderMarkdownContent()}
+          {/* Agent-curated posts: the body text IS the agent's take on
+              the source. Wrap it in a subtle accent-bordered callout so
+              it reads like commentary, not the source's content. */}
+          {isAgentCurated && content.trim().length > 0 ? (
+            <View
+              style={{
+                borderLeftWidth: 2,
+                borderLeftColor: colors.accent,
+                paddingLeft: spacing.md,
+                paddingVertical: spacing.xs,
+                marginBottom: spacing.sm,
+              }}
+            >
+              {renderMarkdownContent()}
+            </View>
+          ) : (
+            renderMarkdownContent()
+          )}
           <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
           <LinkPreview content={content} />
         </View>

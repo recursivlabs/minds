@@ -39,9 +39,9 @@ export const TabBar = React.memo(function TabBar({ tabs, active, onChange, scrol
             })}
           >
             <Text
-              variant="caption"
+              variant={isActive ? 'bodyMedium' : 'body'}
               color={isActive ? colors.accent : colors.textMuted}
-              style={{ fontSize: 13 }}
+              style={{ fontSize: 15 }}
             >
               {label}
             </Text>

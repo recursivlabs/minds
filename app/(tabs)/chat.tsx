@@ -27,6 +27,35 @@ export default function ChatScreen() {
     }
   }, [params.id]);
 
+  // Conversation-list live updates. The active-conversation view already
+  // subscribes to realtime for its own messages, but the LIST view used
+  // to be poll-only — so previews / unread badges didn't move until you
+  // pulled to refresh. Subscribe globally here so every incoming message
+  // bumps the list immediately.
+  React.useEffect(() => {
+    if (!sdk) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        if (cancelled) return;
+        unsub = sdk.realtime.onMessage(() => {
+          // Cheap path: re-fetch the conversations list so previews +
+          // unread counts reflect the latest message. The list query is
+          // cached so this is fast.
+          refresh();
+        });
+      } catch {
+        // Realtime unavailable; fall back to refresh-on-focus behavior.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }, [sdk]);
+
   // Ensure the user has a DM with their personal agent. Idempotent —
   // chat.dm() is get-or-create. Runs on first chat-tab mount; if the
   // user signed up before we wired the building-screen seed, this back-
@@ -605,6 +634,59 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Slash-command suggestions — only shown in agent conversations
+          when the user has typed "/" at the start. The commands route to
+          natural-language prompt prefixes the agent can handle today.
+          Real first-class actions (true /save, /find with structured
+          handlers) are next-session work. */}
+      {(() => {
+        const isAgent = partnerInfo?.isAi || partnerInfo?.is_ai
+          || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
+          || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
+        if (!isAgent) return null;
+        if (!text.startsWith('/')) return null;
+        const COMMANDS: { name: string; hint: string; prompt: string }[] = [
+          { name: '/find', hint: 'Find anything you\'ve seen before or want to know about', prompt: '/find ' },
+          { name: '/summarize', hint: 'Summarize a URL, article, or recent thread', prompt: '/summarize ' },
+          { name: '/save', hint: 'Save the last thing you sent for later', prompt: '/save ' },
+          { name: '/today', hint: 'What did your agent find for you today', prompt: '/today' },
+          { name: '/read', hint: 'Read me my morning brief', prompt: '/read' },
+        ];
+        const q = text.slice(1).toLowerCase();
+        const filtered = q.length === 0 ? COMMANDS : COMMANDS.filter(c => c.name.slice(1).startsWith(q));
+        if (filtered.length === 0) return null;
+        return (
+          <View style={{
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.xs,
+            borderTopWidth: 0.5,
+            borderTopColor: colors.borderSubtle,
+            backgroundColor: colors.surface,
+            gap: 2,
+          }}>
+            {filtered.map((cmd) => (
+              <Pressable
+                key={cmd.name}
+                onPress={() => setText(cmd.prompt)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.md,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.sm,
+                  backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                })}
+              >
+                <Text variant="bodyMedium" color={colors.accent} style={{ minWidth: 84 }}>{cmd.name}</Text>
+                <Text variant="caption" color={colors.textMuted} style={{ flex: 1 }} numberOfLines={1}>{cmd.hint}</Text>
+              </Pressable>
+            ))}
+          </View>
+        );
+      })()}
 
       {/* Input */}
       <View

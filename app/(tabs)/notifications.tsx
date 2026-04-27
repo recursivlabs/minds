@@ -7,6 +7,8 @@ import { Text, Avatar, Skeleton } from '../../components';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
+import { loadLastCuratedAt } from '../../lib/onboarding';
+import { getPreference } from '../../lib/preferences';
 import { colors, spacing } from '../../constants/theme';
 
 function timeAgo(dateStr: string): string {
@@ -29,7 +31,37 @@ export default function NotificationsScreen() {
       if (!sdk) { setLoading(false); return; }
       try {
         const res = await sdk.notifications.list({ limit: 30, organization_id: ORG_ID || undefined });
-        setNotifications(res.data || []);
+        let items = res.data || [];
+
+        // Agent-sourced alerts: synthesise an "agent activity" entry
+        // whenever the local last-curated timestamp is fresh enough to
+        // be worth surfacing (≤ 7 days). This is purely client-side
+        // for now — when the platform ships agent-emitted notifications
+        // server-side, swap this out for a real subscription. Skipped
+        // entirely when the user has flipped off AI in Settings.
+        if (getPreference('aiEnabled')) {
+          const lastCurated = await loadLastCuratedAt();
+          if (lastCurated && Date.now() - lastCurated < 7 * 86_400_000) {
+            items = [
+              ({
+                id: `agent-curated-${lastCurated}`,
+                _agentSourced: true,
+                title: 'Your agent updated your feed',
+                body: 'Pull to refresh your For You for the latest takes.',
+                targetType: 'agent',
+                target_type: 'agent',
+                actionUrl: '/(tabs)',
+                action_url: '/(tabs)',
+                createdAt: new Date(lastCurated).toISOString(),
+                created_at: new Date(lastCurated).toISOString(),
+                status: 'unread',
+              } as any),
+              ...items,
+            ];
+          }
+        }
+
+        setNotifications(items);
       } catch {}
       finally { setLoading(false); }
     })();
@@ -110,10 +142,15 @@ export default function NotificationsScreen() {
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
   const getIcon = (type: string): string => {
-    if (type?.includes('reply') || type?.includes('comment')) return 'chatbubble';
-    if (type?.includes('follow')) return 'person-add';
-    if (type?.includes('reaction') || type?.includes('vote')) return 'heart';
-    if (type?.includes('mention')) return 'at';
+    const t = (type || '').toLowerCase();
+    if (t.includes('mention')) return 'at';
+    if (t.includes('reply') || t.includes('comment')) return 'chatbubble';
+    if (t.includes('follow')) return 'person-add';
+    if (t.includes('repost') || t.includes('reshare')) return 'repeat';
+    if (t.includes('like') || t.includes('reaction') || t.includes('vote')) return 'heart';
+    if (t.includes('community')) return 'people';
+    if (t.includes('message') || t.includes('chat') || t.includes('dm')) return 'mail';
+    if (t.includes('agent') || t.includes('curator')) return 'sparkles';
     return 'notifications';
   };
 
@@ -167,12 +204,26 @@ export default function NotificationsScreen() {
                 paddingHorizontal: spacing.xl,
                 paddingVertical: spacing.lg,
                 backgroundColor: pressed ? colors.surfaceHover
+                  : item._agentSourced ? 'rgba(212,168,68,0.06)'
                   : item.status === 'unread' ? 'rgba(212,168,68,0.03)' : 'transparent',
                 borderBottomWidth: 0.5,
                 borderBottomColor: colors.borderSubtle,
               })}
             >
-              {item.imageUrl || item.image_url ? (
+              {item._agentSourced ? (
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: colors.accent,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="sparkles" size={16} color="#fff" />
+                </View>
+              ) : item.imageUrl || item.image_url ? (
                 <Avatar uri={item.imageUrl || item.image_url} name={item.title} size="md" />
               ) : (
                 <View
