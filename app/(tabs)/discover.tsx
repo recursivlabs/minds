@@ -74,10 +74,30 @@ function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; on
             {bio}
           </Text>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
-          {followerCount > 0 && <Text variant="caption" color={colors.textMuted}>{followerCount} follower{followerCount !== 1 ? 's' : ''}</Text>}
-          {(person.postCount || person.post_count) ? <Text variant="caption" color={colors.textMuted}>· {person.postCount || person.post_count} posts</Text> : null}
-          {(person.createdAt || person.created_at) && <Text variant="caption" color={colors.textMuted}>· Joined {timeAgoShort(person.createdAt || person.created_at)}</Text>}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          {followerCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="people-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{followerCount.toLocaleString()}</Text>
+            </View>
+          )}
+          {(person.postCount || person.post_count) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="newspaper-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{(person.postCount || person.post_count).toLocaleString()}</Text>
+            </View>
+          ) : null}
+          {(person.createdAt || person.created_at) && (() => {
+            const joined = new Date(person.createdAt || person.created_at).getTime();
+            const newish = Date.now() - joined < 7 * 86_400_000;
+            return newish ? (
+              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: 4 }}>
+                <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>NEW</Text>
+              </View>
+            ) : (
+              <Text variant="caption" color={colors.textMuted}>Joined {timeAgoShort(person.createdAt || person.created_at)}</Text>
+            );
+          })()}
         </View>
       </View>
     </Pressable>
@@ -130,10 +150,25 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
             {description}
           </Text>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
-          <Text variant="caption" color={colors.textMuted}>{memberCount} member{memberCount !== 1 ? 's' : ''}</Text>
-          {postCount > 0 && <Text variant="caption" color={colors.textMuted}>· {postCount} post{postCount !== 1 ? 's' : ''}</Text>}
-          {createdAt && <Text variant="caption" color={colors.textMuted}>· Created {timeAgoShort(createdAt)}</Text>}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="people-outline" size={11} color={colors.textMuted} />
+            <Text variant="caption" color={colors.textMuted}>{memberCount.toLocaleString()}</Text>
+          </View>
+          {postCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="newspaper-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
+            </View>
+          )}
+          {/* Heuristic "active" badge: communities with >50 posts are
+              flagged as active. Tighter signal would come from a
+              recent-activity field on the server. */}
+          {postCount >= 50 && (
+            <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: 4 }}>
+              <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>ACTIVE</Text>
+            </View>
+          )}
         </View>
       </View>
     </Pressable>

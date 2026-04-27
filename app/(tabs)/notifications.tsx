@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { View, FlatList, Pressable } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -200,7 +201,33 @@ export default function NotificationsScreen() {
             // agent-sourced, DMs) get full padding + emphasis; low-signal
             // (likes/reactions) collapse to a slimmer row.
             const highSignal = item._agentSourced || t.includes('mention') || t.includes('reply') || t.includes('comment') || t.includes('message') || t.includes('dm');
+
+            // Swipe-left → dismiss. Optimistic UI: remove from list
+            // immediately, mark-as-read on the server in the background
+            // (best-effort).
+            const renderRightAction = () => (
+              <View style={{
+                width: 80,
+                backgroundColor: colors.error || '#ef4444',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="close-circle" size={22} color="#fff" />
+              </View>
+            );
+            const handleDismiss = () => {
+              setNotifications(prev => prev.filter(n => n.id !== item.id));
+              if (sdk && item.id && item.status === 'unread' && !item._agentSourced) {
+                sdk.notifications.markAsRead(item.id).catch(() => {});
+              }
+            };
+
             return (
+            <Swipeable
+              renderRightActions={renderRightAction}
+              onSwipeableRightOpen={handleDismiss}
+              overshootRight={false}
+            >
             <Pressable
               onPress={() => handlePress(item)}
               style={({ pressed }) => ({
@@ -266,6 +293,7 @@ export default function NotificationsScreen() {
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
               )}
             </Pressable>
+            </Swipeable>
             );
           }}
           ListEmptyComponent={null}

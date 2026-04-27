@@ -516,26 +516,36 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </NSFWOverlay>
       ) : (
         <View>
-          {/* Agent-curated posts: the body text IS the agent's take on
-              the source. Wrap it in a subtle accent-bordered callout so
-              it reads like commentary, not the source's content. */}
-          {isAgentCurated && content.trim().length > 0 ? (
-            <View
-              style={{
-                borderLeftWidth: 2,
-                borderLeftColor: colors.accent,
-                paddingLeft: spacing.md,
-                paddingVertical: spacing.xs,
-                marginBottom: spacing.sm,
-              }}
-            >
-              {renderMarkdownContent()}
-            </View>
+          {/* Agent-curated posts: hero-image-first layout.
+              LinkPreview renders the source's OG image full-width at
+              the top so the visual dominates; agent's commentary lives
+              underneath as a quoted callout. Public/user posts keep
+              the legacy order (text → media → preview). */}
+          {isAgentCurated ? (
+            <>
+              <LinkPreview url={externalUrl} content={content} />
+              {content.trim().length > 0 && (
+                <View
+                  style={{
+                    borderLeftWidth: 2,
+                    borderLeftColor: colors.accent,
+                    paddingLeft: spacing.md,
+                    paddingVertical: spacing.xs,
+                    marginTop: spacing.md,
+                  }}
+                >
+                  {renderMarkdownContent()}
+                </View>
+              )}
+              <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
+            </>
           ) : (
-            renderMarkdownContent()
+            <>
+              {renderMarkdownContent()}
+              <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
+              <LinkPreview content={content} />
+            </>
           )}
-          <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
-          <LinkPreview content={content} />
         </View>
       )}
 

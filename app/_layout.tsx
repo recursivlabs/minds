@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Slot, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -67,23 +68,25 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider>
-      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        <ErrorBoundary>
-          <ThemeProvider>
-            <ProjectProvider>
-              <AuthProvider>
-                <ToastProvider>
-                  <NotificationWiring />
-                  <NetworkBanner />
-                  <StatusBar style="light" />
-                  <Slot />
-                </ToastProvider>
-              </AuthProvider>
-            </ProjectProvider>
-          </ThemeProvider>
-        </ErrorBoundary>
-      </View>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+          <ErrorBoundary>
+            <ThemeProvider>
+              <ProjectProvider>
+                <AuthProvider>
+                  <ToastProvider>
+                    <NotificationWiring />
+                    <NetworkBanner />
+                    <StatusBar style="light" />
+                    <Slot />
+                  </ToastProvider>
+                </AuthProvider>
+              </ProjectProvider>
+            </ThemeProvider>
+          </ErrorBoundary>
+        </View>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

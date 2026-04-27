@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header, FeedTabs, PostCard, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
@@ -49,6 +50,29 @@ export default function FeedScreen() {
     trending: 'score',
   } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
+
+  // Horizontal-swipe nav between feed filters. Pan past 60px without
+  // significant vertical drift cycles to the next/previous tab. Vertical
+  // scrolling on the FlatList is unaffected because Pan only activates
+  // when the gesture's horizontal motion clearly dominates.
+  const FEED_TAB_ORDER: FeedTab[] = ['foryou', 'trending', 'latest', 'following'];
+  const swipeGesture = React.useMemo(
+    () => Gesture.Pan()
+      .activeOffsetX([-15, 15])
+      .failOffsetY([-12, 12])
+      .onEnd((evt) => {
+        const dx = evt.translationX;
+        if (Math.abs(dx) < 60) return;
+        const idx = FEED_TAB_ORDER.indexOf(activeTab);
+        if (idx < 0) return;
+        const nextIdx = dx < 0 ? idx + 1 : idx - 1;
+        if (nextIdx < 0 || nextIdx >= FEED_TAB_ORDER.length) return;
+        // setActiveTab needs to run on the JS thread.
+        setActiveTab(FEED_TAB_ORDER[nextIdx]);
+      })
+      .runOnJS(true),
+    [activeTab],
+  );
 
   // Fresh-since-last-visit: track when the user last opened the feed,
   // then count posts created since that moment for a small "new
@@ -225,7 +249,9 @@ export default function FeedScreen() {
           <View style={{ width: 340 }}><FeedSidebar /></View>
         </View>
       ) : (
-        feedContent
+        <GestureDetector gesture={swipeGesture}>
+          <View style={{ flex: 1 }}>{feedContent}</View>
+        </GestureDetector>
       )}
 
     </Container>
