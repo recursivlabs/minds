@@ -138,14 +138,15 @@ export default function SettingsScreen() {
         sdk.settings.listSessions().catch(() => []),
         sdk.settings.getLoginHistory({ limit: 10 }).catch(() => []),
       ]);
-      if (prefs?.privacy) {
+      const privacyData = (prefs as any)?.data?.privacy ?? (prefs as any)?.privacy;
+      if (privacyData) {
         setPrivacy({
-          profilePublic: prefs.privacy.profilePublic ?? true,
-          showEmail: prefs.privacy.showEmail ?? false,
+          profilePublic: privacyData.profilePublic ?? true,
+          showEmail: privacyData.showEmail ?? false,
         });
       }
-      setSessions(Array.isArray(sess) ? sess : sess?.sessions || []);
-      setLoginHistory(Array.isArray(history) ? history : history?.entries || []);
+      setSessions((sess as any)?.data || []);
+      setLoginHistory((history as any)?.data || []);
     } catch {}
     setLoading(false);
   }, [sdk]);
@@ -193,7 +194,7 @@ export default function SettingsScreen() {
       await sdk.settings.updatePrivacy({
         profile_public: updated.profilePublic,
         show_email: updated.showEmail,
-      });
+      } as any);
     } catch { setPrivacy(privacy); showMsg('Failed to update privacy.', true); }
   };
 
@@ -326,6 +327,25 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title="AI">
+          <View style={{ paddingVertical: spacing.xs }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, paddingRight: spacing.lg }}>
+                <Text variant="body">Use my personal AI agent</Text>
+                <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, lineHeight: 18 }}>
+                  Off: clean Minds with no AI mediation. For You falls back to chronological. Agent hidden from chat. You can still post, follow, comment, and DM.
+                </Text>
+              </View>
+              <Switch
+                value={getPreference('aiEnabled')}
+                onValueChange={v => { setPreference('aiEnabled', v); }}
+                trackColor={{ true: colors.accent, false: colors.glass }}
+                thumbColor={colors.text}
+              />
+            </View>
+          </View>
+        </Section>
+
         <Section title="Notifications">
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Replies to my posts</Text>
@@ -362,8 +382,9 @@ export default function SettingsScreen() {
             onPress={async () => {
               if (!sdk) return;
               try {
-                const [profileRes, postsRes, followingRes] = await Promise.all([
-                  sdk.profiles.me().catch(() => null),
+                // First fetch profile, then use its id for following.
+                const profileRes = await sdk.profiles.me().catch(() => null);
+                const [postsRes, followingRes] = await Promise.all([
                   sdk.posts.list({ limit: 200, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
                   sdk.profiles.following(profileRes?.data?.id || '', { limit: 500 }).catch(() => ({ data: [] })),
                 ]);

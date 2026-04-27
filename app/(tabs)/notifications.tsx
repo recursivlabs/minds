@@ -1,11 +1,15 @@
 import * as React from 'react';
 import { View, FlatList, Pressable } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton } from '../../components';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { ORG_ID } from '../../lib/recursiv';
+import { loadLastCuratedAt } from '../../lib/onboarding';
+import { getPreference } from '../../lib/preferences';
 import { colors, spacing } from '../../constants/theme';
 
 function timeAgo(dateStr: string): string {
@@ -27,12 +31,78 @@ export default function NotificationsScreen() {
     (async () => {
       if (!sdk) { setLoading(false); return; }
       try {
-        const res = await sdk.notifications.list({ limit: 30 });
-        setNotifications(res.data || []);
+        const res = await sdk.notifications.list({ limit: 30, organization_id: ORG_ID || undefined });
+        let items = res.data || [];
+
+        // Agent-sourced alerts: synthesise an "agent activity" entry
+        // whenever the local last-curated timestamp is fresh enough to
+        // be worth surfacing (≤ 7 days). This is purely client-side
+        // for now — when the platform ships agent-emitted notifications
+        // server-side, swap this out for a real subscription. Skipped
+        // entirely when the user has flipped off AI in Settings.
+        if (getPreference('aiEnabled')) {
+          const lastCurated = await loadLastCuratedAt();
+          if (lastCurated && Date.now() - lastCurated < 7 * 86_400_000) {
+            items = [
+              ({
+                id: `agent-curated-${lastCurated}`,
+                _agentSourced: true,
+                title: 'Your agent updated your feed',
+                body: 'Pull to refresh your For You for the latest takes.',
+                targetType: 'agent',
+                target_type: 'agent',
+                actionUrl: '/(tabs)',
+                action_url: '/(tabs)',
+                createdAt: new Date(lastCurated).toISOString(),
+                created_at: new Date(lastCurated).toISOString(),
+                status: 'unread',
+              } as any),
+              ...items,
+            ];
+          }
+        }
+
+        setNotifications(items);
       } catch {}
       finally { setLoading(false); }
     })();
   }, [sdk]);
+
+  // Group similar notifications targeting the same post / user within
+  // the last 24h so the list reads "Sarah and 2 others reacted" instead
+  // of three separate rows. Reduces visual noise and matches what good
+  // notification surfaces (Instagram, X) ship.
+  const groupedNotifications = React.useMemo(() => {
+    const buckets = new Map<string, any[]>();
+    const result: any[] = [];
+    const DAY = 24 * 3600 * 1000;
+    for (const n of notifications) {
+      const key = `${n.targetType || n.target_type}-${n.targetId || n.target_id}`;
+      const ts = new Date(n.createdAt || n.created_at || 0).getTime();
+      if (Date.now() - ts < DAY && (n.targetType || n.target_type) && (n.targetId || n.target_id)) {
+        const arr = buckets.get(key) || [];
+        arr.push(n);
+        buckets.set(key, arr);
+      } else {
+        result.push(n);
+      }
+    }
+    for (const [, arr] of buckets) {
+      if (arr.length === 1) {
+        result.push(arr[0]);
+      } else {
+        const newest = arr[0];
+        result.push({
+          ...newest,
+          _groupedCount: arr.length,
+          _groupedTitle: newest.title ? `${newest.title} and ${arr.length - 1} other${arr.length - 1 !== 1 ? 's' : ''}` : `${arr.length} new ${arr.length === 1 ? 'notification' : 'notifications'}`,
+        });
+      }
+    }
+    // Sort newest first
+    result.sort((a, b) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime());
+    return result;
+  }, [notifications]);
 
   const handlePress = (notif: any) => {
     // Mark as read
@@ -73,10 +143,15 @@ export default function NotificationsScreen() {
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
   const getIcon = (type: string): string => {
-    if (type?.includes('reply') || type?.includes('comment')) return 'chatbubble';
-    if (type?.includes('follow')) return 'person-add';
-    if (type?.includes('reaction') || type?.includes('vote')) return 'heart';
-    if (type?.includes('mention')) return 'at';
+    const t = (type || '').toLowerCase();
+    if (t.includes('mention')) return 'at';
+    if (t.includes('reply') || t.includes('comment')) return 'chatbubble';
+    if (t.includes('follow')) return 'person-add';
+    if (t.includes('repost') || t.includes('reshare')) return 'repeat';
+    if (t.includes('like') || t.includes('reaction') || t.includes('vote')) return 'heart';
+    if (t.includes('community')) return 'people';
+    if (t.includes('message') || t.includes('chat') || t.includes('dm')) return 'mail';
+    if (t.includes('agent') || t.includes('curator')) return 'sparkles';
     return 'notifications';
   };
 
@@ -118,9 +193,41 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={groupedNotifications}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            const t = (item.targetType || item.target_type || '').toLowerCase();
+            // Visual hierarchy: high-signal alerts (mentions, replies,
+            // agent-sourced, DMs) get full padding + emphasis; low-signal
+            // (likes/reactions) collapse to a slimmer row.
+            const highSignal = item._agentSourced || t.includes('mention') || t.includes('reply') || t.includes('comment') || t.includes('message') || t.includes('dm');
+
+            // Swipe-left → dismiss. Optimistic UI: remove from list
+            // immediately, mark-as-read on the server in the background
+            // (best-effort).
+            const renderRightAction = () => (
+              <View style={{
+                width: 80,
+                backgroundColor: colors.error || '#ef4444',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="close-circle" size={22} color="#fff" />
+              </View>
+            );
+            const handleDismiss = () => {
+              setNotifications(prev => prev.filter(n => n.id !== item.id));
+              if (sdk && item.id && item.status === 'unread' && !item._agentSourced) {
+                sdk.notifications.markAsRead(item.id).catch(() => {});
+              }
+            };
+
+            return (
+            <Swipeable
+              renderRightActions={renderRightAction}
+              onSwipeableRightOpen={handleDismiss}
+              overshootRight={false}
+            >
             <Pressable
               onPress={() => handlePress(item)}
               style={({ pressed }) => ({
@@ -128,14 +235,28 @@ export default function NotificationsScreen() {
                 alignItems: 'center',
                 gap: spacing.md,
                 paddingHorizontal: spacing.xl,
-                paddingVertical: spacing.lg,
+                paddingVertical: highSignal ? spacing.lg : spacing.md,
                 backgroundColor: pressed ? colors.surfaceHover
+                  : item._agentSourced ? 'rgba(212,168,68,0.06)'
                   : item.status === 'unread' ? 'rgba(212,168,68,0.03)' : 'transparent',
                 borderBottomWidth: 0.5,
                 borderBottomColor: colors.borderSubtle,
               })}
             >
-              {item.imageUrl || item.image_url ? (
+              {item._agentSourced ? (
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: colors.accent,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="sparkles" size={16} color="#fff" />
+                </View>
+              ) : item.imageUrl || item.image_url ? (
                 <Avatar uri={item.imageUrl || item.image_url} name={item.title} size="md" />
               ) : (
                 <View
@@ -157,9 +278,9 @@ export default function NotificationsScreen() {
               )}
               <View style={{ flex: 1 }}>
                 <Text variant="body" numberOfLines={2} style={{ fontSize: 14 }}>
-                  {item.title || item.body || 'New notification'}
+                  {item._groupedTitle || item.title || item.body || 'New notification'}
                 </Text>
-                {item.body && item.title && (
+                {item.body && (item._groupedTitle || item.title) && (
                   <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ marginTop: 2 }}>
                     {item.body}
                   </Text>
@@ -172,7 +293,9 @@ export default function NotificationsScreen() {
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
               )}
             </Pressable>
-          )}
+            </Swipeable>
+            );
+          }}
           ListEmptyComponent={null}
           showsVerticalScrollIndicator={false}
         />

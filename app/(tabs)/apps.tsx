@@ -37,7 +37,7 @@ export default function AppsScreen() {
     setLoading(true);
     try {
       const res = await sdk.projects.list({ organization_id: ORG_ID });
-      setProjects(Array.isArray(res) ? res : res?.projects || []);
+      setProjects((res as any)?.data || []);
     } catch { setProjects([]); }
     setLoading(false);
   }, [sdk]);
@@ -64,7 +64,7 @@ export default function AppsScreen() {
         sdk.projects.deployments(id).catch(() => []),
       ]);
       setDetail(p);
-      setDeployments(Array.isArray(d) ? d : d?.deployments || []);
+      setDeployments((d as any)?.data || []);
     } catch { showError('Failed to load app details.'); }
   };
 

@@ -25,21 +25,24 @@ import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
+// Consumer Create surface: Post is the only first-class mode. Community
+// stays as a reachable mode via ?mode=community deep-link from Discover's
+// "+ Start a community" button — but the mode tab bar is hidden. Blog /
+// Agent / App authoring deferred to the Pro-tier upsell email campaign;
+// those branches stay typed only to avoid touching too much during this
+// pass.
 type Mode = 'post' | 'blog' | 'agent' | 'app' | 'community';
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'post', label: 'Post' },
-  { key: 'blog', label: 'Blog' },
-  { key: 'agent', label: 'Agent' },
-  { key: 'app', label: 'App' },
-  { key: 'community', label: 'Community' },
 ];
 
 export default function CreateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string }>();
+  const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string; mode?: string }>();
   const { sdk, user } = useAuth();
-  const [mode, setMode] = React.useState<Mode>('post');
+  const initialMode: Mode = (params.mode === 'community' || params.mode === 'blog' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
+  const [mode, setMode] = React.useState<Mode>(initialMode);
 
   // Restore draft on mount
   const draftRef = React.useRef<string | null>(null);
@@ -59,6 +62,9 @@ export default function CreateScreen() {
 
   // Post state
   const [content, setContent] = React.useState(params.quote || '');
+  const [autosaveFlash, setAutosaveFlash] = React.useState(false);
+  const POST_CHAR_LIMIT = 5000;
+  const charsRemaining = POST_CHAR_LIMIT - content.length;
   const [isNsfw, setIsNsfw] = React.useState(false);
   const [showTags, setShowTags] = React.useState(false);
   const [tags, setTags] = React.useState<string[]>([]);
@@ -75,6 +81,23 @@ export default function CreateScreen() {
   // the Create screen across navigations, so the initial useState above only
   // applies on first mount — subsequent "Create Post" from inside a community
   // wouldn't update the selection otherwise.
+  // Debounced autosave: while the user types, save the draft every
+  // ~1.2s of idle. Flashes a small "Saved" indicator so the user knows
+  // their work is preserved even if they navigate away accidentally.
+  React.useEffect(() => {
+    if (!content.trim()) return;
+    const timer = setTimeout(() => {
+      try {
+        const id = saveDraft(content, selectedCommunity?.id, selectedCommunity?.name);
+        draftRef.current = (id as any) || draftRef.current;
+        setAutosaveFlash(true);
+        const hide = setTimeout(() => setAutosaveFlash(false), 1500);
+        return () => clearTimeout(hide);
+      } catch {}
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [content, selectedCommunity?.id]);
+
   React.useEffect(() => {
     if (params.communityId && selectedCommunity?.id !== params.communityId) {
       setSelectedCommunity({ id: params.communityId, name: params.communityName || 'Community' });
@@ -178,7 +201,11 @@ export default function CreateScreen() {
     setSubmitting(true);
     try {
       if (mode === 'post') {
-        if ((!content.trim() && !mediaUri) || !selectedCommunity) {
+        // Community is optional. Default = global / public timeline,
+        // matching legacy Minds behavior and modern social conventions
+        // (Twitter, TikTok don't require communities). If a community
+        // is selected, post goes there; otherwise it's public.
+        if (!content.trim() && !mediaUri) {
           setSubmitting(false);
           return;
         }
@@ -192,7 +219,7 @@ export default function CreateScreen() {
               content_type: contentType,
               content_length: blob.size,
             });
-            const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+            const uploadUrl = uploadRes.data?.upload_url || (uploadRes.data as any)?.url;
             if (uploadUrl) {
               const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
               if (!putRes.ok) {
@@ -228,7 +255,7 @@ export default function CreateScreen() {
             const blob = await response.blob();
             const contentType = blob.type || 'image/jpeg';
             const uploadRes = await sdk.uploads.getMediaUploadUrl({ content_type: contentType, content_length: blob.size });
-            const uploadUrl = uploadRes.data?.upload_url || uploadRes.data?.url;
+            const uploadUrl = uploadRes.data?.upload_url || (uploadRes.data as any)?.url;
             if (uploadUrl) {
               const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
               if (putRes.ok) blogMediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
@@ -316,8 +343,8 @@ export default function CreateScreen() {
     }
   };
 
-  const canSubmit = mode === 'post' ? ((content.trim().length > 0 || !!mediaUri) && !!selectedCommunity)
-    : mode === 'blog' ? (blogTitle.trim().length > 0 && blogContent.trim().length > 0 && !!selectedCommunity)
+  const canSubmit = mode === 'post' ? (content.trim().length > 0 || !!mediaUri)
+    : mode === 'blog' ? (blogTitle.trim().length > 0 && blogContent.trim().length > 0)
     : mode === 'agent' ? (agentName.trim().length > 0 && agentBio.trim().length > 0)
     : mode === 'app' ? (appName.trim().length > 0 && appDesc.trim().length > 0)
     : (communityName.trim().length > 0 && communityDesc.trim().length > 0);
@@ -354,51 +381,73 @@ export default function CreateScreen() {
           <Text variant="body" color={colors.textSecondary}>Cancel</Text>
         </Pressable>
 
-        <Pressable
-          onPress={handleSubmit}
-          disabled={!canSubmit || submitting}
-          style={{
-            paddingHorizontal: spacing.xl,
-            paddingVertical: spacing.sm,
-            borderRadius: radius.full,
-            backgroundColor: canSubmit ? colors.accent : colors.surfaceHover,
-            opacity: submitting ? 0.6 : 1,
-          }}
-        >
-          {submitting ? (
-            <ActivityIndicator color={colors.textInverse} size="small" />
-          ) : (
-            <Text variant="bodyMedium" color={canSubmit ? colors.textInverse : colors.textMuted}>
-              {submitLabel}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          {/* Autosave indicator + character count, lighting up only
+              when relevant. Saved-flash = 1.5s pulse after debounced
+              save. Char count goes red below 0. */}
+          {autosaveFlash && mode === 'post' && (
+            <Text variant="caption" color={colors.textMuted}>Saved</Text>
+          )}
+          {mode === 'post' && content.length > POST_CHAR_LIMIT - 240 && (
+            <Text
+              variant="caption"
+              color={charsRemaining < 0 ? colors.error : charsRemaining < 60 ? colors.accent : colors.textMuted}
+              style={{ fontVariant: ['tabular-nums'] as any }}
+            >
+              {charsRemaining}
             </Text>
           )}
-        </Pressable>
+          <Pressable
+            onPress={handleSubmit}
+            disabled={!canSubmit || submitting || charsRemaining < 0}
+            style={{
+              paddingHorizontal: spacing.xl,
+              paddingVertical: spacing.sm,
+              borderRadius: radius.full,
+              backgroundColor: (canSubmit && charsRemaining >= 0) ? colors.accent : colors.surfaceHover,
+              opacity: submitting ? 0.6 : 1,
+            }}
+          >
+            {submitting ? (
+              <ActivityIndicator color={colors.textInverse} size="small" />
+            ) : (
+              <Text variant="bodyMedium" color={(canSubmit && charsRemaining >= 0) ? colors.textInverse : colors.textMuted}>
+                {submitLabel}
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </View>
 
-      {/* Mode switcher */}
-      <TabBar tabs={MODES} active={mode} onChange={(k) => setMode(k as Mode)} />
+      {/*
+        Mode switcher hidden on Create. Post is the only first-class mode here.
+        Agent / App / Community creation moved to dedicated routes:
+          - /agent (agent edit/create)
+          - /apps (app catalog)
+          - /communities (community discovery + create)
+        Keep the modes list around so navigation by ?mode= deep-links still
+        works, but don't surface a 5-tab kitchen sink at the top of compose.
+      */}
 
       {/* Content area */}
       {(mode === 'post' || mode === 'blog') ? (
         <View style={{ flex: 1, padding: spacing.xl }}>
-          {/* Community picker */}
+          {/* Community picker — optional. Default audience is global,
+              matching legacy Minds + modern social conventions. */}
           <View style={{ marginBottom: spacing.md, position: 'relative' }}>
-            {!selectedCommunity && content.trim().length > 0 && (
-              <Text variant="caption" color={colors.error} style={{ marginBottom: spacing.xs }}>Choose a community to post in</Text>
-            )}
             <Pressable
               onPress={() => setShowCommunityPicker(!showCommunityPicker)}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
                 paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-                backgroundColor: selectedCommunity ? colors.accentSubtle : (!selectedCommunity && content.trim().length > 0) ? colors.errorMuted : colors.surface,
+                backgroundColor: selectedCommunity ? colors.accentSubtle : colors.surface,
                 borderRadius: radius.full, alignSelf: 'flex-start',
-                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : (!selectedCommunity && content.trim().length > 0) ? colors.error + '40' : colors.glassBorder,
+                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : colors.glassBorder,
               }}
             >
-              <Ionicons name={selectedCommunity ? 'people' : 'add-circle-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
+              <Ionicons name={selectedCommunity ? 'people' : 'globe-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
               <Text variant="caption" color={selectedCommunity ? colors.accent : colors.textMuted} style={{ fontSize: 13 }}>
-                {selectedCommunity ? selectedCommunity.name : 'Choose a community'}
+                {selectedCommunity ? selectedCommunity.name : 'Public · pick a community (optional)'}
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
             </Pressable>
@@ -528,12 +577,12 @@ export default function CreateScreen() {
               paddingTop: mode === 'post' ? 8 : 0,
             }}>
               <TextInput
-                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's on your mind? Use @ to mention people"}
+                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's on your mind?"}
                 placeholderTextColor={colors.textMuted}
                 value={mode === 'blog' ? blogContent : content}
                 onChangeText={mode === 'blog' ? setBlogContent : setContent}
                 multiline
-                autoFocus={mode !== 'blog'}
+                autoFocus={false}
                 onKeyPress={(e: any) => {
                   if (mode !== 'blog' && Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
                     e.preventDefault();

@@ -7,6 +7,7 @@ import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
+import { getPreference } from '../../lib/preferences';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 import { getCached, setCache } from '../../lib/cache';
 
@@ -25,6 +26,67 @@ export default function ChatScreen() {
       setActiveConvoId(params.id);
     }
   }, [params.id]);
+
+  // Conversation-list live updates. The active-conversation view already
+  // subscribes to realtime for its own messages, but the LIST view used
+  // to be poll-only — so previews / unread badges didn't move until you
+  // pulled to refresh. Subscribe globally here so every incoming message
+  // bumps the list immediately.
+  React.useEffect(() => {
+    if (!sdk) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        if (cancelled) return;
+        unsub = sdk.realtime.onMessage(() => {
+          // Cheap path: re-fetch the conversations list so previews +
+          // unread counts reflect the latest message. The list query is
+          // cached so this is fast.
+          refresh();
+        });
+      } catch {
+        // Realtime unavailable; fall back to refresh-on-focus behavior.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }, [sdk]);
+
+  // Ensure the user has a DM with their personal agent. Idempotent —
+  // chat.dm() is get-or-create. Runs on first chat-tab mount; if the
+  // user signed up before we wired the building-screen seed, this back-
+  // fills the missing conversation so the agent appears in the list.
+  // When the conversation is fresh (created=true), the agent posts a
+  // welcome via chat.sendAsAgent so the chat list isn't empty on first
+  // open. Skipped entirely when the user has flipped off AI in Settings.
+  React.useEffect(() => {
+    if (!sdk) return;
+    if (!getPreference('aiEnabled')) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await sdk.agents.list({ limit: 50 });
+        const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
+        if (!personal || cancelled) return;
+        await sdk.chat.dm({ user_id: personal.id });
+        if (cancelled) return;
+        // The agent's actual welcome message is composed by the
+        // curator's post_brief_to during onboarding/refresh — that's
+        // a richer message than a hardcoded greeting and references
+        // the items the agent just curated. Backfilling this DM here
+        // is just to ensure the conversation exists in the chat list.
+        // Refresh the conversation list to surface the freshly-created DM.
+        refresh();
+      } catch {
+        // Backfill blip is non-fatal.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk]);
 
   if (activeConvoId) {
     return (
@@ -196,7 +258,17 @@ export default function ChatScreen() {
                     </View>
                     {time ? (
                       <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
-                        {new Date(time).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        {(() => {
+                          // iMessage-style relative time: now / 5m / 2h /
+                          // Wed (this week) / Apr 21 (older).
+                          const t = new Date(time);
+                          const diff = Math.floor((Date.now() - t.getTime()) / 1000);
+                          if (diff < 60) return 'now';
+                          if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+                          if (diff < 86_400) return `${Math.floor(diff / 3600)}h`;
+                          if (diff < 7 * 86_400) return t.toLocaleDateString([], { weekday: 'short' });
+                          return t.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                        })()}
                       </Text>
                     ) : null}
                   </View>
@@ -474,7 +546,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             try {
               const agentRes = await sdk.agents.chat(otherId, { message: messageText });
               const agentData = agentRes?.data || agentRes;
-              const reply = agentData?.content || agentData?.message || agentData?.response || (typeof agentData === 'string' ? agentData : null);
+              const reply = (agentData as any)?.content || (agentData as any)?.message || (agentData as any)?.response || (typeof agentData === 'string' ? agentData : null);
               if (reply) {
                 setMessages(prev => [...prev, {
                   id: 'agent-' + Date.now(),
@@ -568,6 +640,59 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Slash-command suggestions — only shown in agent conversations
+          when the user has typed "/" at the start. The commands route to
+          natural-language prompt prefixes the agent can handle today.
+          Real first-class actions (true /save, /find with structured
+          handlers) are next-session work. */}
+      {(() => {
+        const isAgent = partnerInfo?.isAi || partnerInfo?.is_ai
+          || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
+          || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
+        if (!isAgent) return null;
+        if (!text.startsWith('/')) return null;
+        const COMMANDS: { name: string; hint: string; prompt: string }[] = [
+          { name: '/find', hint: 'Find anything you\'ve seen before or want to know about', prompt: '/find ' },
+          { name: '/summarize', hint: 'Summarize a URL, article, or recent thread', prompt: '/summarize ' },
+          { name: '/save', hint: 'Save the last thing you sent for later', prompt: '/save ' },
+          { name: '/today', hint: 'What did your agent find for you today', prompt: '/today' },
+          { name: '/read', hint: 'Read me my morning brief', prompt: '/read' },
+        ];
+        const q = text.slice(1).toLowerCase();
+        const filtered = q.length === 0 ? COMMANDS : COMMANDS.filter(c => c.name.slice(1).startsWith(q));
+        if (filtered.length === 0) return null;
+        return (
+          <View style={{
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.xs,
+            borderTopWidth: 0.5,
+            borderTopColor: colors.borderSubtle,
+            backgroundColor: colors.surface,
+            gap: 2,
+          }}>
+            {filtered.map((cmd) => (
+              <Pressable
+                key={cmd.name}
+                onPress={() => setText(cmd.prompt)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.md,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.sm,
+                  backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                })}
+              >
+                <Text variant="bodyMedium" color={colors.accent} style={{ minWidth: 84 }}>{cmd.name}</Text>
+                <Text variant="caption" color={colors.textMuted} style={{ flex: 1 }} numberOfLines={1}>{cmd.hint}</Text>
+              </Pressable>
+            ))}
+          </View>
+        );
+      })()}
 
       {/* Input */}
       <View

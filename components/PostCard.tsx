@@ -60,6 +60,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const bookmarkedId = (post.reposted_from || post.repostedFrom)?.id || post.id;
   const [saved, setSaved] = React.useState(isBookmarked(bookmarkedId));
 
+  // Repost-by-me toggle: tracks the id of the viewer's own repost of
+  // this original (if any) so they can undo it. In-memory only — after
+  // a reload, the server-side `viewer_reposted_id` flag (TBD) will
+  // restore this. For now the toggle works within the session.
+  const [myRepostId, setMyRepostId] = React.useState<string | null>(null);
+
   // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {
     setCurrentContent(post.content || post.body || '');
@@ -91,7 +97,64 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const authorName = author.name || author.username || 'Anonymous';
   const authorUsername = author.username || author.id || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
-  const content = repostedFrom ? (displayPost.content || '') : (currentContent || '');
+
+  // For agent-curated posts (author is the user's personal AI agent +
+  // there's an external_url), the visual byline should be the SOURCE
+  // (Anthropic, NYT, ESPN) rather than the agent — otherwise every
+  // single post in the feed reads "M · M · M". The agent's voice still
+  // appears in the body content.
+  const isAgentCurated = !!(author.isAi || author.is_ai) && !!(displayPost.external_url || displayPost.externalUrl);
+  const externalUrlForByline = displayPost.external_url || displayPost.externalUrl || '';
+  const sourceFromUrl = (() => {
+    if (!externalUrlForByline) return null;
+    try {
+      const host = new URL(externalUrlForByline).hostname.replace(/^www\./, '');
+      // Prettify common patterns: "anthropic.com" → "Anthropic", "news.ycombinator.com" → "Hacker News"
+      const parts = host.split('.');
+      const root = parts.length >= 2 ? parts[parts.length - 2] : host;
+      const known: Record<string, string> = {
+        ycombinator: 'Hacker News',
+        nytimes: 'NYT',
+        wsj: 'WSJ',
+        ft: 'FT',
+        bloomberg: 'Bloomberg',
+        techmeme: 'Techmeme',
+        theverge: 'The Verge',
+        arstechnica: 'Ars Technica',
+        anthropic: 'Anthropic',
+        openai: 'OpenAI',
+        github: 'GitHub',
+        stratechery: 'Stratechery',
+        substack: 'Substack',
+      };
+      return { host, name: known[root] || (root.charAt(0).toUpperCase() + root.slice(1)) };
+    } catch {
+      return null;
+    }
+  })();
+  const bylineName = isAgentCurated && sourceFromUrl ? sourceFromUrl.name : authorName;
+  const bylineFaviconUrl = isAgentCurated && sourceFromUrl
+    ? `https://www.google.com/s2/favicons?domain=${sourceFromUrl.host}&sz=64`
+    : null;
+  const rawContent = repostedFrom ? (displayPost.content || '') : (currentContent || '');
+  const externalUrl: string | undefined = displayPost.external_url || displayPost.externalUrl;
+  // Strip lines that contain just the external_url — the LinkPreview
+  // card already shows it, so it's noise in the body. Tolerates minor
+  // whitespace differences and trailing slashes.
+  const content = externalUrl
+    ? rawContent
+        .split('\n')
+        .filter((line: string) => {
+          const t = line.trim();
+          if (!t) return true;
+          if (t === externalUrl) return false;
+          if (t.replace(/\/+$/, '') === externalUrl.replace(/\/+$/, '')) return false;
+          return true;
+        })
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    : rawContent;
   const rawMedia = displayPost.media;
   const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || displayPost.image || displayPost.thumbnail || null;
   const replyCount = displayPost.replyCount || displayPost.reply_count || displayPost.comments_count || 0;
@@ -336,18 +399,55 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </Pressable>
       )}
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
-      {/* Avatar column */}
-      <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)} style={{ paddingTop: 2 }}>
-        <Avatar uri={authorAvatar} name={authorName} size="sm" />
+      {/* Avatar column — favicon for agent-curated posts (source-led),
+          else the author avatar. */}
+      <Pressable
+        onPress={() => {
+          if (isAgentCurated && externalUrlForByline) {
+            Linking.openURL(externalUrlForByline);
+            return;
+          }
+          router.push(`/(tabs)/user/${authorUsername}` as any);
+        }}
+        style={{ paddingTop: 2 }}
+      >
+        {isAgentCurated && bylineFaviconUrl ? (
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              borderWidth: 0.5,
+              borderColor: colors.borderSubtle,
+            }}
+          >
+            <Image source={{ uri: bylineFaviconUrl }} style={{ width: 20, height: 20 }} />
+          </View>
+        ) : (
+          <Avatar uri={authorAvatar} name={authorName} size="sm" />
+        )}
       </Pressable>
 
       {/* Content column */}
       <View style={{ flex: 1 }}>
-      {/* Author name + badges + time + community */}
+      {/* Source/author byline + time + via-agent attribution */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, flexWrap: 'wrap' }}>
-        <Pressable onPress={() => router.push(`/(tabs)/user/${authorUsername}` as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Text variant="label">{authorName}</Text>
-          {getBadges(author).map(b => <Badge key={b} type={b} size="sm" />)}
+        <Pressable
+          onPress={() => {
+            if (isAgentCurated && externalUrlForByline) {
+              Linking.openURL(externalUrlForByline);
+              return;
+            }
+            router.push(`/(tabs)/user/${authorUsername}` as any);
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
+        >
+          <Text variant="label">{bylineName}</Text>
+          {!isAgentCurated && getBadges(author).map(b => <Badge key={b} type={b} size="sm" />)}
         </Pressable>
         {communityName && (
           <>
@@ -358,6 +458,16 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           </>
         )}
         <Text variant="caption" color={colors.textMuted}>{timeAgo(createdAt)}</Text>
+        {isAgentCurated && (
+          <Pressable
+            onPress={(e: any) => {
+              e?.stopPropagation?.();
+              router.push(`/(tabs)/user/${authorUsername}` as any);
+            }}
+          >
+            <Text variant="caption" color={colors.textMuted}>via {authorName}</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Content */}
@@ -406,9 +516,36 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </NSFWOverlay>
       ) : (
         <View>
-          {renderMarkdownContent()}
-          <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
-          <LinkPreview content={content} />
+          {/* Agent-curated posts: hero-image-first layout.
+              LinkPreview renders the source's OG image full-width at
+              the top so the visual dominates; agent's commentary lives
+              underneath as a quoted callout. Public/user posts keep
+              the legacy order (text → media → preview). */}
+          {isAgentCurated ? (
+            <>
+              <LinkPreview url={externalUrl} content={content} />
+              {content.trim().length > 0 && (
+                <View
+                  style={{
+                    borderLeftWidth: 2,
+                    borderLeftColor: colors.accent,
+                    paddingLeft: spacing.md,
+                    paddingVertical: spacing.xs,
+                    marginTop: spacing.md,
+                  }}
+                >
+                  {renderMarkdownContent()}
+                </View>
+              )}
+              <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
+            </>
+          ) : (
+            <>
+              {renderMarkdownContent()}
+              <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
+              <LinkPreview content={content} />
+            </>
+          )}
         </View>
       )}
 
@@ -467,22 +604,40 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <Pressable
           onPress={(e: any) => {
             e?.stopPropagation?.();
-            // X-style repost: create a post with reposted_from_id pointing at
-            // the original. No content on the repost row — the feed inlines
-            // the original with a "@<reposter> reposted" header.
             if (!sdk) return;
+            // Toggle: if the viewer already reposted this post in the
+            // current session, undo it. Otherwise create the repost.
+            if (myRepostId) {
+              const idToDelete = myRepostId;
+              setMyRepostId(null);
+              sdk.posts.delete(idToDelete)
+                .then(() => toast.show('Repost removed', 'success'))
+                .catch(() => {
+                  setMyRepostId(idToDelete);
+                  toast.show('Could not undo repost', 'error');
+                });
+              return;
+            }
             sdk.posts.create({
               content: '',
               reposted_from_id: actionPostId,
               organization_id: ORG_ID || undefined,
             } as any)
-              .then(() => toast.show('Reposted', 'success'))
+              .then((res: any) => {
+                const newId = res?.data?.id || res?.id;
+                if (newId) setMyRepostId(newId);
+                toast.show('Reposted', 'success');
+              })
               .catch(() => toast.show('Repost failed', 'error'));
           }}
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
         >
-          <Ionicons name="repeat-outline" size={16} color={colors.textMuted} />
+          <Ionicons
+            name={myRepostId ? 'repeat' : 'repeat-outline'}
+            size={16}
+            color={myRepostId ? colors.accent : colors.textMuted}
+          />
         </Pressable>
 
         <Pressable

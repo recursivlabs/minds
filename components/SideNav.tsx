@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
+import { ORG_ID } from '../lib/recursiv';
 import { useTheme } from '../lib/theme';
 import { useConversations, useCommunities } from '../lib/hooks';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
@@ -85,7 +86,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     if (!sdk) return;
     (async () => {
       try {
-        const res = await sdk.notifications.list({ limit: 10 });
+        const res = await sdk.notifications.list({ limit: 10, organization_id: ORG_ID || undefined });
         const notifs = res.data || [];
         setUnreadNotifs(notifs.filter((n: any) => n.status === 'unread').length);
       } catch {}
