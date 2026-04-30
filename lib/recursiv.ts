@@ -10,6 +10,7 @@ export const BASE_ORIGIN = BASE_URL.replace(/\/api\/v1$/, '');
 export const API_KEY = process.env.EXPO_PUBLIC_RECURSIV_API_KEY || '';
 
 export const ORG_ID = process.env.EXPO_PUBLIC_RECURSIV_ORG_ID || '';
+export const PROJECT_ID = process.env.EXPO_PUBLIC_RECURSIV_PROJECT_ID || '';
 
 /**
  * Create an authenticated SDK instance with a per-user API key.
