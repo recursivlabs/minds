@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Recursiv } from '@recursiv/sdk';
-import { BASE_URL, BASE_ORIGIN, ORG_ID, createAuthedSdk } from './recursiv';
+import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
 import { registerPushToken, registerTokenWithServer } from './notifications';
 
@@ -13,11 +13,17 @@ function registerPushTokenBackground(sdk: Recursiv) {
 const KEYS = {
   apiKey: 'minds:api_key',
   user: 'minds:user',
-  orgId: 'minds:org_id',
+  projectId: 'minds:project_id',
   version: 'minds:auth_version',
 };
 
-const AUTH_VERSION = '5'; // bumped: added uploads:read/write scope
+// Bump when scopes change OR when the auth model changes to force re-auth.
+// 5: added uploads:read/write scope (legacy, pre-Project Membership)
+// 6: Project Membership rollout — api keys are now project-scoped (not
+//    org-scoped). Customers become project_members of the Minds app, not
+//    organization_members of the owning Minds org. Bumping forces existing
+//    customers to re-auth so their stored key gets reissued with the new binding.
+const AUTH_VERSION = '6';
 
 const API_KEY_SCOPES = [
   'posts:read', 'posts:write',
@@ -48,7 +54,7 @@ interface User {
 interface AuthContextValue {
   user: User | null;
   sdk: Recursiv | null;
-  orgId: string | null;
+  projectId: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
@@ -67,7 +73,7 @@ const anonSdk = new Recursiv({ apiKey: 'anonymous', baseUrl: BASE_URL, timeout: 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [authedSdk, setAuthedSdk] = React.useState<Recursiv | null>(null);
-  const [orgId, setOrgId] = React.useState<string | null>(null);
+  const [projectId, setProjectId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -80,10 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const [storedApiKey, storedUser, storedOrgId] = await Promise.all([
+        const [storedApiKey, storedUser, storedProjectId] = await Promise.all([
           storage.getItem(KEYS.apiKey),
           storage.getItem(KEYS.user),
-          storage.getItem(KEYS.orgId),
+          storage.getItem(KEYS.projectId),
         ]);
 
         if (storedApiKey && storedUser) {
@@ -101,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           setAuthedSdk(sdk);
           setUser(JSON.parse(storedUser));
-          setOrgId(storedOrgId);
+          setProjectId(storedProjectId);
           registerPushTokenBackground(sdk);
         }
       } catch {
@@ -116,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await Promise.all([
       storage.removeItem(KEYS.apiKey),
       storage.removeItem(KEYS.user),
-      storage.removeItem(KEYS.orgId),
+      storage.removeItem(KEYS.projectId),
       storage.removeItem(KEYS.version),
     ]).catch(() => {});
   }
@@ -126,12 +132,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await Promise.all([
       storage.setItem(KEYS.apiKey, apiKey),
       storage.setItem(KEYS.user, JSON.stringify(authUser)),
-      storage.setItem(KEYS.orgId, ORG_ID),
+      storage.setItem(KEYS.projectId, PROJECT_ID),
       storage.setItem(KEYS.version, AUTH_VERSION),
     ]);
     setAuthedSdk(sdk);
     setUser(authUser);
-    setOrgId(ORG_ID);
+    setProjectId(PROJECT_ID);
   }
 
   const refreshUser = React.useCallback(async () => {
@@ -170,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyOtp = React.useCallback(async (email: string, otp: string) => {
     const result = await anonSdk.auth.verifyOtpAndCreateKey(
       { email, otp },
-      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], organizationId: ORG_ID },
+      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
     );
 
     await persistSession(result.apiKey, {
@@ -186,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = React.useCallback(async (name: string, email: string, password: string) => {
     const result = await anonSdk.auth.signUpAndCreateKey(
       { name, email, password },
-      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], organizationId: ORG_ID },
+      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
     );
 
     await persistSession(result.apiKey, {
@@ -202,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = React.useCallback(async (email: string, password: string) => {
     const result = await anonSdk.auth.signInAndCreateKey(
       { email, password },
-      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], organizationId: ORG_ID },
+      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
     );
 
     await persistSession(result.apiKey, {
@@ -219,14 +225,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearStorage();
     setUser(null);
     setAuthedSdk(null);
-    setOrgId(null);
+    setProjectId(null);
   }, []);
 
   const value = React.useMemo(
     () => ({
       user,
       sdk: authedSdk,
-      orgId,
+      projectId,
       isLoading,
       isAuthenticated: !!user,
       refreshUser,
@@ -236,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signOut,
     }),
-    [user, authedSdk, orgId, isLoading, refreshUser, sendOtp, verifyOtp, signUp, signIn, signOut],
+    [user, authedSdk, projectId, isLoading, refreshUser, sendOtp, verifyOtp, signUp, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
