@@ -116,7 +116,7 @@ function TwoFactorSetup() {
 export default function SettingsScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
-  const { mode: themeMode, toggle: toggleTheme } = useTheme();
+  const { mode: themeMode, setMode: setThemeMode, colors: themedColors } = useTheme();
 
   const [loading, setLoading] = React.useState(true);
   const [sessions, setSessions] = React.useState<any[]>([]);
@@ -290,18 +290,26 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Appearance">
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Dark mode</Text>
-            <Switch
-              value={themeMode === 'dark'}
-              onValueChange={toggleTheme}
-              trackColor={{ true: colors.accent, false: colors.glass }}
-              thumbColor={colors.text}
-            />
+          <View style={{ paddingVertical: spacing.xs, gap: spacing.sm }}>
+            <Text variant="body">Theme</Text>
+            <View style={{ flexDirection: 'row', backgroundColor: themedColors.glass, borderRadius: radius.md, padding: 2, borderWidth: 0.5, borderColor: themedColors.borderSubtle }}>
+              {(['system', 'light', 'dark'] as const).map(opt => {
+                const active = themeMode === opt;
+                return (
+                  <Pressable
+                    key={opt}
+                    onPress={() => setThemeMode(opt)}
+                    style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: active ? themedColors.surfaceRaised : 'transparent', alignItems: 'center' }}
+                  >
+                    <Text variant="bodyMedium" color={active ? themedColors.text : themedColors.textMuted} style={{ textTransform: 'capitalize' }}>{opt}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Language</Text>
-            <Text variant="body" color={colors.textMuted}>English</Text>
+            <Text variant="body" color={themedColors.textMuted}>English</Text>
           </View>
         </Section>
 

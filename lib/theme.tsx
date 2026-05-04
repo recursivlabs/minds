@@ -1,62 +1,157 @@
 import * as React from 'react';
-import { Platform } from 'react-native';
-import { colors as darkColors, lightColors, colors as mutableColors } from '../constants/theme';
+import { Appearance, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  colors as legacyColors,
+  darkColors,
+  lightColors,
+  type ColorTokens,
+  type ResolvedTheme,
+  type ThemeMode,
+} from '../constants/theme';
 
-type ThemeMode = 'dark' | 'light';
-const THEME_KEY = 'minds:theme';
+const STORAGE_KEY = 'minds:theme-mode';
 
-const ThemeContext = React.createContext<{
+interface ThemeValue {
+  /** User-selected mode: 'system' | 'light' | 'dark' */
   mode: ThemeMode;
-  colors: typeof darkColors;
-  version: number;
+  /** Currently rendered theme: 'light' | 'dark' (resolves 'system') */
+  resolved: ResolvedTheme;
+  /** Convenience flag */
+  isDark: boolean;
+  /** Active color tokens — reactive */
+  colors: ColorTokens;
+  /** Set the user's mode. Persists across launches. */
+  setMode: (mode: ThemeMode) => void;
+  /** Toggle between light/dark (sets explicit, leaves 'system' if user wants) */
   toggle: () => void;
-}>({
-  mode: 'dark',
+  /** Bumps when colors change so memoized consumers can opt in to recompute */
+  version: number;
+}
+
+const noop = () => {};
+
+const ThemeContext = React.createContext<ThemeValue>({
+  mode: 'system',
+  resolved: 'dark',
+  isDark: true,
   colors: darkColors,
+  setMode: noop,
+  toggle: noop,
   version: 0,
-  toggle: () => {},
 });
 
+function resolveSystem(): ResolvedTheme {
+  return Appearance.getColorScheme() === 'light' ? 'light' : 'dark';
+}
+
 /**
- * Mutate the globally exported `colors` object so every file
- * that does `import { colors } from '../constants/theme'`
- * picks up the new theme without needing useTheme().
+ * Mutate the legacy `colors` export so files that still do
+ * `import { colors } from '../constants/theme'` see updated values
+ * the next time they read the object. New code should use useColors().
+ *
+ * The mutation is a transitional aid; a render trigger still requires
+ * the consumer to be inside a component tree that re-renders. The
+ * provider triggers a global re-render via context value change, so
+ * subscribed components recompute. Non-subscribed components reading
+ * the static import fall back to the mutated singleton.
  */
-function applyTheme(mode: ThemeMode) {
-  const source = mode === 'dark' ? darkColors : lightColors;
-  for (const key of Object.keys(source) as (keyof typeof darkColors)[]) {
-    (mutableColors as any)[key] = (source as any)[key];
+function mutateLegacyColors(source: ColorTokens) {
+  for (const key of Object.keys(source) as (keyof ColorTokens)[]) {
+    (legacyColors as any)[key] = source[key];
   }
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = React.useState<ThemeMode>(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem(THEME_KEY);
-      if (saved === 'light') { applyTheme('light'); return 'light'; }
-    }
-    return 'dark';
-  });
-
+  const [mode, setModeState] = React.useState<ThemeMode>('system');
+  const [systemScheme, setSystemScheme] = React.useState<ResolvedTheme>(
+    resolveSystem,
+  );
   const [version, setVersion] = React.useState(0);
+  const [hydrated, setHydrated] = React.useState(false);
 
-  const toggle = React.useCallback(() => {
-    setMode(prev => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      applyTheme(next);
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.localStorage.setItem(THEME_KEY, next);
-        document.body.style.backgroundColor = next === 'dark' ? '#0f0f0f' : '#f8f8f8';
+  // Hydrate user-selected mode from storage once.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        let saved: string | null = null;
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          saved = window.localStorage.getItem(STORAGE_KEY);
+        } else {
+          saved = await AsyncStorage.getItem(STORAGE_KEY);
+        }
+        if (!cancelled && (saved === 'system' || saved === 'light' || saved === 'dark')) {
+          setModeState(saved);
+        }
+      } catch {
+        // ignore — fall through to default
+      } finally {
+        if (!cancelled) setHydrated(true);
       }
-      return next;
-    });
-    // Bump version to force all useTheme() consumers to re-render
-    setVersion(v => v + 1);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  const colors = mode === 'dark' ? darkColors : lightColors as typeof darkColors;
+  // Listen for OS color scheme changes — relevant when mode === 'system'.
+  React.useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemScheme(colorScheme === 'light' ? 'light' : 'dark');
+    });
+    return () => sub.remove();
+  }, []);
 
-  const value = React.useMemo(() => ({ mode, colors, version, toggle }), [mode, colors, version, toggle]);
+  const resolved: ResolvedTheme = mode === 'system' ? systemScheme : mode;
+  const colors = resolved === 'dark' ? darkColors : lightColors;
+
+  // Mutate the legacy singleton synchronously during render so that
+  // any component that does `import { colors }` reads fresh values
+  // when this provider re-renders the tree. This is a transitional
+  // aid until every component migrates to useColors().
+  mutateLegacyColors(colors);
+
+  // Keep <body> background in sync on web (visible during scroll bounce).
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.body.style.backgroundColor = colors.bg;
+    }
+    setVersion(v => v + 1);
+  }, [colors]);
+
+  const setMode = React.useCallback((next: ThemeMode) => {
+    setModeState(next);
+    (async () => {
+      try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.localStorage.setItem(STORAGE_KEY, next);
+        } else {
+          await AsyncStorage.setItem(STORAGE_KEY, next);
+        }
+      } catch {
+        // best-effort persist; in-memory state still updates
+      }
+    })();
+  }, []);
+
+  const toggle = React.useCallback(() => {
+    setMode(resolved === 'dark' ? 'light' : 'dark');
+  }, [resolved, setMode]);
+
+  const value = React.useMemo<ThemeValue>(
+    () => ({
+      mode,
+      resolved,
+      isDark: resolved === 'dark',
+      colors,
+      setMode,
+      toggle,
+      version,
+    }),
+    [mode, resolved, colors, setMode, toggle, version],
+  );
+
+  // Don't render children until hydrated to avoid one-frame light/dark flash.
+  if (!hydrated) return null;
 
   return (
     <ThemeContext.Provider value={value}>
@@ -65,6 +160,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useTheme() {
+export function useTheme(): ThemeValue {
   return React.useContext(ThemeContext);
+}
+
+/** Convenience: just the colors. */
+export function useColors(): ColorTokens {
+  return React.useContext(ThemeContext).colors;
+}
+
+/** Convenience: just the resolved 'light' | 'dark'. */
+export function useResolvedTheme(): ResolvedTheme {
+  return React.useContext(ThemeContext).resolved;
 }

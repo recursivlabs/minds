@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
 import { Slot, useRouter } from 'expo-router';
@@ -7,7 +8,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { ProjectProvider } from '../lib/project';
 import { AuthProvider, useAuth } from '../lib/auth';
-import { ThemeProvider } from '../lib/theme';
+import { ThemeProvider, useTheme } from '../lib/theme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/Toast';
 import { NetworkBanner } from '../components/NetworkBanner';
@@ -21,6 +22,21 @@ injectWebStyles();
 initKeyboardShortcuts();
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Subscribes to theme so the entire tree re-renders on toggle.
+ * Owns StatusBar style + the rendered background color so platform
+ * chrome stays consistent with the active palette.
+ */
+function ThemedRoot({ children }: { children: React.ReactNode }) {
+  const { isDark, colors } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      {children}
+    </View>
+  );
+}
 
 /** Wire push notification listeners — must be inside AuthProvider + Router. */
 function NotificationWiring() {
@@ -71,16 +87,17 @@ export default function RootLayout() {
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <ErrorBoundary>
           <ThemeProvider>
-            <ProjectProvider>
-              <AuthProvider>
-                <ToastProvider>
-                  <NotificationWiring />
-                  <NetworkBanner />
-                  <StatusBar style="light" />
-                  <Slot />
-                </ToastProvider>
-              </AuthProvider>
-            </ProjectProvider>
+            <ThemedRoot>
+              <ProjectProvider>
+                <AuthProvider>
+                  <ToastProvider>
+                    <NotificationWiring />
+                    <NetworkBanner />
+                    <Slot />
+                  </ToastProvider>
+                </AuthProvider>
+              </ProjectProvider>
+            </ThemedRoot>
           </ThemeProvider>
         </ErrorBoundary>
       </View>
