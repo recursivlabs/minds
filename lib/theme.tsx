@@ -110,13 +110,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // aid until every component migrates to useColors().
   mutateLegacyColors(colors);
 
-  // Keep <body> background in sync on web (visible during scroll bounce).
+  // Web: keep <body> bg + CSS custom properties in sync so global
+  // styles (scrollbar, ::selection) flip with the theme.
   React.useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      document.body.style.backgroundColor = colors.bg;
+      const body = document.body;
+      const root = document.documentElement;
+      body.style.backgroundColor = colors.bg;
+      const isDark = resolved === 'dark';
+      root.style.setProperty('--scrollbar-thumb', isDark
+        ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)');
+      root.style.setProperty('--scrollbar-thumb-hover', isDark
+        ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.18)');
+      root.style.setProperty('--selection-bg', isDark
+        ? 'rgba(212,168,68,0.30)' : 'rgba(160,126,36,0.22)');
+      // Mirror to <html> so OS-level UA chrome (form controls, autofill)
+      // picks the right base palette where supported.
+      root.style.colorScheme = isDark ? 'dark' : 'light';
     }
     setVersion(v => v + 1);
-  }, [colors]);
+  }, [colors, resolved]);
 
   const setMode = React.useCallback((next: ThemeMode) => {
     setModeState(next);
