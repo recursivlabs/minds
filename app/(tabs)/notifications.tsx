@@ -130,7 +130,7 @@ export default function NotificationsScreen() {
                 paddingHorizontal: spacing.xl,
                 paddingVertical: spacing.lg,
                 backgroundColor: pressed ? colors.surfaceHover
-                  : item.status === 'unread' ? 'rgba(212,168,68,0.03)' : 'transparent',
+                  : item.status === 'unread' ? colors.accentSubtle : 'transparent',
                 borderBottomWidth: 0.5,
                 borderBottomColor: colors.borderSubtle,
               })}

@@ -216,7 +216,7 @@ export default function ChatScreen() {
                           paddingHorizontal: 6,
                         }}
                       >
-                        <Text variant="caption" color="#fff" style={{ fontSize: 11, fontWeight: '700' }}>{unread}</Text>
+                        <Text variant="caption" color={colors.textOnAccent} style={{ fontSize: 11, fontWeight: '700' }}>{unread}</Text>
                       </View>
                     )}
                   </View>
@@ -620,7 +620,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             justifyContent: 'center',
           })}
         >
-          <Ionicons name="send" size={18} color={text.trim() ? '#fff' : colors.textMuted} />
+          <Ionicons name="send" size={18} color={text.trim() ? colors.textOnAccent : colors.textMuted} />
         </Pressable>
       </View>
     </KeyboardAvoidingView>

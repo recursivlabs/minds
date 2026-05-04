@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { View, Image } from 'react-native';
 import { Text } from './Text';
-import { colors, radius } from '../constants/theme';
+import { radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -34,8 +35,8 @@ function getInitials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function hashColor(name?: string): string {
-  if (!name) return colors.accent;
+function hashColor(name?: string, fallback: string = '#a07e24'): string {
+  if (!name) return fallback;
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -46,6 +47,7 @@ function hashColor(name?: string): string {
 
 export const Avatar = React.memo(function Avatar({ uri, name, size = 'md' }: Props) {
   const dim = sizes[size];
+  const colors = useColors();
 
   if (uri) {
     return (
@@ -69,7 +71,7 @@ export const Avatar = React.memo(function Avatar({ uri, name, size = 'md' }: Pro
         width: dim,
         height: dim,
         borderRadius: radius.full,
-        backgroundColor: hashColor(name),
+        backgroundColor: hashColor(name, colors.accent),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 0.5,

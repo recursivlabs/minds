@@ -78,7 +78,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.bg,
-          borderTopColor: 'rgba(255,255,255,0.06)',
+          borderTopColor: colors.borderSubtle,
           borderTopWidth: 0.5,
           elevation: 0,
           height: 56,
@@ -147,7 +147,7 @@ export default function TabLayout() {
             <Ionicons name="notifications-outline" size={22} color={color} />
           ),
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.error || '#ef4444', fontSize: 10 },
+          tabBarBadgeStyle: { backgroundColor: colors.error, fontSize: 10 },
         }}
       />
       <Tabs.Screen name="wallet" options={{ href: null }} />

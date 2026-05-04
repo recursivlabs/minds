@@ -183,10 +183,10 @@ export default function FeedScreen() {
           width: 56, height: 56, borderRadius: 28,
           backgroundColor: pressed ? colors.accentHover : colors.accent,
           alignItems: 'center', justifyContent: 'center',
-          elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 8,
+          elevation: 4, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 8,
         })}
       >
-        <Ionicons name="add" size={28} color="#fff" />
+        <Ionicons name="add" size={28} color={colors.textOnAccent} />
       </Pressable>
     </Container>
   );

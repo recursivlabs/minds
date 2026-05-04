@@ -91,7 +91,7 @@ export function TipModal({ visible, onClose, recipientName, recipientAvatar, onS
               >
                 <Text
                   variant="bodyMedium"
-                  color={amount === String(preset) ? '#fff' : colors.text}
+                  color={amount === String(preset) ? colors.textOnAccent : colors.text}
                 >
                   {preset}
                 </Text>

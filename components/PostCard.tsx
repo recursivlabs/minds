@@ -309,7 +309,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       // nested Pressables and would otherwise trigger post navigation.
       onPress={() => !isEditing && !showMenu && router.push(`/(tabs)/post/${actionPostId}` as any)}
       style={({ pressed, hovered }: any) => ({
-        backgroundColor: pressed && !isEditing && !showMenu ? colors.surfaceHover : (hovered && !isEditing && !showMenu) ? 'rgba(255,255,255,0.03)' : 'transparent',
+        backgroundColor: pressed && !isEditing && !showMenu ? colors.surfaceHover : (hovered && !isEditing && !showMenu) ? colors.glass : 'transparent',
         borderBottomWidth: 1,
         borderBottomColor: colors.borderSubtle,
         paddingHorizontal: spacing.xl,
@@ -393,7 +393,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               disabled={editSaving || !editContent.trim()}
               style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.accent, opacity: editSaving ? 0.6 : 1 }}
             >
-              <Text variant="label" color="#fff">{editSaving ? 'Saving...' : 'Save'}</Text>
+              <Text variant="label" color={colors.textOnAccent}>{editSaving ? 'Saving...' : 'Save'}</Text>
             </Pressable>
           </View>
         </View>
@@ -531,7 +531,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       >
         <Pressable
           onPress={() => setShowMenu(false)}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.15)' }}
+          style={{ flex: 1, backgroundColor: colors.scrim }}
         >
           {(() => {
             const MENU_WIDTH = 180;

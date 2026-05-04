@@ -828,7 +828,7 @@ export default function LandingScreen() {
             </Text>
           </Pressable>
           {resetSent && (
-            <Text variant="caption" color={c.accent} align="center">
+            <Text variant="caption" color={c.wordmark} align="center">
               Check your email for a reset link.
             </Text>
           )}

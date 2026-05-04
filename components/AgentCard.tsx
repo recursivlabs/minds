@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   agent: any;
@@ -14,6 +15,7 @@ interface Props {
 export function AgentCard({ agent, onChat }: Props) {
   const router = useRouter();
   const { sdk } = useAuth();
+  const colors = useColors();
   const name = agent.name || 'AI Agent';
   const description = agent.description || agent.systemPrompt || '';
   const model = agent.model || agent.modelId || 'AI';
@@ -44,7 +46,7 @@ export function AgentCard({ agent, onChat }: Props) {
   return (
     <View
       style={{
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: colors.glass,
         borderRadius: radius.md,
         padding: spacing.lg,
         borderWidth: 0.5,
@@ -99,8 +101,8 @@ export function AgentCard({ agent, onChat }: Props) {
           marginTop: spacing.xs,
         })}
       >
-        <Ionicons name="chatbubble" size={16} color="#fff" />
-        <Text variant="bodyMedium" color="#fff" style={{ fontSize: 14 }}>
+        <Ionicons name="chatbubble" size={16} color={colors.textOnAccent} />
+        <Text variant="bodyMedium" color={colors.textOnAccent} style={{ fontSize: 14 }}>
           Chat
         </Text>
       </Pressable>

@@ -1,5 +1,6 @@
 import { View, ViewProps, Platform } from 'react-native';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props extends ViewProps {
   variant?: 'default' | 'raised' | 'ghost';
@@ -7,12 +8,13 @@ interface Props extends ViewProps {
 }
 
 export function Card({ variant = 'default', padding = 'lg', style, ...props }: Props) {
+  const colors = useColors();
   const bg =
     variant === 'raised'
-      ? 'rgba(255,255,255,0.03)'
+      ? colors.surfaceRaised
       : variant === 'ghost'
         ? 'transparent'
-        : 'rgba(255,255,255,0.03)';
+        : colors.glass;
 
   return (
     <View

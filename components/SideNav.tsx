@@ -270,7 +270,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                     opacity: pressed ? 0.5 : 0.7,
                     padding: 6,
                     borderRadius: 6,
-                    backgroundColor: pressed ? 'rgba(255,255,255,0.05)' : 'transparent',
+                    backgroundColor: pressed ? colors.surfaceHover : 'transparent',
                   })}
                 >
                   <Ionicons name="chevron-back" size={16} color={colors.textMuted} />

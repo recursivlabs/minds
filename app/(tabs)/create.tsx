@@ -415,7 +415,7 @@ export default function CreateScreen() {
                 onPress={() => setShowCommunityPicker(false)}
                 style={{
                   flex: 1,
-                  backgroundColor: 'rgba(0,0,0,0.75)',
+                  backgroundColor: colors.scrimStrong,
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: spacing.xl,
@@ -563,9 +563,9 @@ export default function CreateScreen() {
               />
               <Pressable
                 onPress={() => setMediaUri(null)}
-                style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.full, padding: spacing.sm }}
+                style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: spacing.sm }}
               >
-                <Ionicons name="close" size={18} color="#fff" />
+                <Ionicons name="close" size={18} color="#ffffff" />
               </Pressable>
             </View>
           )}

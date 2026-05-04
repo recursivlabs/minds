@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface Props {
 
 export function NSFWOverlay({ children }: Props) {
   const [revealed, setRevealed] = React.useState(false);
+  const colors = useColors();
 
   if (revealed) {
     return <>{children}</>;
@@ -28,7 +30,7 @@ export function NSFWOverlay({ children }: Props) {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(9, 9, 11, 0.92)',
+          backgroundColor: colors.scrimStrong,
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: radius.md,

@@ -53,7 +53,7 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.85)',
+          backgroundColor: colors.scrimStrong,
           justifyContent: 'center',
           alignItems: 'center',
           padding: spacing.xl,
