@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { BASE_URL, BASE_ORIGIN } from '../lib/recursiv';
 import { Text, Button } from '../components';
 import { colors, spacing } from '../constants/theme';
+import { useTheme } from '../lib/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const W = SCREEN_W || 1200;
@@ -346,9 +347,23 @@ type ScreenMode = 'home' | 'earlyAccess' | 'login' | 'signUp' | 'submitted' | 'o
 export default function LandingScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading, signIn, signUp, sendOtp, verifyOtp } = useAuth();
-  const [isDark, setIsDark] = React.useState(true);
-  const darkOpacity = React.useRef(new Animated.Value(1)).current;
-  const lightOpacity = React.useRef(new Animated.Value(0)).current;
+  const { resolved: globalTheme, setMode: setGlobalTheme } = useTheme();
+  const [isDark, setIsDark] = React.useState(globalTheme === 'dark');
+  const darkOpacity = React.useRef(new Animated.Value(globalTheme === 'dark' ? 1 : 0)).current;
+  const lightOpacity = React.useRef(new Animated.Value(globalTheme === 'dark' ? 0 : 1)).current;
+
+  // Keep welcome animation layer in sync with the global theme so a
+  // user who picked Light in Settings doesn't land back on the dark
+  // hero on logout.
+  React.useEffect(() => {
+    const targetDark = globalTheme === 'dark';
+    if (targetDark === isDark) return;
+    setIsDark(targetDark);
+    Animated.parallel([
+      Animated.timing(darkOpacity, { toValue: targetDark ? 1 : 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(lightOpacity, { toValue: targetDark ? 0 : 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, [globalTheme]);
 
   const [screen, setScreen] = React.useState<ScreenMode>('home');
   const [email, setEmail] = React.useState('');
@@ -382,6 +397,9 @@ export default function LandingScreen() {
   const toggleTheme = () => {
     const toDark = !isDark;
     setIsDark(toDark);
+    // Persist to global theme so the post-login app matches the
+    // welcome screen choice (and survives reload).
+    setGlobalTheme(toDark ? 'dark' : 'light');
     Animated.parallel([
       Animated.timing(darkOpacity, { toValue: toDark ? 1 : 0, duration: 800, useNativeDriver: true }),
       Animated.timing(lightOpacity, { toValue: toDark ? 0 : 1, duration: 800, useNativeDriver: true }),
@@ -488,13 +506,15 @@ export default function LandingScreen() {
     buttonBg: lightColors.buttonBg,
     buttonText: lightColors.buttonText,
     ghostText: lightColors.ghostText,
-    inputBg: 'rgba(255,255,255,0.5)',
-    inputBorder: 'rgba(255,255,255,0.6)',
+    // Solid panel + visible border. The previous translucent values
+    // disappeared against the sky-blue background.
+    inputBg: '#ffffff',
+    inputBorder: 'rgba(26,26,46,0.18)',
     inputBorderFocus: lightColors.accent,
     inputText: '#1a1a2e',
-    inputPlaceholder: 'rgba(26,26,46,0.35)',
+    inputPlaceholder: 'rgba(26,26,46,0.45)',
     successText: lightColors.text,
-    subtleText: 'rgba(26,26,46,0.5)',
+    subtleText: 'rgba(26,26,46,0.6)',
   };
 
   const inputStyle = {

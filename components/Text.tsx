@@ -1,5 +1,6 @@
 import { Text as RNText, TextProps, TextStyle } from 'react-native';
-import { colors, typography } from '../constants/theme';
+import { typography } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 type Variant = keyof typeof typography;
 
@@ -10,6 +11,7 @@ interface Props extends TextProps {
 }
 
 export function Text({ variant = 'body', color, align, style, ...props }: Props) {
+  const colors = useColors();
   return (
     <RNText
       style={[

@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   showBack?: boolean;
@@ -15,6 +16,7 @@ export function Header({ showBack, title }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
+  const colors = useColors();
   const isDesktop = Platform.OS === 'web' && width > 768;
 
   if (isDesktop) {

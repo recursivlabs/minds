@@ -3,7 +3,8 @@ import { View, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   title: string;
@@ -17,6 +18,7 @@ interface Props {
  */
 export const ScreenHeader = React.memo(function ScreenHeader({ title, showBack = true, right }: Props) {
   const router = useRouter();
+  const colors = useColors();
   return (
     <View
       style={{

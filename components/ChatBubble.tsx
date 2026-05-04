@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View, Platform } from 'react-native';
 import { Text } from './Text';
 import { parseMarkdownSegments, renderMarkdownToHtml } from '../lib/markdown';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   message: any;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Props) {
+  const colors = useColors();
   const content = message.content || message.text || message.body || '';
   const timestamp = message.createdAt || message.created_at || '';
   const hasMarkdown = /[*`#\[\]]/.test(content);
@@ -18,8 +20,8 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
     ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
 
-  const textColor = isOwn ? '#fff' : colors.text;
-  const linkColor = isOwn ? '#ffffffcc' : colors.accent;
+  const textColor = isOwn ? colors.textOnAccent : colors.text;
+  const linkColor = isOwn ? colors.textOnAccent : colors.accent;
 
   const renderContent = () => {
     if (!hasMarkdown) {

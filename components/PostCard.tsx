@@ -17,7 +17,8 @@ import { getCached } from '../lib/cache';
 import { LinkPreview } from './LinkPreview';
 import { MediaViewer } from './MediaViewer';
 import { Badge, getBadges } from './Badge';
-import { colors, spacing, radius, typography } from '../constants/theme';
+import { spacing, radius, typography } from '../constants/theme';
+import { useColors } from '../lib/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
 interface Props {
@@ -43,6 +44,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const router = useRouter();
   const { sdk, user } = useAuth();
   const toast = useToast();
+  const colors = useColors();
   const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(
     post.userReaction || post.user_reaction || post.userVote || post.user_vote || null
   );

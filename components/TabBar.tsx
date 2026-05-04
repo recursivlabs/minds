@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { View, ScrollView, Pressable, Platform } from 'react-native';
 import { Text } from './Text';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Tab {
   key: string;
@@ -21,6 +22,7 @@ interface Props {
  * and typography everywhere.
  */
 export const TabBar = React.memo(function TabBar({ tabs, active, onChange, scrollable = false }: Props) {
+  const colors = useColors();
   const content = (
     <>
       {tabs.map(({ key, label }) => {
