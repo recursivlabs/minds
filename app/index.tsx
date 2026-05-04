@@ -318,10 +318,15 @@ function SunGlow() {
     anim.start();
     return () => anim.stop();
   }, []);
+  // Scale the sun off-screen on small viewports so it doesn't cover
+  // the wordmark on mobile.
+  const size = Math.min(500, Math.round(SCREEN_W * 0.9));
+  const offTop = Math.round(size * 0.5);
+  const offRight = Math.round(size * 0.25);
   return (
     <Animated.View style={{
-      position: 'absolute', top: -200, right: -100,
-      width: 500, height: 500, borderRadius: 250,
+      position: 'absolute', top: -offTop, right: -offRight,
+      width: size, height: size, borderRadius: size / 2,
       backgroundColor: '#ffe082', opacity, transform: [{ scale }],
       ...(Platform.OS === 'web' ? { filter: 'blur(100px)' } as any : {}),
     }} />
@@ -969,8 +974,11 @@ export default function LandingScreen() {
             color={c.wordmark}
             align="center"
             style={{
-              fontSize: 96,
-              letterSpacing: 12,
+              // Scale to viewport so the wordmark never clips on small
+              // screens. 96pt is the desktop target; iPhone widths
+              // (~390pt) drop it to ~58pt.
+              fontSize: Math.min(96, Math.round(SCREEN_W * 0.15)),
+              letterSpacing: Math.min(12, Math.round(SCREEN_W * 0.018)),
               fontWeight: '300',
               textTransform: 'lowercase',
               marginBottom: spacing['3xl'],

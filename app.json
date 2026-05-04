@@ -11,7 +11,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.minds.app",
-      "associatedDomains": ["applinks:minds.on.recursiv.io", "applinks:minds.com"]
+      "associatedDomains": [
+        "applinks:minds.on.recursiv.io",
+        "applinks:minds.com"
+      ]
     },
     "android": {
       "package": "com.minds.app",
@@ -20,10 +23,19 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "minds.on.recursiv.io" },
-            { "scheme": "https", "host": "minds.com" }
+            {
+              "scheme": "https",
+              "host": "minds.on.recursiv.io"
+            },
+            {
+              "scheme": "https",
+              "host": "minds.com"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -34,7 +46,9 @@
         {
           "color": "#1b6ef3"
         }
-      ]
+      ],
+      "@sentry/react-native",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
