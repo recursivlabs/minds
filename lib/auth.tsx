@@ -199,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: result.user?.id || '',
       name: result.user?.name || name,
       email: result.user?.email || email,
-      username: result.user?.username || email.split('@')[0],
+      username: (result.user as any)?.username || email.split('@')[0],
       image: result.user?.image ?? null,
       bio: '',
     });
@@ -215,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: result.user?.id || '',
       name: result.user?.name || '',
       email: result.user?.email || email,
-      username: result.user?.username || email.split('@')[0],
+      username: (result.user as any)?.username || email.split('@')[0],
       image: result.user?.image ?? null,
       bio: '',
     });

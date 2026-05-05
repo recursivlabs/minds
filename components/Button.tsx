@@ -80,7 +80,8 @@ export function Button({
         <Text
           variant="bodyMedium"
           color={textColor}
-          style={{ fontSize: s.fontSize }}
+          align="center"
+          style={{ fontSize: s.fontSize, textAlign: 'center' }}
         >
           {children}
         </Text>

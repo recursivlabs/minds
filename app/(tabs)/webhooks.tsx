@@ -28,7 +28,7 @@ export default function WebhooksScreen() {
     setLoading(true);
     try {
       const res = await sdk.webhooks.list();
-      setWebhooks(Array.isArray(res) ? res : res?.webhooks || []);
+      setWebhooks((res as any)?.data || []);
     } catch { setWebhooks([]); }
     setLoading(false);
   }, [sdk]);
@@ -40,7 +40,10 @@ export default function WebhooksScreen() {
     setSaving(true);
     try {
       const event_types = events.split(',').map(e => e.trim()).filter(Boolean);
-      await sdk.webhooks.register({ url, event_types });
+      // Webhooks API requires a provider. For the consumer app, default
+      // to a generic "custom" provider so the form still submits; the
+      // power-user webhooks dashboard will set the right provider.
+      await sdk.webhooks.register({ provider: 'custom', events: event_types } as any);
       setShowCreate(false);
       setUrl('');
       setEvents('');
