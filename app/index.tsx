@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, Platform, Animated, Dimensions, Pressable, TextInput, Alert } from 'react-native';
+import { View, Platform, Animated, Dimensions, Pressable, TextInput, Alert, useWindowDimensions, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
@@ -353,6 +354,12 @@ export default function LandingScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading, signIn, signUp, sendOtp, verifyOtp } = useAuth();
   const { resolved: globalTheme, setMode: setGlobalTheme } = useTheme();
+  const { width: viewportW, height: viewportH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // Hero scales down to fit narrow viewports (mobile). Desktop tops out at 96.
+  const heroFontSize = Math.max(40, Math.min(96, Math.round(viewportW * 0.14)));
+  const heroLetterSpacing = Math.max(2, Math.min(12, Math.round(viewportW * 0.018)));
+  const isMobile = viewportW < 600;
   const [isDark, setIsDark] = React.useState(globalTheme === 'dark');
   const darkOpacity = React.useRef(new Animated.Value(globalTheme === 'dark' ? 1 : 0)).current;
   const lightOpacity = React.useRef(new Animated.Value(globalTheme === 'dark' ? 0 : 1)).current;
@@ -939,17 +946,28 @@ export default function LandingScreen() {
         <AirplaneField />
       </Animated.View>
 
-      {/* Content */}
+      {/* Content — KeyboardAvoidingView shifts the form above the
+          on-screen keyboard so submit buttons stay tappable while
+          typing. TouchableWithoutFeedback dismisses the keyboard
+          when the user taps outside an input. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
+      >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={{
         flex: 1, alignItems: 'center', justifyContent: 'center',
         paddingHorizontal: spacing['2xl'],
+        paddingTop: insets.top + spacing.lg,
+        paddingBottom: insets.bottom + spacing.lg,
       }}>
         {/* Theme toggle */}
         <Pressable
           onPress={toggleTheme}
           style={{
             position: 'absolute',
-            top: 50,
+            top: insets.top + 12,
             right: 24,
             width: 44,
             height: 44,
@@ -968,20 +986,18 @@ export default function LandingScreen() {
         </Pressable>
 
         {/* Hero */}
-        <View style={{ alignItems: 'center', marginBottom: spacing['6xl'] }}>
+        <View style={{ alignItems: 'center', marginBottom: isMobile ? spacing['3xl'] : spacing['6xl'] }}>
           <Text
             variant="hero"
             color={c.wordmark}
             align="center"
             style={{
-              // Scale to viewport so the wordmark never clips on small
-              // screens. 96pt is the desktop target; iPhone widths
-              // (~390pt) drop it to ~58pt.
-              fontSize: Math.min(96, Math.round(SCREEN_W * 0.15)),
-              letterSpacing: Math.min(12, Math.round(SCREEN_W * 0.018)),
+              fontSize: heroFontSize,
+              letterSpacing: heroLetterSpacing,
               fontWeight: '300',
               textTransform: 'lowercase',
-              marginBottom: spacing['3xl'],
+              marginBottom: isMobile ? spacing.lg : spacing['3xl'],
+              lineHeight: heroFontSize * 1.2,
             }}
           >
             minds
@@ -1006,6 +1022,8 @@ export default function LandingScreen() {
 
         {renderForm()}
       </View>
+      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </View>
   );
 }
