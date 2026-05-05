@@ -11,9 +11,11 @@ import { usePosts } from '../../lib/hooks';
 import { getPreference } from '../../lib/preferences';
 import { registerShortcut } from '../../lib/keyboard';
 import { getItem, setItem } from '../../lib/storage';
+import { loadPreferences } from '../../lib/onboarding';
 import { colors, spacing } from '../../constants/theme';
 
 const PROFILE_NUDGE_DISMISSED_KEY = 'minds:profileNudge:dismissed';
+const CALIBRATION_NUDGE_DISMISSED_KEY = 'minds:calibrationNudge:dismissed';
 
 type FeedTab = 'foryou' | 'latest' | 'following' | 'trending';
 
@@ -36,6 +38,33 @@ export default function FeedScreen() {
     setNudgeDismissed(true);
     if (user?.id) {
       setItem(`${PROFILE_NUDGE_DISMISSED_KEY}:${user.id}`, 'true');
+    }
+  }, [user?.id]);
+
+  // Calibration nudge: legacy users land on For You with no saved taste
+  // signals. Show one inline banner pointing at the swipe deck. Once
+  // dismissed (or once preferences exist), it stays gone.
+  const [calibrationDismissed, setCalibrationDismissed] = React.useState(true);
+  const [hasPreferences, setHasPreferences] = React.useState(true);
+  React.useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    (async () => {
+      const [dismissed, prefs] = await Promise.all([
+        getItem(`${CALIBRATION_NUDGE_DISMISSED_KEY}:${user.id}`),
+        loadPreferences(),
+      ]);
+      if (!active) return;
+      setCalibrationDismissed(dismissed === 'true');
+      setHasPreferences(!!prefs && (prefs.interests?.length ?? 0) > 0);
+    })();
+    return () => { active = false; };
+  }, [user?.id]);
+
+  const dismissCalibration = React.useCallback(() => {
+    setCalibrationDismissed(true);
+    if (user?.id) {
+      setItem(`${CALIBRATION_NUDGE_DISMISSED_KEY}:${user.id}`, 'true');
     }
   }, [user?.id]);
 
@@ -165,6 +194,26 @@ export default function FeedScreen() {
           )}
           ListHeaderComponent={
             <>
+              {activeTab === 'foryou' && !calibrationDismissed && !hasPreferences && (
+                <Pressable
+                  onPress={() => router.push('/onboarding/swipe' as any)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                    backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+                    borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                  })}
+                >
+                  <Ionicons name="sparkles-outline" size={22} color={colors.accent} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyMedium" color={colors.text}>Tune your feed</Text>
+                    <Text variant="caption" color={colors.textMuted}>Swipe through 30 items so we know what you'd read.</Text>
+                  </View>
+                  <Pressable onPress={(e) => { e.stopPropagation?.(); dismissCalibration(); }} hitSlop={12}>
+                    <Ionicons name="close" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </Pressable>
+              )}
               {profileIncomplete && !nudgeDismissed && (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: spacing.md,

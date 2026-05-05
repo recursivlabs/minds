@@ -373,6 +373,13 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       // clicks on menu items (mute / report / share) bubble up through
       // nested Pressables and would otherwise trigger post navigation.
       onPress={() => !isEditing && !showMenu && router.push(`/(tabs)/post/${actionPostId}` as any)}
+      onLongPress={(e: any) => {
+        const pageX = e?.nativeEvent?.pageX ?? 0;
+        const pageY = e?.nativeEvent?.pageY ?? 0;
+        setMenuPos({ x: pageX, y: pageY });
+        setShowMenu(true);
+      }}
+      delayLongPress={300}
       style={({ pressed, hovered }: any) => ({
         backgroundColor: pressed && !isEditing && !showMenu ? colors.surfaceHover : (hovered && !isEditing && !showMenu) ? colors.glass : 'transparent',
         borderBottomWidth: 1,
@@ -711,6 +718,47 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                   ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)' } as any : { elevation: 12 }),
                 }}
               >
+                {!isOwnPost && (
+                  <>
+                    <Pressable
+                      onPress={async () => {
+                        setShowMenu(false);
+                        const topic = (post.title || '').slice(0, 80);
+                        if (!topic) return;
+                        toast.show('Looking for more like this');
+                        try {
+                          await (sdk as any)?.curator?.run?.({
+                            sources: [{ type: 'web_search', query: topic, freshness: 'pw' }],
+                            prompt: {
+                              system: 'You are a personal curator agent. One-line take, max 20 words, no preamble.',
+                              user_template: 'Title: {{title}}\nSource: {{source}}\nURL: {{url}}',
+                            },
+                            target_size: 8,
+                          });
+                        } catch {}
+                      }}
+                      style={{ padding: spacing.md }}
+                    >
+                      <Text variant="body">More like this</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setShowMenu(false);
+                        const sourceHost = (() => {
+                          try { return new URL(post.external_url || post.url || '').hostname.replace('www.', ''); }
+                          catch { return ''; }
+                        })();
+                        const target = sourceHost || author.id;
+                        if (!target) return;
+                        toggleMute(target);
+                        toast.show(`Less ${sourceHost || authorName} from now on`);
+                      }}
+                      style={{ padding: spacing.md }}
+                    >
+                      <Text variant="body">Less like this</Text>
+                    </Pressable>
+                  </>
+                )}
                 {isOwnPost && (
                   <Pressable onPress={() => { setShowMenu(false); setEditContent(content); setIsEditing(true); }} style={{ padding: spacing.md }}>
                     <Text variant="body">Edit</Text>

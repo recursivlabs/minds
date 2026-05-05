@@ -31,8 +31,13 @@ export interface BuildCuratorRequestInput {
   fresh?: boolean;
 }
 
+export type CuratorRequestSource =
+  | { type?: 'rss'; url: string; name?: string }
+  | { type: 'web_search'; query: string; freshness?: 'pd' | 'pw' | 'pm' | 'py'; limit?: number; name?: string }
+  | { type: 'minds_internal'; networkId?: string; freshnessDays?: number; followIds?: string[]; limit?: number; name?: string };
+
 export interface CuratorRequest {
-  sources: { url: string; name?: string }[];
+  sources: CuratorRequestSource[];
   prompt: { system: string; user_template: string };
   model?: string;
   target_size?: number;
@@ -97,8 +102,27 @@ export function buildCuratorRequest(input: BuildCuratorRequestInput): CuratorReq
     // @handle / /c/ forms need a server lookup to resolve; skip silently.
   }
 
+  // Multi-source mix: RSS feeds for the user's interests + paste-ins
+  // come first; on top of that we always layer one Brave web_search
+  // pulled from the same interests, plus a Minds-internal pull from
+  // the user's network so curated cards include in-network content.
+  const rssSources: CuratorRequestSource[] = [...interestSources, ...pasteRss].map((s) => ({
+    type: 'rss',
+    url: s.url,
+    name: s.name,
+  }));
+
+  const interestQuery = input.interests.length > 0
+    ? input.interests.slice(0, 5).join(' ')
+    : 'long reads this week';
+
+  const dynamicSources: CuratorRequestSource[] = [
+    { type: 'web_search', query: interestQuery, freshness: 'pw', limit: 8, name: 'Web' },
+    { type: 'minds_internal', freshnessDays: 7, limit: 12, name: 'Minds' },
+  ];
+
   return {
-    sources: [...interestSources, ...pasteRss],
+    sources: [...rssSources, ...dynamicSources],
     prompt: { system, user_template },
     target_size: input.targetSize,
     fresh: input.fresh,

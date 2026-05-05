@@ -138,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthedSdk(sdk);
     setUser(authUser);
     setProjectId(PROJECT_ID);
+    registerPushTokenBackground(sdk);
   }
 
   const refreshUser = React.useCallback(async () => {

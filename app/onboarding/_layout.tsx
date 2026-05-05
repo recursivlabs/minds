@@ -1,23 +1,20 @@
 import { Stack } from 'expo-router';
 import { OnboardingProvider } from '../../lib/onboarding';
-import { colors } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 export default function OnboardingLayout() {
+  const colors = useColors();
   return (
     <OnboardingProvider>
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: 'slide_from_right',
+          animation: 'fade',
           gestureEnabled: false,
         }}
       >
-        <Stack.Screen name="index" />
-        <Stack.Screen name="agent" />
-        <Stack.Screen name="interests" />
-        <Stack.Screen name="vibe" />
-        <Stack.Screen name="connect" />
+        <Stack.Screen name="swipe" />
         <Stack.Screen name="building" />
       </Stack>
     </OnboardingProvider>

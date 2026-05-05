@@ -7,7 +7,7 @@ import { spacing } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
-import { isOnboardingComplete } from '../../lib/onboarding';
+import { isOnboardingComplete, markOnboardingComplete } from '../../lib/onboarding';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
@@ -15,22 +15,41 @@ export default function TabLayout() {
   const isDesktop = Platform.OS === 'web';
   const sidebar = useSidebarState();
   const { colors } = useTheme();
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // Onboarding gate: new authenticated users without a completed onboarding
-  // pass get pushed to /onboarding before they ever see the tab bar.
+  // Onboarding gate. New authenticated users go to swipe calibration.
+  // Legacy users (any prior post or follow on this account) bypass it
+  // entirely — they want their feed, not a 60-second tutorial.
   React.useEffect(() => {
-    if (!sdk) return;
+    if (!sdk || !user?.id) return;
     let cancelled = false;
     (async () => {
       const done = await isOnboardingComplete();
+      if (cancelled || done) return;
+
+      try {
+        const [posts, following] = await Promise.all([
+          sdk.posts.list({ author_id: user.id, limit: 1 }).catch(() => null),
+          sdk.users.following(user.id, { limit: 1 } as any).catch(() => null),
+        ]);
+        const hasPost = (posts?.data?.length ?? 0) > 0;
+        const hasFollow = (following?.data?.length ?? 0) > 0;
+        if (cancelled) return;
+        if (hasPost || hasFollow) {
+          await markOnboardingComplete();
+          return;
+        }
+      } catch {
+        // Detection failure → fall through to onboarding (safer default).
+      }
+
       if (cancelled) return;
-      if (!done) router.replace('/onboarding/agent' as any);
+      router.replace('/onboarding/swipe' as any);
     })();
     return () => { cancelled = true; };
-  }, [sdk, router]);
+  }, [sdk, user?.id, router]);
 
   // Poll unread notification count
   const [unreadCount, setUnreadCount] = React.useState(0);
