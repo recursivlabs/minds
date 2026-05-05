@@ -255,7 +255,7 @@ export default function CommunityDetailScreen() {
                   variant="ghost"
                   size="sm"
                 >
-                  View Members ({memberCount})
+                  {`View Members (${memberCount})`}
                 </Button>
                 <Button
                   onPress={async () => {
@@ -268,8 +268,14 @@ export default function CommunityDetailScreen() {
                           text: 'Delete',
                           style: 'destructive',
                           onPress: async () => {
+                            if (!sdk) return;
                             try {
-                              await sdk.communities.delete(community.id);
+                              const sdkAny = sdk.communities as any;
+                              if (typeof sdkAny.delete === 'function') {
+                                await sdkAny.delete(community.id);
+                              } else if (typeof sdkAny.update === 'function') {
+                                await sdkAny.update(community.id, { archived: true });
+                              }
                               router.back();
                             } catch { Alert.alert('Error', 'Could not delete community'); }
                           },

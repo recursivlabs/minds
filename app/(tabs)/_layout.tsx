@@ -2,9 +2,12 @@ import * as React from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { View, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import { ORG_ID } from '../../lib/recursiv';
+import { isOnboardingComplete, markOnboardingComplete } from '../../lib/onboarding';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
@@ -12,7 +15,41 @@ export default function TabLayout() {
   const isDesktop = Platform.OS === 'web';
   const sidebar = useSidebarState();
   const { colors } = useTheme();
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  // Onboarding gate. New authenticated users go to swipe calibration.
+  // Legacy users (any prior post or follow on this account) bypass it
+  // entirely — they want their feed, not a 60-second tutorial.
+  React.useEffect(() => {
+    if (!sdk || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const done = await isOnboardingComplete();
+      if (cancelled || done) return;
+
+      try {
+        const [posts, following] = await Promise.all([
+          sdk.posts.list({ author_id: user.id, limit: 1 }).catch(() => null),
+          sdk.users.following(user.id, { limit: 1 } as any).catch(() => null),
+        ]);
+        const hasPost = (posts?.data?.length ?? 0) > 0;
+        const hasFollow = (following?.data?.length ?? 0) > 0;
+        if (cancelled) return;
+        if (hasPost || hasFollow) {
+          await markOnboardingComplete();
+          return;
+        }
+      } catch {
+        // Detection failure → fall through to onboarding (safer default).
+      }
+
+      if (cancelled) return;
+      router.replace('/onboarding/swipe' as any);
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, user?.id, router]);
 
   // Poll unread notification count
   const [unreadCount, setUnreadCount] = React.useState(0);
@@ -21,7 +58,7 @@ export default function TabLayout() {
     let active = true;
     const check = async () => {
       try {
-        const res = await sdk.notifications.list({ limit: 20 });
+        const res = await sdk.notifications.list({ limit: 20, organization_id: ORG_ID || undefined });
         if (active) {
           const unread = (res.data || []).filter((n: any) => !n.read && !n.is_read).length;
           setUnreadCount(unread);
@@ -81,9 +118,9 @@ export default function TabLayout() {
           borderTopColor: colors.borderSubtle,
           borderTopWidth: 0.5,
           elevation: 0,
-          height: 56,
-          paddingBottom: 6,
-          paddingTop: 4,
+          height: 56 + insets.bottom,
+          paddingBottom: insets.bottom + 6,
+          paddingTop: 6,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
@@ -92,6 +129,7 @@ export default function TabLayout() {
           fontWeight: '400',
           letterSpacing: 0.2,
         },
+        tabBarIconStyle: { marginTop: 0 },
       }}
     >
       <Tabs.Screen
@@ -106,7 +144,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Discover',
+          title: 'Search',
           tabBarIcon: ({ color }) => (
             <Ionicons name="search-outline" size={22} color={color} />
           ),
@@ -131,15 +169,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="person-outline" size={22} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="notifications"
         options={{
           title: 'Alerts',
@@ -150,6 +179,8 @@ export default function TabLayout() {
           tabBarBadgeStyle: { backgroundColor: colors.error, fontSize: 10 },
         }}
       />
+      {/* Profile moved to the header avatar — not a primary tab. */}
+      <Tabs.Screen name="profile" options={{ href: null }} />
       <Tabs.Screen name="wallet" options={{ href: null }} />
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />

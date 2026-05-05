@@ -3,12 +3,15 @@ import { useAuth } from './auth';
 import { getSdk, ORG_ID } from './recursiv';
 import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations } from './cache';
 import { filterMuted } from './muted';
+import { loadPreferences, markCuratedNow } from './onboarding';
+import { buildCuratorRequest } from './curator';
+import { getPreference } from './preferences';
 
 /**
  * Fetch posts from the feed.
  * All calls scoped to the Minds org.
  */
-export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limit = 20) {
+export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = 'latest', limit = 20) {
   const { sdk, user } = useAuth();
   const cacheKey = `posts:${sort}:${limit}`;
   const cached = getCached(cacheKey);
@@ -21,12 +24,12 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
   const followingIdsRef = React.useRef<Set<string> | null>(null);
   const myCommunityIdsRef = React.useRef<Set<string> | null>(null);
 
-  const fetchPosts = React.useCallback(async (refresh = false) => {
+  const fetchPosts = React.useCallback(async (refresh = false, silent = false) => {
     const s = sdk || getSdk();
     if (!s) return;
     try {
       if (refresh) {
-        setRefreshing(true);
+        if (!silent) setRefreshing(true);
         offsetRef.current = 0;
       }
 
@@ -51,7 +54,23 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
         }
       }
 
-      const res = await s.posts.list({ limit, offset: refresh ? 0 : offsetRef.current, organization_id: ORG_ID || undefined });
+      // 'personal' = the user's private brief feed authored by their
+      // personal AI agent. The server scopes via audience_user_id.
+      // Personal-feed posts are user-scoped, not org-scoped, so we
+      // intentionally omit organization_id when requesting personal —
+      // otherwise the curator-inserted posts (no organization_id) get
+      // filtered out by the server's org_id filter.
+      const listParams: Record<string, any> = {
+        limit,
+        offset: refresh ? 0 : offsetRef.current,
+      };
+      if (sort === 'personal') {
+        listParams.audience_user_id = 'me';
+      } else if (ORG_ID) {
+        listParams.organization_id = ORG_ID;
+      }
+
+      const res = await s.posts.list(listParams as any);
       let data = res.data || [];
 
       if (sort === 'score') {
@@ -114,12 +133,68 @@ export function usePosts(sort: 'score' | 'latest' | 'following' = 'latest', limi
     fetchPosts(true);
   }, [sort]);
 
-  const refresh = React.useCallback(() => fetchPosts(true), [fetchPosts]);
+  // Silent re-fetch — used by tab focus, polling, and any background
+  // freshness check. Just re-queries the post list. Does NOT trigger
+  // the curator (which is a 10-20s RSS + LLM round-trip and shouldn't
+  // fire on every tab switch). Passes silent=true so the FlatList's
+  // RefreshControl doesn't flash a stuck inset on focus.
+  const refresh = React.useCallback(() => fetchPosts(true, true), [fetchPosts]);
+
+  // User-initiated pull-to-refresh on the personal feed actually asks
+  // the agent for fresh content: ensures the personal agent exists,
+  // builds the Minds-flavoured curator request locally, calls the
+  // generic Recursiv curator primitive, then re-fetches. Only triggered
+  // on explicit user gestures — focus refreshes stay silent. When the
+  // user has disabled AI in Settings we never call the curator and just
+  // re-fetch chronologically.
+  const recurate = React.useCallback(async () => {
+    if (sort !== 'personal' || !getPreference('aiEnabled')) return fetchPosts(true);
+    const s = sdk || getSdk();
+    const ensurePersonal = (s as any)?.agents?.ensurePersonal;
+    const runCurator = (s as any)?.curator?.run;
+    try {
+      const stored = await loadPreferences();
+      const prefs = stored || {
+        interests: ['ai', 'tech', 'startups', 'science'],
+        free_text_interests: '',
+        vibes: ['news'],
+        persona: 'curious',
+        agent_name: undefined,
+        paste_sources: {},
+      };
+      if (typeof ensurePersonal === 'function') {
+        await ensurePersonal.call((s as any).agents, {
+          preferences: {
+            interests: prefs.interests,
+            free_text_interests: prefs.free_text_interests,
+            vibes: prefs.vibes,
+            persona: prefs.persona,
+          },
+          overrides: prefs.agent_name ? { name: prefs.agent_name } : undefined,
+        });
+      }
+      if (typeof runCurator === 'function') {
+        const request = buildCuratorRequest({
+          agentName: prefs.agent_name || undefined,
+          interests: prefs.interests,
+          vibes: prefs.vibes,
+          persona: prefs.persona as any,
+          pasteSources: prefs.paste_sources as any,
+        });
+        await runCurator.call((s as any).curator, request);
+        await markCuratedNow();
+      }
+    } catch {
+      // Curator blip is non-fatal; we still re-fetch below.
+    }
+    return fetchPosts(true);
+  }, [fetchPosts, sort, sdk]);
+
   const loadMore = React.useCallback(() => {
     if (hasMore && !loading && !refreshing) fetchPosts(false);
   }, [fetchPosts, hasMore, loading, refreshing]);
 
-  return { posts, setPosts, loading, error, refreshing, refresh, loadMore, hasMore };
+  return { posts, setPosts, loading, error, refreshing, refresh, recurate, loadMore, hasMore };
 }
 
 /**
@@ -296,7 +371,7 @@ export function useProfile(username: string) {
         if (!cancelled && res?.data) {
           setProfile(res.data);
           setCache(cacheKey, res.data);
-          if (!res.data.isAgent) {
+          if (!(res.data as any).isAgent) {
             try {
               const followRes = await s.profiles.isFollowing(res.data.id);
               setIsFollowing(followRes.data?.is_following ?? false);
@@ -358,7 +433,7 @@ export function useConversations() {
   const fetch = React.useCallback(async () => {
     if (!sdk) return;
     try {
-      const res = await sdk.chat.conversations({ limit: 50 });
+      const res = await sdk.chat.conversations({ limit: 50, organization_id: ORG_ID || undefined });
       const data = res.data || [];
       setConversations(data);
       setCache(cacheKey, data);
@@ -558,7 +633,7 @@ export function useSearch(query: string) {
         // Search in parallel
         const [postRes, profileRes, commRes] = await Promise.allSettled([
           s.posts.search({ q: query, limit: 10, organization_id: ORG_ID || undefined }),
-          s.profiles.search ? s.profiles.search({ query, limit: 10 }) : Promise.reject('no search'),
+          s.profiles.search ? s.profiles.search({ q: query, limit: 10 }) : Promise.reject('no search'),
           s.communities.list({ limit: 50, organization_id: ORG_ID || undefined }),
         ]);
 

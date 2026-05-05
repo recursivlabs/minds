@@ -33,8 +33,8 @@ export default function OrgSettingsScreen() {
       ]);
       setOrgSettings(os);
       setSecurity(sec);
-      if (os?.github_owner) setGithubOwner(os.github_owner);
-      if (os?.default_template_url) setTemplateUrl(os.default_template_url);
+      if ((os as any)?.github_owner) setGithubOwner((os as any).github_owner);
+      if ((os as any)?.default_template_url) setTemplateUrl((os as any).default_template_url);
     } catch {}
     setLoading(false);
   }, [sdk]);
@@ -45,7 +45,7 @@ export default function OrgSettingsScreen() {
     if (!sdk || !githubOwner.trim()) return;
     setSaving('github');
     try {
-      await sdk.organizationSettings.connectGitHub(ORG_ID, { github_owner: githubOwner });
+      await sdk.organizationSettings.connectGitHub(ORG_ID, { github_owner: githubOwner } as any);
       showSuccess('GitHub connected.');
       await load();
     } catch { showError('Failed to connect GitHub.'); }
@@ -68,7 +68,7 @@ export default function OrgSettingsScreen() {
     if (!sdk || !templateUrl.trim()) return;
     setSaving('template');
     try {
-      await sdk.organizationSettings.setDefaultTemplate(ORG_ID, { url: templateUrl });
+      await sdk.organizationSettings.setDefaultTemplate(ORG_ID, { url: templateUrl } as any);
       showSuccess('Default template updated.');
     } catch { showError('Failed to set template.'); }
     setSaving('');

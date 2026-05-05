@@ -34,7 +34,7 @@ export default function ProtocolsScreen() {
         sdk.protocols.list().catch(() => []),
         sdk.protocols.getSettings().catch(() => null),
       ]);
-      setProtocols(Array.isArray(p) ? p : p?.protocols || []);
+      setProtocols((p as any)?.data || []);
       setSettings(s);
     } catch {}
     setLoading(false);
@@ -47,7 +47,7 @@ export default function ProtocolsScreen() {
     setSearching(true);
     try {
       const res = await sdk.protocols.search({ query: searchQuery });
-      setSearchResults(Array.isArray(res) ? res : res?.results || []);
+      setSearchResults((res as any)?.data || []);
     } catch { setSearchResults([]); }
     setSearching(false);
   };

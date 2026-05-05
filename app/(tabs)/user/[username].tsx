@@ -52,6 +52,26 @@ export default function UserProfileScreen() {
   const { refresh: refreshMyProfile } = useMyProfile();
 
   const isOwnProfile = !!user?.id && (user.id === profile?.id || user.username === username);
+
+  // Check if this is the viewer's OWN AI agent. We fetch the user's
+  // agents list (which includes personal agents) and check membership.
+  const [isMyAgent, setIsMyAgent] = React.useState(false);
+  React.useEffect(() => {
+    if (!sdk || !profile?.id || !(profile.isAi || profile.is_ai)) {
+      setIsMyAgent(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await sdk.agents.list({ limit: 100 });
+        if (cancelled) return;
+        const owned = (res.data || []).some((a: any) => a.id === profile.id);
+        setIsMyAgent(owned);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, profile?.id, profile?.isAi, profile?.is_ai]);
   const ALLOWED_TABS = isOwnProfile ? OWNER_TABS : OTHER_TABS;
   const validInitialTab: ProfileTab = (ALLOWED_TABS as readonly string[]).includes(initialTab || '')
     ? (initialTab as ProfileTab)
@@ -237,7 +257,13 @@ export default function UserProfileScreen() {
                   }}
                   variant="secondary"
                   size="sm"
-                  style={{ height: 36, minHeight: 36 }}
+                  style={{
+                    height: 36,
+                    minHeight: 36,
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    borderWidth: 0.5,
+                  }}
                 >
                   Edit Profile
                 </Button>
@@ -246,13 +272,13 @@ export default function UserProfileScreen() {
                   style={{
                     width: 36, height: 36,
                     borderRadius: radius.sm,
-                    backgroundColor: colors.glass,
-                    borderWidth: 0.5, borderColor: colors.glassBorder,
+                    backgroundColor: colors.surface,
+                    borderWidth: 0.5, borderColor: colors.border,
                     alignItems: 'center', justifyContent: 'center',
                   }}
                   hitSlop={8}
                 >
-                  <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+                  <Ionicons name="settings-outline" size={20} color={colors.text} />
                 </Pressable>
               </View>
             )}
@@ -294,6 +320,33 @@ export default function UserProfileScreen() {
                 style={{ padding: spacing.md, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}
               >
                 <Text variant="body" color={colors.error}>Sign Out</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Edit Agent CTA when viewer is the owner of this AI agent */}
+          {isMyAgent && (
+            <View style={{ marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }}>
+              <Text variant="bodyMedium" color={colors.text} style={{ marginBottom: spacing.xs }}>Your personal agent</Text>
+              <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18, marginBottom: spacing.md }}>
+                Edit your agent's name, voice, and full system prompt. You control how it works.
+              </Text>
+              <Pressable
+                onPress={() => router.push('/agent' as any)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: spacing.sm,
+                  paddingHorizontal: spacing.md,
+                  borderRadius: radius.sm,
+                  backgroundColor: pressed ? colors.surfaceHover : colors.bg,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
+                })}
+              >
+                <Text variant="body" color={colors.text}>Edit agent</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </Pressable>
             </View>
           )}
