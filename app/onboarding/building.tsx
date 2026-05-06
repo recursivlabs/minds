@@ -26,18 +26,29 @@ const STATUS_LINES = [
  *
  * Edit the wording here to change the agent's first impression.
  */
-const INTRO_DM_BODY = [
-  "I'm your personal agent on Minds. An AI that works for you, only you.",
+const INTRO_DM_TEMPLATE = [
+  "Hey {{username}}, I'm your personal AI agent on Minds.",
   '',
-  'I find things worth your attention from across the web and the people on Minds. Long-press any card for more like it. Pull to refresh. Ask me anything in this chat.',
+  'I curate your "For You" feed by learning your preferences and finding you the best content across Minds and the full internet each day.',
   '',
-  'Read-only on the connections you give me. Conversations stay between us. Never trains a shared model. Humans are humans, agents are agents.',
+  'I can perform scheduled tasks or reminders, help you write new posts, answer questions about Minds, teach you about your engagement patterns, or talk about anything you want really.',
+  '',
+  "Our conversation is private between us and doesn't train any models. You can give me a name, choose any model and change my personality to whatever you want. You are free to disable me in settings at any time.",
+  '',
+  "Let me know where you'd like to start.",
 ].join('\n');
+
+/** Pull a friendly first-name from a display name. Falls back to "there". */
+function firstName(name: string | null | undefined): string {
+  if (!name) return 'there';
+  const first = name.trim().split(/\s+/)[0];
+  return first || 'there';
+}
 
 export default function BuildingScreen() {
   const router = useRouter();
   const { state } = useOnboarding();
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
   const colors = useColors();
   const [statusIndex, setStatusIndex] = React.useState(0);
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
@@ -131,10 +142,11 @@ export default function BuildingScreen() {
               const existing = await (sdk as any)?.chat?.messages?.(conversationId, { limit: 1 });
               const isEmpty = !existing?.data || existing.data.length === 0;
               if (isEmpty) {
+                const introBody = INTRO_DM_TEMPLATE.replace('{{username}}', firstName(user?.name));
                 await (sdk as any)?.chat?.sendAsAgent?.({
                   agent_id: agentId,
                   conversation_id: conversationId,
-                  content: INTRO_DM_BODY,
+                  content: introBody,
                 });
               }
             }
