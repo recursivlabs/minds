@@ -34,7 +34,7 @@ export interface BuildCuratorRequestInput {
 export type CuratorRequestSource =
   | { type?: 'rss'; url: string; name?: string }
   | { type: 'web_search'; query: string; freshness?: 'pd' | 'pw' | 'pm' | 'py'; limit?: number; name?: string }
-  | { type: 'minds_internal'; networkId?: string; freshnessDays?: number; followIds?: string[]; limit?: number; name?: string };
+  | { type: 'minds_internal'; networkId: string; freshnessDays?: number; followIds?: string[]; limit?: number; name?: string };
 
 export interface CuratorRequest {
   sources: CuratorRequestSource[];
@@ -104,8 +104,12 @@ export function buildCuratorRequest(input: BuildCuratorRequestInput): CuratorReq
 
   // Multi-source mix: RSS feeds for the user's interests + paste-ins
   // come first; on top of that we always layer one Brave web_search
-  // pulled from the same interests, plus a Minds-internal pull from
-  // the user's network so curated cards include in-network content.
+  // pulled from the same interests. The `minds_internal` source is
+  // intentionally NOT included — it requires a `networkId`, and until
+  // Phase 2 lands the Minds-only network it would pull from the shared
+  // Recursiv default network and surface unrelated platform/swarm
+  // content. Add it back when minds-app has a real Minds network ID
+  // to scope the pull to.
   const rssSources: CuratorRequestSource[] = [...interestSources, ...pasteRss].map((s) => ({
     type: 'rss',
     url: s.url,
@@ -118,7 +122,6 @@ export function buildCuratorRequest(input: BuildCuratorRequestInput): CuratorReq
 
   const dynamicSources: CuratorRequestSource[] = [
     { type: 'web_search', query: interestQuery, freshness: 'pw', limit: 8, name: 'Web' },
-    { type: 'minds_internal', freshnessDays: 7, limit: 12, name: 'Minds' },
   ];
 
   return {

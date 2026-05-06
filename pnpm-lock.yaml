@@ -21,8 +21,8 @@ importers:
         specifier: 2.2.0
         version: 2.2.0(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0))
       '@recursiv/sdk':
-        specifier: ^0.4.0
-        version: 0.4.0(react@19.1.0)
+        specifier: ^0.5.0
+        version: 0.5.0(react@19.1.0)
       '@sentry/react-native':
         specifier: ~7.2.0
         version: 7.2.0(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -1379,8 +1379,8 @@ packages:
   '@react-navigation/routers@7.5.3':
     resolution: {integrity: sha512-1tJHg4KKRJuQ1/EvJxatrMef3NZXEPzwUIUZ3n1yJ2t7Q97siwRtbynRpQG9/69ebbtiZ8W3ScOZF/OmhvM4Rg==}
 
-  '@recursiv/sdk@0.4.0':
-    resolution: {integrity: sha512-0ckK85cfY+CkfktqZl1w3gclt/3G+3MamfWlkAcLnr8vWW6Qmadf0f+sSgV2x3pU9HPZaKMgNaxpHdSaJX4TKg==}
+  '@recursiv/sdk@0.5.0':
+    resolution: {integrity: sha512-Di2Nu81p1p90iVZ36MucPIvMbtnzrEageD5kJvd6K9dnPCx9zZhH7aCmKjEA/QPa/juRi/mTpRJe0Xsaxmqz/A==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18.3.1 || ^19.0.0
@@ -5717,7 +5717,7 @@ snapshots:
     dependencies:
       nanoid: 3.3.11
 
-  '@recursiv/sdk@0.4.0(react@19.1.0)':
+  '@recursiv/sdk@0.5.0(react@19.1.0)':
     dependencies:
       react: 19.1.0
       socket.io-client: 4.8.3
