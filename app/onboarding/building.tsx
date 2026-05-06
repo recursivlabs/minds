@@ -87,12 +87,21 @@ export default function BuildingScreen() {
         // run AND store it as the daily_curate config so the server's
         // background worker can re-run it every morning and push the
         // user "5 new picks" without any client-side cron.
+        //
+        // `fresh: true` wipes any prior audience-scoped posts before
+        // inserting new ones. Whenever the user lands here they have
+        // explicitly tapped through onboarding or "Tune your feed" —
+        // they want this run to be their feed, not appended on top of
+        // last week's stale curator output. For brand-new users the
+        // wipe is a no-op (nothing to delete); for returning users
+        // recalibrating it cleans the slate.
         const curatorRequest = buildCuratorRequest({
           agentName: state.agentName || undefined,
           interests: state.interests,
           vibes: state.vibes,
           persona: state.persona as any,
           pasteSources: state.pasteSources as any,
+          fresh: true,
         });
 
         await savePreferences({
