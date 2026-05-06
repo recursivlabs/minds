@@ -119,7 +119,11 @@ export default function BuildingScreen() {
             },
           },
           overrides: {
-            name: state.agentName || undefined,
+            // Don't pass `name` here. The swipe-deck onboarding has no
+            // agent-naming UI, so `state.agentName` is always the
+            // default "Minds" — passing it would stomp the existing
+            // name of any returning user (legacy or recalibrating)
+            // every time they trigger the calibration flow.
             system_prompt: MINDS_PERSONAL_AGENT_SYSTEM_PROMPT,
           },
         });

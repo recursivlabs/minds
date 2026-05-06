@@ -17,7 +17,6 @@ import { Text } from '../../components/Text';
 import { Container } from '../../components/Container';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../lib/auth';
-import { BASE_URL } from '../../lib/recursiv';
 import { useOnboarding } from '../../lib/onboarding';
 import { spacing, radius } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
@@ -78,20 +77,16 @@ export default function SwipeOnboardingScreen() {
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
 
-  // Fetch the seed deck on mount.
+  // Fetch the seed deck on mount via the typed SDK method (auth handled
+  // by HttpClient, no manual Bearer header juggling).
   React.useEffect(() => {
     if (!sdk) return;
     let cancelled = false;
     (async () => {
       try {
-        const apiKey = (sdk as any)?.apiKey || (sdk as any)?.config?.apiKey;
-        const res = await fetch(`${BASE_URL}/curator/seed-deck?count=${TARGET_COUNT}`, {
-          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
-        });
-        if (!res.ok) throw new Error(`seed-deck ${res.status}`);
-        const json = await res.json();
+        const res = await (sdk as any).curator.seedDeck({ count: TARGET_COUNT });
         if (cancelled) return;
-        const items: SeedCard[] = (json.data || []).filter((c: SeedCard) => c.title && c.external_url);
+        const items: SeedCard[] = (res?.data || []).filter((c: SeedCard) => c.title && c.external_url);
         if (items.length === 0) throw new Error('Empty seed deck');
         setCards(items);
       } catch (e: any) {
