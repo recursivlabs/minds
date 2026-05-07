@@ -144,17 +144,26 @@ export default function BuildingScreen() {
           await markCuratedNow();
         }
 
-        // One-time intro DM. Sent once per user, ever — by guarding on
-        // the agent DM thread being empty. After this the agent stays
-        // quiet until the user types.
+        // One-time intro DM. Sent once per user, ever — guarded on
+        // whether the agent has ever posted in this thread. (Originally
+        // gated on "thread is empty," which silently skipped the send
+        // for any returning user whose thread had a prior message from
+        // either side; that misclassified anyone who ever typed at the
+        // agent before the intro was wired up.)
         if (agentId) {
           try {
             const dmRes = await (sdk as any)?.chat?.dm?.({ user_id: agentId });
             const conversationId: string | undefined = dmRes?.data?.id;
             if (conversationId) {
-              const existing = await (sdk as any)?.chat?.messages?.(conversationId, { limit: 1 });
-              const isEmpty = !existing?.data || existing.data.length === 0;
-              if (isEmpty) {
+              // Pull a deeper window than 1 — we need to look across
+              // the recent history to detect prior agent-authored
+              // messages, not just whether anything exists.
+              const existing = await (sdk as any)?.chat?.messages?.(conversationId, { limit: 50 });
+              const messages: Array<{ author?: { id?: string; is_ai?: boolean; isAi?: boolean } }> = existing?.data ?? [];
+              const agentAlreadyPosted = messages.some(
+                (m) => m.author?.id === agentId || m.author?.is_ai === true || m.author?.isAi === true,
+              );
+              if (!agentAlreadyPosted) {
                 const introBody = INTRO_DM_TEMPLATE.replace('{{username}}', firstName(user?.name));
                 await (sdk as any)?.chat?.sendAsAgent?.({
                   agent_id: agentId,
