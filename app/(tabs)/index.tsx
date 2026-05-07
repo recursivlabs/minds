@@ -289,7 +289,33 @@ export default function FeedScreen() {
   return (
     <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>
       <Header />
-      <FeedTabs active={activeTab} onChange={setActiveTab} unread={freshCounts} />
+      <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+        <View style={{ flex: 1 }}>
+          <FeedTabs active={activeTab} onChange={setActiveTab} unread={freshCounts} />
+        </View>
+        {activeTab === 'foryou' && (
+          <Pressable
+            onPress={recurate}
+            disabled={refreshing}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              paddingHorizontal: spacing.xl,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottomWidth: 1,
+              borderBottomColor: colors.borderSubtle,
+              opacity: refreshing ? 0.5 : pressed ? 0.7 : 1,
+            })}
+            accessibilityLabel="Refresh feed"
+          >
+            <Ionicons
+              name={refreshing ? 'sync' : 'refresh-outline'}
+              size={18}
+              color={colors.textMuted}
+            />
+          </Pressable>
+        )}
+      </View>
 
       {isDesktopWeb ? (
         <View style={{ flex: 1, flexDirection: 'row', paddingHorizontal: spacing.xl }}>
