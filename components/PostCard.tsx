@@ -525,36 +525,18 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </NSFWOverlay>
       ) : (
         <View>
-          {/* Agent-curated posts: hero-image-first layout.
-              LinkPreview renders the source's OG image full-width at
-              the top so the visual dominates; agent's commentary lives
-              underneath as a quoted callout. Public/user posts keep
-              the legacy order (text → media → preview). */}
-          {isAgentCurated ? (
-            <>
-              <LinkPreview url={externalUrl} content={content} />
-              {content.trim().length > 0 && (
-                <View
-                  style={{
-                    borderLeftWidth: 2,
-                    borderLeftColor: colors.accent,
-                    paddingLeft: spacing.md,
-                    paddingVertical: spacing.xs,
-                    marginTop: spacing.md,
-                  }}
-                >
-                  {renderMarkdownContent()}
-                </View>
-              )}
-              <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
-            </>
-          ) : (
-            <>
-              {renderMarkdownContent()}
-              <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
-              <LinkPreview content={content} />
-            </>
-          )}
+          {/* Unified post body: text → media → link preview, regardless of
+              author. The byline above already attributes agent-curated
+              posts to the source (e.g. "STRATECHERY · stratechery.com");
+              the body just lets the author's words read first and the
+              link card sit underneath as a reference. Pass the explicit
+              `url` so agent-curated posts (where external_url is a
+              separate field, not embedded in content) render the right
+              link; LinkPreview falls back to URL extraction from content
+              for user posts that paste the URL inline. */}
+          {renderMarkdownContent()}
+          <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
+          <LinkPreview url={externalUrl} content={content} />
         </View>
       )}
 
