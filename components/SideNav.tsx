@@ -8,6 +8,9 @@ import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTheme } from '../lib/theme';
 import { useConversations, useCommunities } from '../lib/hooks';
+import { ensureIntroDM } from '../lib/agentIntro';
+import { invalidate } from '../lib/cache';
+import { getPreference } from '../lib/preferences';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
 
 const COLLAPSED_WIDTH = 60;
@@ -92,6 +95,33 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       } catch {}
     })();
   }, [sdk, pathname]); // Refetch when navigating (cheap, cached)
+
+  // Personal-agent intro back-fill. Runs once per app load. If the
+  // user has a personal agent and that thread has no agent-authored
+  // message yet, post the intro DM. Covers accounts whose original
+  // /agent setup swallowed the sendAsAgent failure (Samson stayed
+  // mute in the Recent inbox). Idempotent: ensureIntroDM no-ops
+  // when the thread already has an agent message.
+  const introBackfilledRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!sdk || !user?.id || introBackfilledRef.current) return;
+    if (!getPreference('aiEnabled')) return;
+    introBackfilledRef.current = true;
+    (async () => {
+      try {
+        const list = await sdk.agents.list({ limit: 50 });
+        const personal = (list.data || []).find(
+          (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
+        );
+        if (!personal) return;
+        await ensureIntroDM(sdk, personal.id, user?.name);
+        invalidate('conversations');
+        refreshConvos();
+      } catch (err) {
+        console.warn('[SideNav intro back-fill] failed', err);
+      }
+    })();
+  }, [sdk, user?.id, user?.name, refreshConvos]);
 
   // Real-time unread tracking + conversation reordering
   React.useEffect(() => {

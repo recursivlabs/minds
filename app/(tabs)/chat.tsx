@@ -10,6 +10,7 @@ import { useConversations } from '../../lib/hooks';
 import { getPreference } from '../../lib/preferences';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 import { getCached, setCache, invalidate } from '../../lib/cache';
+import { ensureIntroDM } from '../../lib/agentIntro';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -72,15 +73,15 @@ export default function ChatScreen() {
           (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
         );
         if (!personal || cancelled) return;
-        await sdk.chat.dm({ user_id: personal.id });
+        // Open the DM AND post the intro if the thread is empty.
+        // Covers accounts whose original /agent setup swallowed the
+        // sendAsAgent failure, so Samson's thread is still blank.
+        await ensureIntroDM(sdk, personal.id, user?.name);
         if (cancelled) return;
-        // Drop the cached conversations snapshot so the sidebar
-        // (which subscribes to invalidations) refetches and shows
-        // the agent thread on existing accounts that never had it.
         invalidate('conversations');
         refresh();
-      } catch {
-        // Back-fill blip is non-fatal.
+      } catch (err) {
+        console.warn('[chat back-fill] failed', err);
       }
     })();
     return () => { cancelled = true; };

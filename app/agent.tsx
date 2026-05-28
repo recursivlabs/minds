@@ -16,6 +16,7 @@ import {
 } from '../lib/onboarding';
 import { buildCuratorRequest } from '../lib/curator';
 import { invalidate } from '../lib/cache';
+import { ensureIntroDM, INTRO_DM_TEMPLATE as _IDT, firstName as _FN } from '../lib/agentIntro';
 import { colors, spacing, radius, typography } from '../constants/theme';
 
 // Model options — must match server allowlist in lib/modelAllowlist.ts.
@@ -36,22 +37,10 @@ const DEFAULT_SYSTEM_PROMPT = [
   'Your conversations with the user are private and never train a shared model.',
 ].join(' ');
 
-const INTRO_DM_TEMPLATE = (firstName: string) => [
-  `Hey ${firstName || 'there'}, I'm your personal AI agent on Minds.`,
-  '',
-  'I curate your "For You" feed by learning your preferences and finding you the best content across Minds and the full internet each day.',
-  '',
-  'I can perform scheduled tasks or reminders, help you write new posts, answer questions about Minds, teach you about your engagement patterns, or talk about anything you want really.',
-  '',
-  "Our conversation is private between us and doesn't train any models. You can change my name, model, or personality anytime in settings. You are free to disable me anytime.",
-  '',
-  "Let me know where you'd like to start.",
-].join('\n');
-
-function firstName(name: string | null | undefined): string {
-  if (!name) return 'there';
-  return name.trim().split(/\s+/)[0] || 'there';
-}
+// INTRO_DM_TEMPLATE + firstName moved to lib/agentIntro so the chat
+// back-fill + SideNav can share the same idempotent helper.
+const INTRO_DM_TEMPLATE = _IDT;
+const firstName = _FN;
 
 export default function AgentSetupScreen() {
   const router = useRouter();
@@ -205,40 +194,16 @@ export default function AgentSetupScreen() {
         stopStatusCycle();
       }
 
-      // 4. Open DM thread + (first-time only) post the intro message so
-      //    the user sees the agent in their Recent sidebar right after
-      //    setup. Re-runs of /agent (editing) still open/refresh the
-      //    thread but skip the intro post.
+      // 4. Open the DM thread and post the intro if missing. The
+      //    helper is idempotent: editing /agent later won't re-post.
       if (newAgentId) {
         setStepMsg('Opening agent chat');
         try {
-          const dmRes: any = await sdk.chat.dm({ user_id: newAgentId });
-          const conversationId: string | undefined = dmRes?.data?.id;
-          if (conversationId && !isExistingAgent) {
-            const existing: any = await (sdk as any).chat.messages?.(conversationId, { limit: 50 });
-            const messages: Array<{ author?: { id?: string; is_ai?: boolean; isAi?: boolean } }> = existing?.data ?? [];
-            const agentAlreadyPosted = messages.some(
-              (m) => m.author?.id === newAgentId || m.author?.is_ai === true || m.author?.isAi === true,
-            );
-            if (!agentAlreadyPosted) {
-              await (sdk as any).chat.sendAsAgent({
-                agent_id: newAgentId,
-                conversation_id: conversationId,
-                content: INTRO_DM_TEMPLATE(firstName(user?.name)),
-              });
-            }
-          }
+          await ensureIntroDM(sdk, newAgentId, user?.name);
         } catch (dmErr: any) {
-          // Surface the failure in the UI status line so we notice
-          // when the intro doesn't post (Recent inbox staying empty
-          // was the symptom). Setup still succeeds — agent + feed
-          // work — but at least the user knows the welcome chat
-          // didn't go through.
           console.warn('[agent setup] intro DM failed', dmErr);
           setError(`Agent saved, but welcome chat didn't post: ${dmErr?.message || 'unknown error'}`);
         }
-        // Either way, drop the cached conversations snapshot so the
-        // sidebar refetches and shows the agent thread immediately.
         invalidate('conversations');
       }
 
