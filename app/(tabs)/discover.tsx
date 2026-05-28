@@ -7,6 +7,7 @@ import { Container } from '../../components/Container';
 import { TabBar } from '../../components/TabBar';
 import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
+import { getPreference } from '../../lib/preferences';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
 function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
@@ -27,6 +28,231 @@ function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; o
         {toggled ? 'Following' : 'Follow'}
       </Text>
     </Pressable>
+  );
+}
+
+// Topic chips that filter the Discover canvas. Short, opinionated set
+// chosen to match the curator's top categories. Adding more = more
+// noise; keeping under 8 keeps the row scannable.
+const TOPIC_CHIPS: { key: string; label: string; match: RegExp }[] = [
+  { key: 'all', label: 'All', match: /.*/ },
+  { key: 'ai', label: 'AI', match: /\b(ai|llm|gpt|claude|anthropic|openai|gemini|agent|model|inference)\b/i },
+  { key: 'crypto', label: 'Crypto', match: /\b(crypto|bitcoin|btc|eth|sol|defi|wallet|chain|blockchain|stablecoin)\b/i },
+  { key: 'tech', label: 'Tech', match: /\b(startup|founder|product|launch|release|app|software|github|api|sdk)\b/i },
+  { key: 'science', label: 'Science', match: /\b(research|study|scientist|biology|physics|paper|nature|arxiv|theory)\b/i },
+  { key: 'culture', label: 'Culture', match: /\b(film|music|book|art|essay|writer|culture|history|design)\b/i },
+  { key: 'world', label: 'World', match: /\b(china|russia|europe|asia|africa|government|election|war|policy)\b/i },
+];
+
+function topicMatches(post: any, topicKey: string): boolean {
+  const chip = TOPIC_CHIPS.find((c) => c.key === topicKey);
+  if (!chip) return true;
+  const hay = `${post.title || ''} ${post.content || ''} ${post.tags?.join(' ') || ''}`;
+  return chip.match.test(hay);
+}
+
+function getDomain(url: string | null | undefined): string {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '');
+  } catch { return ''; }
+}
+
+function extractUrl(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = text.match(/https?:\/\/\S+/);
+  return m ? m[0].replace(/[.,;:!?)\]]+$/, '') : null;
+}
+
+function postSource(post: any): string {
+  // Curator posts carry source on post.source_name; legacy posts may
+  // carry the URL inline. Prefer explicit field, fall back to URL.
+  if (post.source_name) return String(post.source_name);
+  if (post.sourceName) return String(post.sourceName);
+  const url = post.external_url || post.externalUrl || extractUrl(post.content);
+  return getDomain(url) || 'minds';
+}
+
+function postCategory(post: any): string {
+  // Cheap classifier: walks the topic chips in order and picks the
+  // first that matches. Fed back into the dense-row eyebrow so each
+  // headline reads "AI · TechCrunch" or "CRYPTO · Bloomberg" instead
+  // of just a hostname.
+  for (const chip of TOPIC_CHIPS) {
+    if (chip.key === 'all') continue;
+    if (topicMatches(post, chip.key)) return chip.label.toUpperCase();
+  }
+  return '';
+}
+
+function postAITake(post: any): string {
+  // Curator stores the agent's editorial caption on post.content;
+  // the original article link lives on external_url. Show the first
+  // ~120 chars as the AI take. If content IS just the URL, skip.
+  const body = (post.content || '').trim();
+  if (!body) return '';
+  if (/^https?:\/\//.test(body)) return '';
+  const firstSentence = body.split(/(?<=[.!?])\s+/)[0] || body;
+  return firstSentence.length > 140 ? firstSentence.slice(0, 137) + '…' : firstSentence;
+}
+
+function DiscoverHero({ post, onPress }: { post: any; onPress: () => void }) {
+  const image = post.image || post.previewImage;
+  const source = postSource(post);
+  const category = postCategory(post);
+  const take = postAITake(post);
+  const replies = post.replyCount || post.reply_count || 0;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({ opacity: pressed ? 0.95 : 1 })}
+    >
+      {image ? (
+        <View style={{ width: '100%', aspectRatio: 1.91, backgroundColor: colors.surfaceRaised, marginBottom: spacing.lg }}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          {Platform.OS === 'web'
+            ? <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' } as any} />
+            : null}
+        </View>
+      ) : null}
+      <View style={{ paddingHorizontal: spacing.xl, gap: spacing.sm }}>
+        <Text variant="caption" color={colors.accent} style={{ letterSpacing: 1.5, fontSize: 10 }}>
+          {category ? `${category} · TODAY` : 'TODAY · MINDS'}
+        </Text>
+        <Text variant="h1" color={colors.text} style={{ fontWeight: '600', lineHeight: 34 }} numberOfLines={4}>
+          {post.title || (post.content || '').split('\n')[0].slice(0, 120)}
+        </Text>
+        {take ? (
+          <Text variant="body" color={colors.textSecondary} style={{ fontStyle: 'italic', lineHeight: 22 }} numberOfLines={3}>
+            {take}
+          </Text>
+        ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          <Text variant="caption" color={colors.textMuted}>{source}</Text>
+          {replies > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="chatbubble-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{replies} repl{replies === 1 ? 'y' : 'ies'} on Minds</Text>
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' as any }}>
+            <Text variant="caption" color={colors.accent}>Discuss →</Text>
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function DenseHeadline({ post, onPress }: { post: any; onPress: () => void }) {
+  const source = postSource(post);
+  const category = postCategory(post);
+  const take = postAITake(post);
+  const replies = post.replyCount || post.reply_count || 0;
+  const score = post.score || 0;
+  const title = post.title || (post.content || '').split('\n')[0];
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.xl,
+        borderBottomWidth: 0.5,
+        borderBottomColor: colors.borderSubtle,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        gap: 2,
+      })}
+    >
+      <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10, letterSpacing: 0.8 }}>
+        {category ? `${category} · ` : ''}{source}
+      </Text>
+      <Text variant="bodyMedium" color={colors.text} numberOfLines={2} style={{ lineHeight: 20 }}>
+        {title || 'Untitled'}
+      </Text>
+      {take ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ fontStyle: 'italic' }}>
+          {take}
+        </Text>
+      ) : null}
+      {(replies > 0 || score > 0) ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 }}>
+          {replies > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="chatbubble-outline" size={10} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{replies}</Text>
+            </View>
+          ) : null}
+          {score > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="arrow-up-outline" size={10} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{score}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function TopicChipRow({ chips, active, onChange }: { chips: typeof TOPIC_CHIPS; active: string; onChange: (k: string) => void }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.sm }}
+    >
+      {chips.map((c) => {
+        const isActive = active === c.key;
+        return (
+          <Pressable
+            key={c.key}
+            onPress={() => onChange(c.key)}
+            style={({ pressed }) => ({
+              paddingHorizontal: spacing.md,
+              paddingVertical: 6,
+              borderRadius: radius.full,
+              borderWidth: 1,
+              borderColor: isActive ? colors.accent : colors.borderSubtle,
+              backgroundColor: isActive ? colors.accentMuted : 'transparent',
+              opacity: pressed ? 0.7 : 1,
+              marginRight: spacing.sm,
+            })}
+          >
+            <Text variant="caption" color={isActive ? colors.accent : colors.textMuted} style={{ fontSize: 12 }}>
+              {c.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function EndOfBrief({ onAsk }: { onAsk: () => void }) {
+  return (
+    <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing['3xl'], gap: spacing.md, alignItems: 'center' }}>
+      <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.5, fontSize: 10 }}>
+        END OF TODAY'S BRIEF
+      </Text>
+      <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 320, lineHeight: 22 }}>
+        That's your reading list. Ask your agent what to dig into next.
+      </Text>
+      <Pressable
+        onPress={onAsk}
+        style={({ pressed }) => ({
+          marginTop: spacing.sm,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.sm,
+          borderRadius: radius.full,
+          borderWidth: 1,
+          borderColor: colors.accent,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <Text variant="bodyMedium" color={colors.accent}>Ask my agent</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -387,6 +613,8 @@ export default function DiscoverScreen() {
     (params.tab as DiscoverTab) || 'posts'
   );
   const [searchQuery, setSearchQuery] = React.useState(params.q || '');
+  const [activeTopic, setActiveTopic] = React.useState<string>('all');
+  const topicChips = React.useMemo(() => TOPIC_CHIPS, []);
 
   // Followers/following mode — kept as-is, takes over the screen
   const [followList, setFollowList] = React.useState<any[]>([]);
@@ -408,7 +636,12 @@ export default function DiscoverScreen() {
     })();
   }, [followMode, followUserId, sdk]);
 
-  const { posts, loading: postsLoading, loadMore: loadMorePosts, hasMore: hasMorePosts } = usePosts('score', 20);
+  // Pull from the user's personal curated stream when AI is on (the
+  // agent's hand-picked reading list); fall back to score-ranked
+  // network posts when AI is off so the page isn't empty for users
+  // with the master switch flipped.
+  const aiEnabled = getPreference('aiEnabled');
+  const { posts, loading: postsLoading, loadMore: loadMorePosts, hasMore: hasMorePosts } = usePosts(aiEnabled ? 'personal' : 'score', 30);
   const { communities, loading: commLoading } = useCommunities(50);
   const { agents, loading: agentsLoading } = useAgents(50);
   const { profiles, loading: profilesLoading } = useProfiles(50);
@@ -451,127 +684,69 @@ export default function DiscoverScreen() {
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // ── Editorial canvas view (no search query, no follow mode) ──
+  // ── Discover canvas: hero + dense column ──
+  // Drudge meets Reddit front page meets your AI's editorial brief.
+  // Hero gets full visual treatment when the top pick has an OG image;
+  // dense column below scrolls fast with source bylines, AI takes, and
+  // reply counts. Topic chips at top filter the whole canvas.
   const renderCanvas = () => {
-    const trendingPosts = (posts || []).slice(0, 3);
-    const featuredCommunities = (communities || []).slice(0, 8);
-    const featuredAgents = (agents || []).slice(0, 8);
-    const featuredPeople = (profiles || []).slice(0, 8);
+    if (postsLoading && (posts || []).length === 0) {
+      return (
+        <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.xl, gap: spacing.lg }}>
+          <Skeleton width="100%" height={240} borderRadius={radius.lg} />
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <View key={i} style={{ gap: spacing.xs }}>
+              <Skeleton width={100} height={10} />
+              <Skeleton width="100%" height={18} />
+            </View>
+          ))}
+        </View>
+      );
+    }
+    if ((posts || []).length === 0) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+          <Ionicons name="newspaper-outline" size={40} color={colors.accent} />
+          <Text variant="h2" color={colors.text} align="center">Your agent is warming up</Text>
+          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 320, lineHeight: 24 }}>
+            Set up your personal AI agent and it'll surface the day's reading list here, curated to your taste.
+          </Text>
+          <Button onPress={() => router.push('/agent' as any)} size="sm">Set up agent</Button>
+        </View>
+      );
+    }
+    // Filtered set drives both hero pick and dense column. When the
+    // user selects a topic chip, both update together.
+    const filtered = activeTopic
+      ? (posts || []).filter((p: any) => topicMatches(p, activeTopic))
+      : (posts || []);
+    const hero = filtered.find((p: any) => p.image || p.previewImage) || filtered[0];
+    const dense = filtered.filter((p: any) => p.id !== hero?.id).slice(0, 29);
 
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['3xl'] }}>
-        {/* Trending posts — vertical list, lead card on top */}
-        <SectionHeader
-          title="Trending on Minds"
-          subtitle="What people are reading and talking about"
-          onSeeAll={() => setActiveTab('posts')}
+        <TopicChipRow active={activeTopic} onChange={setActiveTopic} chips={topicChips} />
+        {hero && <DiscoverHero post={hero} onPress={() => router.push(`/(tabs)/post/${hero.id}` as any)} />}
+        <View style={{ height: 1, backgroundColor: colors.borderSubtle, marginTop: spacing.lg }} />
+        {dense.map((p: any) => (
+          <DenseHeadline
+            key={p.id}
+            post={p}
+            onPress={() => router.push(`/(tabs)/post/${p.id}` as any)}
+          />
+        ))}
+        <EndOfBrief
+          onAsk={async () => {
+            if (!sdk) return;
+            try {
+              const list = await sdk.agents.list({ limit: 50 });
+              const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
+              if (!personal) { router.push('/agent' as any); return; }
+              const dm = await sdk.chat.dm({ user_id: personal.id });
+              if (dm.data?.id) router.push(`/(tabs)/chat?id=${dm.data.id}` as any);
+            } catch {}
+          }}
         />
-        {postsLoading && trendingPosts.length === 0 ? (
-          <View style={{ paddingHorizontal: spacing.xl, gap: spacing.lg }}>
-            {[1, 2, 3].map((i) => (
-              <View key={i} style={{ gap: spacing.sm }}>
-                <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-                  <Skeleton width={36} height={36} borderRadius={18} />
-                  <View style={{ flex: 1, gap: spacing.xs }}>
-                    <Skeleton width={140} height={12} />
-                    <Skeleton width={80} height={10} />
-                  </View>
-                </View>
-                <Skeleton width="100%" height={50} />
-              </View>
-            ))}
-          </View>
-        ) : trendingPosts.length === 0 ? (
-          <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }}>
-            <Text variant="body" color={colors.textMuted}>No trending posts yet.</Text>
-          </View>
-        ) : (
-          trendingPosts.map((p: any, index: number) => {
-            if (index === 0) {
-              return (
-                <View key={p.id} style={{ borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle }}>
-                  <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg }}>
-                    <View style={{ alignSelf: 'flex-start', backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4, marginBottom: spacing.sm }}>
-                      <Text variant="caption" color={colors.accent} style={{ fontSize: 10, letterSpacing: 0.5 }}>TRENDING NOW</Text>
-                    </View>
-                  </View>
-                  <PostCard post={p} />
-                </View>
-              );
-            }
-            return <PostCard key={p.id} post={p} compact />;
-          })
-        )}
-
-        {/* Communities */}
-        <SectionHeader
-          title="Communities to join"
-          subtitle="Find your people"
-          onSeeAll={() => setActiveTab('communities')}
-        />
-        <HorizontalCarousel loading={commLoading && featuredCommunities.length === 0}>
-          {featuredCommunities.map((c: any) => (
-            <CommunityTile
-              key={c.id}
-              community={c}
-              onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
-            />
-          ))}
-          <Pressable
-            onPress={() => router.push('/(tabs)/create?mode=community' as any)}
-            style={({ pressed }) => ({
-              width: TILE_WIDTH,
-              padding: spacing.lg,
-              marginRight: spacing.md,
-              backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-              borderRadius: radius.lg,
-              borderWidth: 0.5,
-              borderColor: colors.borderSubtle,
-              borderStyle: 'dashed',
-              alignItems: 'flex-start',
-              justifyContent: 'center',
-              minHeight: 160,
-            })}
-          >
-            <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="add" size={22} color={colors.accent} />
-            </View>
-            <Text variant="bodyMedium" color={colors.accent} style={{ marginTop: spacing.sm }}>Start a community</Text>
-            <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>Gather people around an interest</Text>
-          </Pressable>
-        </HorizontalCarousel>
-
-        {/* Agents */}
-        <SectionHeader
-          title="Agents to chat with"
-          subtitle="AIs people on Minds have built"
-          onSeeAll={() => setActiveTab('agents')}
-        />
-        <HorizontalCarousel loading={agentsLoading && featuredAgents.length === 0}>
-          {featuredAgents.map((a: any) => (
-            <AgentTile
-              key={a.id}
-              agent={a}
-              onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
-            />
-          ))}
-        </HorizontalCarousel>
-
-        {/* People */}
-        <SectionHeader
-          title="People to follow"
-          subtitle="New voices on the network"
-          onSeeAll={() => setActiveTab('people')}
-        />
-        <HorizontalCarousel loading={profilesLoading && featuredPeople.length === 0}>
-          {featuredPeople.map((p: any) => (
-            <PersonTile
-              key={p.id}
-              person={p}
-              onPress={() => router.push(`/(tabs)/user/${p.username || p.id}` as any)}
-            />
-          ))}
-        </HorizontalCarousel>
       </ScrollView>
     );
   };
