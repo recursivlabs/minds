@@ -62,7 +62,9 @@ export default function AgentSetupScreen() {
   const [model, setModel] = React.useState(MODELS[0].key);
   const [systemPrompt, setSystemPrompt] = React.useState(DEFAULT_SYSTEM_PROMPT);
   const [interests, setInterests] = React.useState('');
-  const [contextDoc, setContextDoc] = React.useState('');
+  // File-upload context is stubbed for v1 — the upload control renders
+  // a coming-soon dropzone. When wired, this state will hold uploaded
+  // file references that the agent reads as private context.
 
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -161,7 +163,7 @@ export default function AgentSetupScreen() {
           interests: stored?.interests || [],
           free_text_interests: interests.trim() || '',
           vibes: stored?.vibes || [],
-          context_document: contextDoc.trim() || null,
+          // context_document removed for v1 — file-upload UI replaces it.
         },
         overrides: {
           name: name.trim() || undefined,
@@ -260,7 +262,7 @@ export default function AgentSetupScreen() {
   );
 
   return (
-    <Container safeTop safeBottom>
+    <Container safeTop safeBottom maxWidth={720}>
       <ScreenHeader title={isExistingAgent ? 'Your agent' : 'Set up your agent'} showBack />
 
       <ScrollView
@@ -340,25 +342,30 @@ export default function AgentSetupScreen() {
 
             <View style={{ gap: spacing.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text variant="label" color={colors.textMuted}>SECURE CONTEXT</Text>
+                <Text variant="label" color={colors.textMuted}>CONTEXT FILES</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="lock-closed" size={11} color={colors.textMuted} />
                   <Text variant="caption" color={colors.textMuted}>Private</Text>
                 </View>
               </View>
               <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>
-                Drop in anything your agent should know about you — bio, projects, working style, "always answer this way", etc. Stays private. Never shared.
+                Upload PDFs, docs, or notes your agent should know about you — bio, projects, working style, reference material. Stays private. Never shared.
               </Text>
-              <TextInput
-                value={contextDoc}
-                onChangeText={setContextDoc}
-                placeholder="I'm a builder working on… My writing voice is… When recommending content, always…"
-                placeholderTextColor={colors.textMuted}
-                multiline
-                textAlignVertical="top"
-                maxLength={8000}
-                style={{ ...inputBase, minHeight: 120 }}
-              />
+              {/* File-upload stub. Match the connectors styling so the
+                 "coming soon" state is obvious. Wires to a real picker +
+                 backend ingestion later. */}
+              <View style={{
+                padding: spacing.lg, borderRadius: radius.md,
+                borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border,
+                alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+                opacity: 0.7,
+              }}>
+                <Ionicons name="cloud-upload-outline" size={28} color={colors.textMuted} />
+                <Text variant="bodyMedium" color={colors.textMuted}>Upload context files</Text>
+                <Text variant="caption" color={colors.textSecondary} align="center" style={{ maxWidth: 320 }}>
+                  PDF, DOCX, MD, TXT. Coming soon — your agent will index uploads as private context.
+                </Text>
+              </View>
             </View>
 
             <View style={{ gap: spacing.sm }}>

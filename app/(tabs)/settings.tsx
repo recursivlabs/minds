@@ -223,7 +223,7 @@ export default function SettingsScreen() {
 
   if (loading) {
     return (
-      <Container safeTop>
+      <Container safeTop maxWidth={720}>
         <View style={{ paddingTop: spacing['3xl'], gap: spacing.xl }}>
           {[1, 2, 3, 4].map(i => <Skeleton key={i} height={80} />)}
         </View>
@@ -232,7 +232,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <Container safeTop padded={false}>
+    <Container safeTop padded={false} maxWidth={720}>
       <ScreenHeader title="Settings" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: spacing['5xl'] }}>
