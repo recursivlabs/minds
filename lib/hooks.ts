@@ -610,7 +610,10 @@ export function useSearchPosts(query: string) {
 
   React.useEffect(() => {
     if (!query.trim()) {
+      // Clearing the query mid-search left loading=true, so the search
+      // results UI kept a spinner over an empty list. Reset both.
       setResults([]);
+      setLoading(false);
       return;
     }
     let cancelled = false;

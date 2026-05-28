@@ -134,9 +134,38 @@ export const LinkPreview = React.memo(function LinkPreview({ content, url: urlPr
   const image = preview?.image;
   const favicon = preview?.favicon;
 
-  // Still loading — render nothing so the card pops in cleanly once metadata
-  // is ready. (Avoids the flash of a loading pill.)
-  if (!loaded) return null;
+  // While the preview metadata is in flight, reserve space with a
+  // skeleton card the same shape as the loaded preview. Without this
+  // reservation the post body renders, the preview fetches 100-500ms
+  // later, and then a hero card pops in below it — pushing everything
+  // down. Net effect: content "jumps." With the skeleton the layout
+  // stays put and the image just fills in.
+  if (!loaded) {
+    return (
+      <View
+        style={{
+          marginTop: spacing.md,
+          backgroundColor: colors.surface,
+          borderRadius: radius.xl,
+          borderWidth: 0.5,
+          borderColor: colors.borderSubtle,
+          overflow: 'hidden',
+        }}
+      >
+        <View
+          style={{
+            width: '100%',
+            aspectRatio: 1.91,
+            backgroundColor: colors.surfaceRaised,
+          }}
+        />
+        <View style={{ padding: spacing.lg, gap: spacing.xs }}>
+          <View style={{ height: 16, width: '60%', backgroundColor: colors.surfaceRaised, borderRadius: 4 }} />
+          <View style={{ height: 12, width: '90%', backgroundColor: colors.surfaceRaised, borderRadius: 4, marginTop: spacing.xs }} />
+        </View>
+      </View>
+    );
+  }
 
   // Hero card: big image, domain pill overlaid on bottom-left, text beneath.
   if (image) {

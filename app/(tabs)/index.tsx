@@ -330,7 +330,14 @@ export default function FeedScreen() {
             ) : null
           }
           ListEmptyComponent={
-            !postsLoading ? (
+            // While the feed is loading the first time, show post-shaped
+            // skeletons (not a centered spinner). Spinner-replacing-list
+            // looks broken; skeleton makes it feel like content is on
+            // the way. Empty-state hero only renders once loading is
+            // done AND the result is genuinely empty.
+            postsLoading ? (
+              <FeedSkeletons count={4} />
+            ) : (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], gap: spacing['2xl'] }}>
                 {activeTab === 'foryou' && refreshing ? (
                   <ActivityIndicator color={colors.accent} size="large" />
@@ -359,7 +366,7 @@ export default function FeedScreen() {
                   )}
                 </View>
               </View>
-            ) : null
+            )
           }
           showsVerticalScrollIndicator={false}
         />
