@@ -9,7 +9,7 @@ import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
 import { getPreference } from '../../lib/preferences';
 import { colors, spacing, radius, typography } from '../../constants/theme';
-import { getCached, setCache } from '../../lib/cache';
+import { getCached, setCache, invalidate } from '../../lib/cache';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -74,6 +74,10 @@ export default function ChatScreen() {
         if (!personal || cancelled) return;
         await sdk.chat.dm({ user_id: personal.id });
         if (cancelled) return;
+        // Drop the cached conversations snapshot so the sidebar
+        // (which subscribes to invalidations) refetches and shows
+        // the agent thread on existing accounts that never had it.
+        invalidate('conversations');
         refresh();
       } catch {
         // Back-fill blip is non-fatal.
