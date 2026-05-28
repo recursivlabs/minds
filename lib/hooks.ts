@@ -147,10 +147,17 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   // on explicit user gestures — focus refreshes stay silent. When the
   // user has disabled AI in Settings we never call the curator and just
   // re-fetch chronologically.
+  // Fire-and-forget curator refresh. Returns fast (status: fresh /
+  // already-running / started) instead of awaiting the 5-15s pipeline.
+  // Background work updates curation_run when it completes; the user
+  // sees fresher content on the NEXT view, not after a long spinner.
+  // Falls back to the legacy awaited path only if refreshIfStale isn't
+  // available on the SDK (older client / staging).
   const recurate = React.useCallback(async () => {
     if (sort !== 'personal' || !getPreference('aiEnabled')) return fetchPosts(true);
     const s = sdk || getSdk();
     const ensurePersonal = (s as any)?.agents?.ensurePersonal;
+    const refreshIfStale = (s as any)?.curator?.refreshIfStale;
     const runCurator = (s as any)?.curator?.run;
     try {
       const stored = await loadPreferences();
@@ -173,14 +180,20 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
           overrides: prefs.agent_name ? { name: prefs.agent_name } : undefined,
         });
       }
-      if (typeof runCurator === 'function') {
-        const request = buildCuratorRequest({
-          agentName: prefs.agent_name || undefined,
-          interests: prefs.interests,
-          vibes: prefs.vibes,
-          persona: prefs.persona as any,
-          pasteSources: prefs.paste_sources as any,
-        });
+      const request = buildCuratorRequest({
+        agentName: prefs.agent_name || undefined,
+        interests: prefs.interests,
+        vibes: prefs.vibes,
+        persona: prefs.persona as any,
+        pasteSources: prefs.paste_sources as any,
+      });
+      if (typeof refreshIfStale === 'function') {
+        const res: any = await refreshIfStale.call((s as any).curator, request);
+        if (res?.data?.status === 'started') await markCuratedNow();
+        // 'fresh' or 'already-running' → do nothing extra; the feed
+        // re-fetch below picks up whatever is already in the post table.
+      } else if (typeof runCurator === 'function') {
+        // Legacy SDK fallback path. Awaits the run.
         await runCurator.call((s as any).curator, request);
         await markCuratedNow();
       }
