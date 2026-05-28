@@ -15,6 +15,7 @@ import {
   markCuratedNow,
 } from '../lib/onboarding';
 import { buildCuratorRequest } from '../lib/curator';
+import { invalidate } from '../lib/cache';
 import { colors, spacing, radius, typography } from '../constants/theme';
 
 // Model options — must match server allowlist in lib/modelAllowlist.ts.
@@ -204,13 +205,16 @@ export default function AgentSetupScreen() {
         stopStatusCycle();
       }
 
-      // 4. Send intro DM (only on first-time setup — don't spam on edits)
-      if (!isExistingAgent && newAgentId) {
-        setStepMsg('Sending welcome message');
+      // 4. Open DM thread + (first-time only) post the intro message so
+      //    the user sees the agent in their Recent sidebar right after
+      //    setup. Re-runs of /agent (editing) still open/refresh the
+      //    thread but skip the intro post.
+      if (newAgentId) {
+        setStepMsg('Opening agent chat');
         try {
           const dmRes: any = await sdk.chat.dm({ user_id: newAgentId });
           const conversationId: string | undefined = dmRes?.data?.id;
-          if (conversationId) {
+          if (conversationId && !isExistingAgent) {
             const existing: any = await (sdk as any).chat.messages?.(conversationId, { limit: 50 });
             const messages: Array<{ author?: { id?: string; is_ai?: boolean; isAi?: boolean } }> = existing?.data ?? [];
             const agentAlreadyPosted = messages.some(
@@ -224,9 +228,18 @@ export default function AgentSetupScreen() {
               });
             }
           }
-        } catch {
-          // DM seeding blip — agent + feed still work
+        } catch (dmErr: any) {
+          // Surface the failure in the UI status line so we notice
+          // when the intro doesn't post (Recent inbox staying empty
+          // was the symptom). Setup still succeeds — agent + feed
+          // work — but at least the user knows the welcome chat
+          // didn't go through.
+          console.warn('[agent setup] intro DM failed', dmErr);
+          setError(`Agent saved, but welcome chat didn't post: ${dmErr?.message || 'unknown error'}`);
         }
+        // Either way, drop the cached conversations snapshot so the
+        // sidebar refetches and shows the agent thread immediately.
+        invalidate('conversations');
       }
 
       // 5. Flag setup complete + back to feed

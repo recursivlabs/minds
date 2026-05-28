@@ -462,6 +462,17 @@ export function useConversations() {
     fetch();
   }, [fetch]);
 
+  // Match the invalidation contract used by useCommunities/usePosts so
+  // any code path that calls `invalidate('conversations')` (e.g. agent
+  // setup right after creating the personal-agent DM) forces this
+  // sidebar to re-fetch without waiting 30s for the FRESH_MS window.
+  React.useEffect(() => {
+    const unsub = subscribeToInvalidations((key) => {
+      if (key === cacheKey) fetch();
+    });
+    return unsub;
+  }, [fetch]);
+
   return { conversations, loading, error, refresh: fetch };
 }
 
