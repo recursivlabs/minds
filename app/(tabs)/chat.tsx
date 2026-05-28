@@ -56,33 +56,64 @@ export default function ChatScreen() {
     };
   }, [sdk]);
 
-  // Ensure the user has a DM with their personal agent. Idempotent —
-  // chat.dm() is get-or-create. Runs on first chat-tab mount; if the
-  // user signed up before we wired the building-screen seed, this back-
-  // fills the missing conversation so the agent appears in the list.
-  // When the conversation is fresh (created=true), the agent posts a
-  // welcome via chat.sendAsAgent so the chat list isn't empty on first
-  // open. Skipped entirely when the user has flipped off AI in Settings.
+  // Ensure the user has a personal agent AND a DM with them. Idempotent.
+  // Legacy / pre-onboarding users never had ensurePersonal called, so
+  // agents.list().find(personal) returns nothing and the prior version
+  // silently no-op'd. Call ensurePersonal first (it's a find-or-create),
+  // then get-or-create the DM, then seed the intro DM if the agent has
+  // never posted in this thread. Skipped entirely if AI is off in Settings.
   React.useEffect(() => {
     if (!sdk) return;
     if (!getPreference('aiEnabled')) return;
     let cancelled = false;
     (async () => {
       try {
-        const list = await sdk.agents.list({ limit: 50 });
-        const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
-        if (!personal || cancelled) return;
-        await sdk.chat.dm({ user_id: personal.id });
+        // Step 1: ensure a personal agent exists. Server creates it lazily
+        // if missing, returns the existing one otherwise. Idempotent.
+        const ensureRes = await (sdk as any)?.agents?.ensurePersonal?.({});
+        const agentId: string | undefined = ensureRes?.data?.id;
+        if (!agentId || cancelled) return;
+
+        // Step 2: get-or-create the DM conversation.
+        const dmRes = await sdk.chat.dm({ user_id: agentId });
+        const conversationId: string | undefined = (dmRes as any)?.data?.id;
+        if (!conversationId || cancelled) return;
+
+        // Step 3: seed intro DM if the agent has never posted. Same gate
+        // as building.tsx — checks recent message history for any
+        // agent-authored message.
+        try {
+          const existing = await (sdk as any)?.chat?.messages?.(conversationId, { limit: 50 });
+          const messages: Array<{ author?: { id?: string; is_ai?: boolean; isAi?: boolean } }> = existing?.data ?? [];
+          const agentAlreadyPosted = messages.some(
+            (m) => m.author?.id === agentId || m.author?.is_ai === true || m.author?.isAi === true,
+          );
+          if (!agentAlreadyPosted) {
+            const introBody = [
+              `Hey ${user?.name?.split(/\s+/)[0] || 'there'}, I'm your personal AI agent on Minds.`,
+              '',
+              'I curate your "For You" feed by learning your preferences and finding you the best content across Minds and the full internet each day.',
+              '',
+              'I can perform scheduled tasks or reminders, help you write new posts, answer questions about Minds, teach you about your engagement patterns, or talk about anything you want really.',
+              '',
+              "Our conversation is private between us and doesn't train any models. You can give me a name, choose any model and change my personality to whatever you want. You are free to disable me in settings at any time.",
+              '',
+              "Let me know where you'd like to start.",
+            ].join('\n');
+            await (sdk as any)?.chat?.sendAsAgent?.({
+              agent_id: agentId,
+              conversation_id: conversationId,
+              content: introBody,
+            });
+          }
+        } catch {
+          // Intro-DM seeding is best-effort.
+        }
+
         if (cancelled) return;
-        // The agent's actual welcome message is composed by the
-        // curator's post_brief_to during onboarding/refresh — that's
-        // a richer message than a hardcoded greeting and references
-        // the items the agent just curated. Backfilling this DM here
-        // is just to ensure the conversation exists in the chat list.
-        // Refresh the conversation list to surface the freshly-created DM.
         refresh();
       } catch {
-        // Backfill blip is non-fatal.
+        // Back-fill blip is non-fatal.
       }
     })();
     return () => { cancelled = true; };
@@ -165,7 +196,14 @@ export default function ChatScreen() {
               value={dmUsername}
               onChangeText={(t) => { setDmUsername(t); setDmError(null); }}
               autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              textContentType="none"
               onSubmitEditing={handleNewDM}
+              // Discourage password managers (Bitwarden, 1Password) from
+              // matching this as a username/identity field. RN Web maps
+              // these props to native HTML attrs.
+              {...(Platform.OS === 'web' ? { 'data-form-type': 'other', 'data-lpignore': 'true', name: 'chat-search' } as any : {})}
               style={{
                 flex: 1,
                 backgroundColor: colors.surface,
