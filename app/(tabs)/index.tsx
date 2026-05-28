@@ -28,12 +28,15 @@ function formatRelativeTime(ts: number): string {
   return `${d}d ago`;
 }
 
-type FeedTab = 'foryou' | 'latest' | 'following';
+type FeedTab = 'foryou' | 'following';
 
 export default function FeedScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
-  const [activeTab, setActiveTab] = React.useState<FeedTab>('foryou');
+  // Honor the user's saved default. New accounts land on 'foryou'; if
+  // a user flips the preference in Settings, this is what runs on
+  // every cold open.
+  const [activeTab, setActiveTab] = React.useState<FeedTab>(() => getPreference('defaultFeed'));
   const [nudgeDismissed, setNudgeDismissed] = React.useState(true); // start true to avoid flash before storage read
 
   // Load persisted nudge dismissal so it stays dismissed across refreshes.
@@ -99,7 +102,6 @@ export default function FeedScreen() {
   const aiEnabled = getPreference('aiEnabled');
   const sortMap = {
     foryou: aiEnabled ? 'personal' : 'latest',
-    latest: 'latest',
     following: 'following',
   } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
@@ -108,7 +110,7 @@ export default function FeedScreen() {
   // significant vertical drift cycles to the next/previous tab. Vertical
   // scrolling on the FlatList is unaffected because Pan only activates
   // when the gesture's horizontal motion clearly dominates.
-  const FEED_TAB_ORDER: FeedTab[] = ['foryou', 'following', 'latest'];
+  const FEED_TAB_ORDER: FeedTab[] = ['foryou', 'following'];
   const swipeGesture = React.useMemo(
     () => Gesture.Pan()
       .activeOffsetX([-15, 15])
@@ -345,7 +347,11 @@ export default function FeedScreen() {
                   <Ionicons name={activeTab === 'following' ? 'people-outline' : 'newspaper-outline'} size={40} color={colors.accent} />
                 )}
                 <Text variant="h2" color={colors.text} align="center">
-                  {activeTab === 'following' ? 'Following' : activeTab === 'foryou' ? (refreshing ? 'Your agent is working on it…' : 'Your agent is warming up') : 'Latest'}
+                  {activeTab === 'following'
+                    ? 'Following'
+                    : refreshing
+                      ? 'Your agent is working on it…'
+                      : 'Your agent is warming up'}
                 </Text>
                 <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
                   {activeTab === 'following'

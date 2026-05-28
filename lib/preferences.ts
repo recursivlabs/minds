@@ -2,6 +2,9 @@ import { getItemSync, getItem, setItem } from './storage';
 
 const PREFS_KEY = 'minds:preferences';
 
+/** Feed shown when the home tab is opened. */
+export type DefaultFeed = 'foryou' | 'following';
+
 interface Preferences {
   showNsfw: boolean;
   autoplayVideo: boolean;
@@ -15,12 +18,20 @@ interface Preferences {
    * the way they remember.
    */
   aiEnabled: boolean;
+  /**
+   * Which feed tab opens by default on the home screen. Default 'foryou'
+   * so a new user lands on the agent-curated brief; existing users can
+   * switch to 'following' if they prefer the chronological social-graph
+   * stream as their main loop.
+   */
+  defaultFeed: DefaultFeed;
 }
 
 const defaults: Preferences = {
   showNsfw: false,
   autoplayVideo: true,
   aiEnabled: true,
+  defaultFeed: 'foryou',
 };
 
 let prefs: Preferences = { ...defaults };

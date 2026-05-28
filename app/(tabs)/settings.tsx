@@ -132,6 +132,11 @@ export default function SettingsScreen() {
   const [saving, setSaving] = React.useState('');
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
   const [deletePw, setDeletePw] = React.useState('');
+  // Forces re-read of getPreference() values when the user toggles a
+  // local pref (Switch / pill button). lib/preferences caches in-memory
+  // so without this nudge the active-pill style won't update until the
+  // next mount.
+  const [, setSettingsTick] = React.useState(0);
 
   const load = React.useCallback(async () => {
     if (!sdk) return;
@@ -318,12 +323,46 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title="Feed">
+          <View style={{ paddingVertical: spacing.xs }}>
+            <Text variant="body" style={{ marginBottom: spacing.sm }}>Default feed</Text>
+            <Text variant="caption" color={themedColors.textMuted} style={{ marginBottom: spacing.md, lineHeight: 18 }}>
+              Which feed opens when you launch the app. You can always switch tabs once you're in.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {[
+                { key: 'foryou' as const, label: 'For You' },
+                { key: 'following' as const, label: 'Following' },
+              ].map(opt => {
+                const isActive = (getPreference('defaultFeed') as string) === opt.key;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    onPress={() => { setPreference('defaultFeed', opt.key); setSettingsTick(t => t + 1); }}
+                    style={({ pressed }) => ({
+                      paddingVertical: spacing.sm,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: radius.full,
+                      borderWidth: 1,
+                      borderColor: isActive ? colors.accent : colors.borderSubtle,
+                      backgroundColor: isActive ? colors.accentMuted : 'transparent',
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Text variant="bodyMedium" color={isActive ? colors.accent : colors.text}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </Section>
+
         <Section title="Content">
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Show NSFW content</Text>
             <Switch
               value={getPreference('showNsfw')}
-              onValueChange={v => { setPreference('showNsfw', v); }}
+              onValueChange={v => { setPreference('showNsfw', v); setSettingsTick(t => t + 1); }}
               trackColor={{ true: colors.accent, false: colors.glass }}
               thumbColor={colors.text}
             />
@@ -332,7 +371,7 @@ export default function SettingsScreen() {
             <Text variant="body">Autoplay videos</Text>
             <Switch
               value={getPreference('autoplayVideo')}
-              onValueChange={v => { setPreference('autoplayVideo', v); }}
+              onValueChange={v => { setPreference('autoplayVideo', v); setSettingsTick(t => t + 1); }}
               trackColor={{ true: colors.accent, false: colors.glass }}
               thumbColor={colors.text}
             />

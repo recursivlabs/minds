@@ -3,7 +3,7 @@ import { View, Pressable, Platform } from 'react-native';
 import { Text } from './Text';
 import { colors, spacing } from '../constants/theme';
 
-type FeedTab = 'foryou' | 'latest' | 'following';
+type FeedTab = 'foryou' | 'following';
 
 interface Props {
   active: FeedTab;
@@ -12,13 +12,12 @@ interface Props {
   unread?: Partial<Record<FeedTab, number>>;
 }
 
-// Three jobs. No overlap. Trending got folded into Discover (platform
-// editorial surface) so the tab bar stays focused on personal-feed
-// flavors: agent-curated / chronological / your social graph.
+// Two jobs, no overlap. Latest was dropped — it duplicated Following
+// without the follow filter and read as dead weight. Discover lives as
+// its own primary tab on the bottom bar.
 const TABS: { key: FeedTab; label: string }[] = [
   { key: 'foryou', label: 'For You' },
   { key: 'following', label: 'Following' },
-  { key: 'latest', label: 'Latest' },
 ];
 
 export function FeedTabs({ active, onChange, unread }: Props) {
