@@ -575,14 +575,20 @@ export default function LandingScreen() {
             }}
             keyboardType="number-pad"
             inputMode="numeric"
+            // iOS uses textContentType for "From Messages" suggestion.
+            // Android uses autoComplete="sms-otp" for SMS Retriever API.
+            // Web: do NOT set autoComplete="one-time-code" — it activates
+            // Chrome's WebOTP API which hijacks the input on desktop and
+            // prevents normal typing/pasting. Leave web autoComplete off.
             textContentType="oneTimeCode"
-            autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
+            {...(Platform.OS === 'android' ? { autoComplete: 'sms-otp' as const } : {})}
             maxLength={6}
             autoFocus
             onSubmitEditing={handleVerifyOtp}
             // Block Bitwarden / 1Password / LastPass from grabbing focus and
-            // re-filling on every keystroke.
-            {...(Platform.OS === 'web' ? { 'data-bwignore': 'true', 'data-lpignore': 'true', 'data-form-type': 'other', name: 'otp-code' } as any : {})}
+            // re-filling on every keystroke. Set autoComplete="off" on web
+            // explicitly so the browser doesn't apply any special handling.
+            {...(Platform.OS === 'web' ? { autoComplete: 'off', 'data-bwignore': 'true', 'data-lpignore': 'true', 'data-form-type': 'other', name: 'otp-code' } as any : {})}
             style={{
               ...inputStyle,
               fontSize: 24, letterSpacing: 8, textAlign: 'center' as const,
