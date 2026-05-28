@@ -56,60 +56,23 @@ export default function ChatScreen() {
     };
   }, [sdk]);
 
-  // Ensure the user has a personal agent AND a DM with them. Idempotent.
-  // Legacy / pre-onboarding users never had ensurePersonal called, so
-  // agents.list().find(personal) returns nothing and the prior version
-  // silently no-op'd. Call ensurePersonal first (it's a find-or-create),
-  // then get-or-create the DM, then seed the intro DM if the agent has
-  // never posted in this thread. Skipped entirely if AI is off in Settings.
+  // Back-fill DM with the user's personal agent IF one already exists.
+  // Do NOT silently auto-create one — provisioning a personal agent is
+  // now an explicit opt-in step via /agent setup. Auto-creating here
+  // produced ghost agents named "Minds" right after signup before the
+  // user had ever gone through setup. Skip if AI is off in Settings.
   React.useEffect(() => {
     if (!sdk) return;
     if (!getPreference('aiEnabled')) return;
     let cancelled = false;
     (async () => {
       try {
-        // Step 1: ensure a personal agent exists. Server creates it lazily
-        // if missing, returns the existing one otherwise. Idempotent.
-        const ensureRes = await (sdk as any)?.agents?.ensurePersonal?.({});
-        const agentId: string | undefined = ensureRes?.data?.id;
-        if (!agentId || cancelled) return;
-
-        // Step 2: get-or-create the DM conversation.
-        const dmRes = await sdk.chat.dm({ user_id: agentId });
-        const conversationId: string | undefined = (dmRes as any)?.data?.id;
-        if (!conversationId || cancelled) return;
-
-        // Step 3: seed intro DM if the agent has never posted. Same gate
-        // as building.tsx — checks recent message history for any
-        // agent-authored message.
-        try {
-          const existing = await (sdk as any)?.chat?.messages?.(conversationId, { limit: 50 });
-          const messages: Array<{ author?: { id?: string; is_ai?: boolean; isAi?: boolean } }> = existing?.data ?? [];
-          const agentAlreadyPosted = messages.some(
-            (m) => m.author?.id === agentId || m.author?.is_ai === true || m.author?.isAi === true,
-          );
-          if (!agentAlreadyPosted) {
-            const introBody = [
-              `Hey ${user?.name?.split(/\s+/)[0] || 'there'}, I'm your personal AI agent on Minds.`,
-              '',
-              'I curate your "For You" feed by learning your preferences and finding you the best content across Minds and the full internet each day.',
-              '',
-              'I can perform scheduled tasks or reminders, help you write new posts, answer questions about Minds, teach you about your engagement patterns, or talk about anything you want really.',
-              '',
-              "Our conversation is private between us and doesn't train any models. You can give me a name, choose any model and change my personality to whatever you want. You are free to disable me in settings at any time.",
-              '',
-              "Let me know where you'd like to start.",
-            ].join('\n');
-            await (sdk as any)?.chat?.sendAsAgent?.({
-              agent_id: agentId,
-              conversation_id: conversationId,
-              content: introBody,
-            });
-          }
-        } catch {
-          // Intro-DM seeding is best-effort.
-        }
-
+        const list = await sdk.agents.list({ limit: 50 });
+        const personal = (list.data || []).find(
+          (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
+        );
+        if (!personal || cancelled) return;
+        await sdk.chat.dm({ user_id: personal.id });
         if (cancelled) return;
         refresh();
       } catch {

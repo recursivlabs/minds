@@ -280,9 +280,11 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             )}
           </View>
 
-          {/* Main nav */}
+          {/* Main nav — filter admin tab to platform admins only */}
           <View style={{ gap: spacing.xs }}>
-            {NAV_ITEMS.map(renderNavItem)}
+            {NAV_ITEMS
+              .filter((item) => item.name !== 'admin' || (user as any)?.role === 'admin')
+              .map(renderNavItem)}
           </View>
 
           {/* Separator */}
