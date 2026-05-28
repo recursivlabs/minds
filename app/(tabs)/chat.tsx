@@ -227,7 +227,15 @@ export default function ChatScreen() {
         </View>
       ) : (
         <FlatList
-          data={conversations}
+          data={(conversations || []).filter((c: any) => {
+            // Match the SideNav orphan filter: skip one-on-ones with
+            // no resolvable other participant (ghost-agent leftovers).
+            const participants: any[] = c.participants || c.members || [];
+            const others = participants.filter((p: any) => (p?.id ?? p?.userId) && (p?.id ?? p?.userId) !== user?.id);
+            const type = c.type || (others.length <= 1 ? 'one_on_one' : 'group');
+            if (type === 'one_on_one' && others.length === 0) return false;
+            return true;
+          })}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
             const other = item.participants?.find((p: any) => p.id !== user?.id) || item.participants?.[0];
@@ -306,6 +314,53 @@ export default function ChatScreen() {
         />
       )}
     </Container>
+  );
+}
+
+// Three dots that pulse in sequence while the agent is composing a
+// reply. Generic CSS animation on web, RN Animated on native.
+function TypingIndicator() {
+  const dot = (delay: number, key: number) => (
+    <View
+      key={key}
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: colors.textMuted,
+        ...(Platform.OS === 'web'
+          ? ({
+              animationName: 'mindsTypingPulse',
+              animationDuration: '1200ms',
+              animationIterationCount: 'infinite',
+              animationDelay: `${delay}ms`,
+            } as any)
+          : {}),
+      }}
+    />
+  );
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+      }}
+    >
+      {Platform.OS === 'web' && (
+        <style>{`
+          @keyframes mindsTypingPulse {
+            0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+            40% { opacity: 1; transform: translateY(-2px); }
+          }
+        `}</style>
+      )}
+      {dot(0, 0)}
+      {dot(200, 1)}
+      {dot(400, 2)}
+    </View>
   );
 }
 
@@ -500,25 +555,31 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     setText('');
     setSending(true);
 
+    // Optimistic insert FIRST so the message appears the instant the
+    // user hits send — no waiting on the server round-trip. Reconciled
+    // with the real server id when the response lands. iMessage feel.
+    const tempId = 'temp-' + Date.now();
+    setMessages(prev => [...prev, {
+      id: tempId,
+      content: messageText,
+      sender: { id: user?.id, name: user?.name },
+      createdAt: new Date().toISOString(),
+      pending: true,
+    }]);
+
     try {
-      // Send message — no optimistic insert, let server confirm via WS or poll
       const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText });
       const serverMsgId = sendRes?.data?.id;
 
-      // If WS is connected, the message will arrive via WS event.
-      // If polling, add it immediately from the send response.
-      if (serverMsgId && !wsConnectedRef.current) {
-        if (!messageIdsRef.current.has(serverMsgId)) {
-          messageIdsRef.current.add(serverMsgId);
-          setMessages(prev => [...prev, {
-            id: serverMsgId,
-            content: messageText,
-            sender: { id: user?.id, name: user?.name },
-            createdAt: new Date().toISOString(),
-          }]);
-        }
-      } else if (serverMsgId) {
+      // Reconcile: replace the temp row with the real one. WS may also
+      // emit the same id; messageIdsRef.add() lets the WS handler dedupe.
+      if (serverMsgId) {
         messageIdsRef.current.add(serverMsgId);
+        setMessages(prev => prev.map(m => m.id === tempId
+          ? { ...m, id: serverMsgId, pending: false }
+          : m));
+      } else {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false } : m));
       }
 
       const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
@@ -576,8 +637,12 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         }
         setAgentTyping(false);
       }
-    } catch {
-      // Send failed — nothing to remove since we didn't add optimistically
+    } catch (err) {
+      // Send failed — mark the temp row as failed so the user knows.
+      setMessages(prev => prev.map(m => m.id === tempId
+        ? { ...m, pending: false, failed: true }
+        : m));
+      console.warn('[chat] send failed', err);
     } finally {
       setSending(false);
     }
@@ -627,12 +692,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             justifyContent: messages.length === 0 ? 'center' : 'flex-end',
           }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          ListFooterComponent={agentTyping ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.xs }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent, opacity: 0.6 }} />
-              <Text variant="caption" color={colors.textMuted}>Thinking...</Text>
-            </View>
-          ) : null}
+          ListFooterComponent={agentTyping ? <TypingIndicator /> : null}
           ListEmptyComponent={
             <View style={{ alignItems: 'center' }}>
               <Text variant="body" color={colors.textMuted}>Start the conversation</Text>

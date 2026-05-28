@@ -123,6 +123,24 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     })();
   }, [sdk, user?.id, user?.name, refreshConvos]);
 
+  // The currently-viewed conversation id, derived from the URL. Used
+  // to suppress the unread badge on the sidebar item the user is
+  // actively reading.
+  const activeConvoIdFromPath = React.useMemo(() => {
+    // Routes that point at a conversation:
+    //   /chat?id=<uuid>
+    //   /(tabs)/chat?id=<uuid>
+    // pathname doesn't include the query string in expo-router, so
+    // we also check the global location on web.
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        return url.searchParams.get('id');
+      } catch { return null; }
+    }
+    return null;
+  }, [pathname]);
+
   // Real-time unread tracking + conversation reordering
   React.useEffect(() => {
     if (!sdk) return;
@@ -132,17 +150,33 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         await sdk.realtime.connect();
         unsub = sdk.realtime.onMessage((msg: any) => {
           const convoId = msg.conversationId || msg.conversation_id;
-          if (convoId && msg.senderId !== user?.id && msg.sender?.id !== user?.id) {
+          if (!convoId) return;
+          const senderId = msg.senderId || msg.sender?.id;
+          if (senderId === user?.id) return;
+          // Don't mark unread for the conversation the user is
+          // actively reading — Samson lighting up gold while you're
+          // chatting with him is the bug Jack flagged.
+          if (convoId !== activeConvoIdFromPath) {
             setUnreadConvos(prev => new Set(prev).add(convoId));
-            setLastMessageConvoId(convoId);
-            // Refresh conversation list to reorder by latest message
-            refreshConvos();
           }
+          setLastMessageConvoId(convoId);
+          refreshConvos();
         });
       } catch {}
     })();
     return () => { unsub?.(); };
-  }, [sdk, user?.id, refreshConvos]);
+  }, [sdk, user?.id, refreshConvos, activeConvoIdFromPath]);
+
+  // Clear unread when the user navigates into a conversation.
+  React.useEffect(() => {
+    if (!activeConvoIdFromPath) return;
+    setUnreadConvos(prev => {
+      if (!prev.has(activeConvoIdFromPath)) return prev;
+      const next = new Set(prev);
+      next.delete(activeConvoIdFromPath);
+      return next;
+    });
+  }, [activeConvoIdFromPath]);
 
   const isActive = (name: string) => {
     if (name === 'index') return pathname === '/' || pathname === '';
@@ -151,24 +185,47 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
 
   const width = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
 
-  // Combine recent DMs and communities for inbox
-  const recentDMs = (conversations || []).slice(0, 4).map((c: any) => {
-    const other = c.participants?.find((p: any) => p.id !== user?.id) || c.participants?.[0];
-    return {
+  // Combine recent DMs and communities for inbox.
+  //
+  // DM filtering rules:
+  // - Skip one-on-ones where there's no valid "other" participant
+  //   (the orphan ghost-agent thread that rendered as "Conversation").
+  // - Skip threads with no resolvable display name at all.
+  //
+  // Community filtering rules:
+  // - Strict membership check. Only is_member === true. Earlier
+  //   permissive check (`c.is_member || c.isMember`) accepted any
+  //   truthy value and Jack saw communities he hadn't joined.
+  const recentDMs = (conversations || [])
+    .map((c: any) => {
+      const participants: any[] = c.participants || c.members || [];
+      const others = participants.filter((p: any) => (p?.id ?? p?.userId) && (p?.id ?? p?.userId) !== user?.id);
+      const other = others[0];
+      const type = c.type || (others.length <= 1 ? 'one_on_one' : 'group');
+      const name = c.name || other?.name || other?.username || null;
+      // One-on-one with no resolvable other is the orphan case.
+      if (type === 'one_on_one' && !other) return null;
+      if (!name) return null;
+      return {
+        id: c.id,
+        type: 'dm' as const,
+        name,
+        avatar: other?.image || null,
+        preview: c.lastMessage?.content || c.last_message?.content || '',
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 4) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string }>;
+  const recentCommunities = (communities || [])
+    .filter((c: any) => c.is_member === true || c.isMember === true)
+    .slice(0, 3)
+    .map((c: any) => ({
       id: c.id,
-      type: 'dm' as const,
-      name: c.name || other?.name || 'Conversation',
-      avatar: other?.image || null,
-      preview: c.lastMessage?.content || c.last_message?.content || '',
-    };
-  });
-  const recentCommunities = (communities || []).filter((c: any) => c.is_member || c.isMember).slice(0, 3).map((c: any) => ({
-    id: c.id,
-    type: 'community' as const,
-    name: c.name || 'Community',
-    avatar: c.image || c.avatar || null,
-    preview: `${c.memberCount || c.member_count || 0} members`,
-  }));
+      type: 'community' as const,
+      name: c.name || 'Community',
+      avatar: c.image || c.avatar || null,
+      preview: `${c.memberCount || c.member_count || 0} members`,
+    }));
   const inboxItems = [...recentDMs, ...recentCommunities];
 
   const renderNavItem = (item: NavItem) => {
