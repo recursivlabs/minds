@@ -8,6 +8,7 @@ import { TabBar } from '../../components/TabBar';
 import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
 import { getPreference } from '../../lib/preferences';
+import { logSignal } from '../../lib/signals';
 import { colors, spacing, radius, typography } from '../../constants/theme';
 
 function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
@@ -103,9 +104,14 @@ function DiscoverHero({ post, onPress }: { post: any; onPress: () => void }) {
   const category = postCategory(post);
   const take = postAITake(post);
   const replies = post.replyCount || post.reply_count || 0;
+  // Hero is in-viewport the moment Discover renders, so log a view
+  // signal once per mount per post.
+  React.useEffect(() => {
+    if (post?.id) logSignal('view', { postId: post.id, metadata: { surface: 'discover_hero' } });
+  }, [post?.id]);
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_hero' } }); onPress(); }}
       style={({ pressed }) => ({ opacity: pressed ? 0.95 : 1 })}
     >
       {image ? (
@@ -152,9 +158,14 @@ function DenseHeadline({ post, onPress }: { post: any; onPress: () => void }) {
   const replies = post.replyCount || post.reply_count || 0;
   const score = post.score || 0;
   const title = post.title || (post.content || '').split('\n')[0];
+  // Log a view when the row mounts. Dedup inside logSignal keeps
+  // this from counting the same post twice across re-renders.
+  React.useEffect(() => {
+    if (post?.id) logSignal('view', { postId: post.id, metadata: { surface: 'discover_dense' } });
+  }, [post?.id]);
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_dense' } }); onPress(); }}
       style={({ pressed }) => ({
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.xl,
