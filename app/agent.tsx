@@ -17,12 +17,14 @@ import {
 import { buildCuratorRequest } from '../lib/curator';
 import { colors, spacing, radius, typography } from '../constants/theme';
 
-// Model options (small curated list — keep the picker simple, premium feel).
+// Model options — must match server allowlist in lib/modelAllowlist.ts.
+// IDs are dotted (OpenRouter convention), not dashed. Keep list short to
+// keep the picker clean; full set is broader.
 const MODELS: Array<{ key: string; label: string; sub: string }> = [
-  { key: 'anthropic/claude-sonnet-4-7', label: 'Claude Sonnet 4.7', sub: 'Sharp, balanced. Default.' },
-  { key: 'anthropic/claude-opus-4-7', label: 'Claude Opus 4.7', sub: 'Most thoughtful, slower.' },
+  { key: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', sub: 'Sharp, balanced. Default.' },
+  { key: 'anthropic/claude-opus-4.6', label: 'Claude Opus 4.6', sub: 'Most thoughtful, slower.' },
   { key: 'openai/gpt-5.4', label: 'GPT-5.4', sub: 'Versatile, broad context.' },
-  { key: 'google/gemini-3.1-pro', label: 'Gemini 3.1 Pro', sub: 'Strong at multi-step tools.' },
+  { key: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', sub: 'Strong at multi-step tools.' },
 ];
 
 const DEFAULT_SYSTEM_PROMPT = [
