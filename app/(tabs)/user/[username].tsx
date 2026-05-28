@@ -8,7 +8,7 @@ import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TabBar } from '../../../components/TabBar';
 import { useAuth } from '../../../lib/auth';
-import { useProfile, useMyProfile, useCommunities, useAgents } from '../../../lib/hooks';
+import { useProfile, useMyProfile, useCommunities } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { getBookmarks } from '../../../lib/bookmarks';
 import { getCached } from '../../../lib/cache';
@@ -16,8 +16,10 @@ import { colors, spacing, radius, typography } from '../../../constants/theme';
 
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 
-const OWNER_TABS = ['posts', 'replies', 'blogs', 'followers', 'following', 'communities', 'agents', 'apps', 'saved'] as const;
-const OTHER_TABS = ['posts', 'replies', 'blogs', 'followers', 'following', 'communities', 'agents'] as const;
+// Owner gets a Saved tab (private bookmarks). Visitors don't. Both
+// share the same primary tab order so the IA reads the same way.
+const OWNER_TABS = ['posts', 'replies', 'communities', 'saved', 'followers', 'following'] as const;
+const OTHER_TABS = ['posts', 'replies', 'communities', 'followers', 'following'] as const;
 type ProfileTab = typeof OWNER_TABS[number];
 
 function SavedPostsTab() {
@@ -95,7 +97,6 @@ export default function UserProfileScreen() {
   const [editAvatarUri, setEditAvatarUri] = React.useState<string | null>(null);
 
   const { communities } = useCommunities(isOwnProfile ? 50 : 0);
-  const { agents } = useAgents(isOwnProfile ? 50 : 0);
 
   // Reset local state on username change
   React.useEffect(() => {
@@ -480,20 +481,6 @@ export default function UserProfileScreen() {
         )}
 
         {/* Blogs */}
-        {profileTab === 'blogs' && (
-          postsLoading ? (
-            <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={60} />)}</View>
-          ) : userPosts.filter((p: any) => p.title).length === 0 ? (
-            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-              <Text variant="body" color={colors.textMuted}>No blogs yet</Text>
-            </View>
-          ) : (
-            userPosts.filter((p: any) => p.title).map((post: any) => (
-              <PostCard key={post.id} post={post} compact />
-            ))
-          )
-        )}
-
         {/* Followers */}
         {profileTab === 'followers' && (
           relationsLoading && followersList === null ? (
@@ -553,51 +540,6 @@ export default function UserProfileScreen() {
               <Text variant="body" color={colors.textMuted}>Communities this user has joined</Text>
             </View>
           )
-        )}
-
-        {/* Agents (owner only) */}
-        {profileTab === 'agents' && (
-          isOwnProfile ? (
-            agents.length === 0 ? (
-              <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-                <Text variant="body" color={colors.textMuted}>No agents yet</Text>
-              </View>
-            ) : (
-              <View style={{ padding: spacing.xl, gap: spacing.md }}>
-                {agents.slice(0, 20).map((a: any) => (
-                  <Pressable
-                    key={a.id}
-                    onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md,
-                      backgroundColor: colors.surface, borderRadius: radius.md,
-                      borderWidth: 0.5, borderColor: colors.glassBorder,
-                    }}
-                  >
-                    <Avatar uri={a.image || a.avatar} name={a.name} size="md" />
-                    <View style={{ flex: 1 }}>
-                      <Text variant="bodyMedium" numberOfLines={1}>{a.name}</Text>
-                      {(a.bio || a.description) && <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{a.bio || a.description}</Text>}
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            )
-          ) : (
-            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-              <Text variant="body" color={colors.textMuted}>Agents created by this user</Text>
-            </View>
-          )
-        )}
-
-        {/* Apps (owner only) */}
-        {profileTab === 'apps' && isOwnProfile && (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
-            <Ionicons name="cube-outline" size={40} color={colors.accent} />
-            <Text variant="h2" color={colors.text} align="center">Apps</Text>
-            <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>Build and deploy apps powered by the Minds network.</Text>
-            <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create</Button>
-          </View>
         )}
 
         {/* Saved (owner only) */}

@@ -480,10 +480,24 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           }
 
           setMessages(prev => {
-            // Remove agent-* optimistic if content matches
+            // Drop any optimistic row whose content matches the
+            // incoming server row. Covers two cases:
+            //   - `agent-*` ids from the SSE fallback when a user
+            //     was chatting with an agent and WS wasn't yet ready.
+            //   - `temp-*` ids from the user's own send-side
+            //     optimistic insert (added today for snappy feel).
+            //     Without this filter the temp row sticks around and
+            //     the WS row gets added too → message renders twice.
+            const incomingContent = newMsg.content?.trim();
+            const incomingSenderId = newMsg.sender?.id;
             const filtered = prev.filter(m => {
-              if (m.id.startsWith('agent-') && m.content?.trim() === newMsg.content?.trim()) return false;
-              return true;
+              if (!m.id.startsWith('temp-') && !m.id.startsWith('agent-')) return true;
+              if (m.content?.trim() !== incomingContent) return true;
+              // Content match — same sender? If sender can't be
+              // disambiguated, fall back to content-only match.
+              const optimisticSenderId = m.sender?.id;
+              if (!optimisticSenderId || !incomingSenderId) return false;
+              return optimisticSenderId !== incomingSenderId;
             });
             const byId = new Map<string, any>();
             for (const m of filtered) byId.set(m.id, m);
