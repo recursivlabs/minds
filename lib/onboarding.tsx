@@ -56,6 +56,7 @@ const OnboardingContext = React.createContext<OnboardingContextValue | null>(nul
 const ONBOARDING_COMPLETE_KEY = 'minds:onboarding:complete';
 const ONBOARDING_PREFS_KEY = 'minds:onboarding:preferences';
 const LAST_CURATE_AT_KEY = 'minds:lastCurateAt';
+const USERNAME_PICKED_KEY = 'minds:onboarding:usernamePicked';
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<OnboardingState>(DEFAULT_STATE);
@@ -87,6 +88,15 @@ export async function markOnboardingComplete() {
 
 export async function isOnboardingComplete(): Promise<boolean> {
   const v = await getItem(ONBOARDING_COMPLETE_KEY);
+  return v === '1';
+}
+
+export async function markUsernamePicked() {
+  await setItem(USERNAME_PICKED_KEY, '1');
+}
+
+export async function isUsernamePicked(): Promise<boolean> {
+  const v = await getItem(USERNAME_PICKED_KEY);
   return v === '1';
 }
 
