@@ -28,7 +28,7 @@ function formatRelativeTime(ts: number): string {
   return `${d}d ago`;
 }
 
-type FeedTab = 'foryou' | 'latest' | 'following' | 'trending';
+type FeedTab = 'foryou' | 'latest' | 'following';
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -101,7 +101,6 @@ export default function FeedScreen() {
     foryou: aiEnabled ? 'personal' : 'latest',
     latest: 'latest',
     following: 'following',
-    trending: 'score',
   } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
@@ -109,7 +108,7 @@ export default function FeedScreen() {
   // significant vertical drift cycles to the next/previous tab. Vertical
   // scrolling on the FlatList is unaffected because Pan only activates
   // when the gesture's horizontal motion clearly dominates.
-  const FEED_TAB_ORDER: FeedTab[] = ['foryou', 'trending', 'latest', 'following'];
+  const FEED_TAB_ORDER: FeedTab[] = ['foryou', 'following', 'latest'];
   const swipeGesture = React.useMemo(
     () => Gesture.Pan()
       .activeOffsetX([-15, 15])
