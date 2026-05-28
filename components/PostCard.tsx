@@ -12,6 +12,7 @@ import { BASE_ORIGIN, ORG_ID } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
+import { logSignal } from '../lib/signals';
 import { isMuted, toggleMute } from '../lib/muted';
 import { getCached } from '../lib/cache';
 import { LinkPreview } from './LinkPreview';
@@ -200,6 +201,11 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
     setUserVote(newVote);
     setScore(newScore);
     onVoteChange?.(actionPostId, newScore, newVote);
+    // Log a signal whenever the user actively chooses a direction
+    // (skip the un-vote case so toggling off doesn't pollute the
+    // ranking signal).
+    if (newVote === 'upvote') logSignal('react_up', { postId: actionPostId });
+    else if (newVote === 'downvote') logSignal('react_down', { postId: actionPostId });
 
     try {
       if (wasVoted) {
@@ -636,6 +642,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             const nowSaved = toggleBookmark(actionPostId);
             setSaved(nowSaved);
             toast.show(nowSaved ? 'Saved' : 'Removed from saved');
+            logSignal(nowSaved ? 'save' : 'hide', { postId: actionPostId, metadata: { source: 'postcard_bookmark' } });
           }}
           hitSlop={8}
           style={{ padding: 2 }}
