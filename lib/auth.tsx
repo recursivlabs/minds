@@ -139,6 +139,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(authUser);
     setProjectId(PROJECT_ID);
     registerPushTokenBackground(sdk);
+
+    // Re-fetch the user record from the server. Sign-up/sign-in responses
+    // can return an incomplete user (e.g. server hasn't assigned the
+    // slugified username yet; client falls back to email-prefix which
+    // contains `+` or other URL-unsafe chars). Fetching `users.me()`
+    // overwrites with the canonical username so profile navigation works.
+    try {
+      const res = await sdk.users.me();
+      const me = (res as any).data || res;
+      if (me) {
+        const canonical: User = {
+          id: me.id || authUser.id,
+          name: me.name || authUser.name,
+          email: me.email || authUser.email,
+          username: me.username || authUser.username,
+          image: me.image ?? authUser.image,
+          bio: me.bio || me.briefdescription || authUser.bio,
+        };
+        setUser(canonical);
+        await storage.setItem(KEYS.user, JSON.stringify(canonical));
+      }
+    } catch {
+      // Non-fatal — the half-baked user still works for most flows;
+      // refreshUser() will rehydrate on next manual trigger.
+    }
   }
 
   const refreshUser = React.useCallback(async () => {

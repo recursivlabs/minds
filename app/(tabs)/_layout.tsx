@@ -7,7 +7,7 @@ import { spacing } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
-import { isOnboardingComplete, markOnboardingComplete } from '../../lib/onboarding';
+import { isOnboardingComplete, markOnboardingComplete, isUsernamePicked } from '../../lib/onboarding';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
@@ -22,10 +22,30 @@ export default function TabLayout() {
   // Onboarding gate. New authenticated users go to swipe calibration.
   // Legacy users (any prior post or follow on this account) bypass it
   // entirely — they want their feed, not a 60-second tutorial.
+  //
+  // Username gate runs BEFORE onboarding. If the server hasn't assigned
+  // a clean username yet (legacy auto-fallback wrote email-prefix garbage,
+  // OR signup never ran the pick-username step), force the user to pick
+  // one. Once picked we set a flag so we don't loop back. Legacy users
+  // who already have a username skip this entirely.
   React.useEffect(() => {
     if (!sdk || !user?.id) return;
     let cancelled = false;
     (async () => {
+      // 1. Username gate
+      const picked = await isUsernamePicked();
+      const currentUsername = (user.username || '').toLowerCase();
+      const needsUsername = !picked && (
+        !currentUsername ||
+        !/^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/.test(currentUsername)
+      );
+      if (cancelled) return;
+      if (needsUsername) {
+        router.replace('/auth/pick-username' as any);
+        return;
+      }
+
+      // 2. Onboarding gate (existing)
       const done = await isOnboardingComplete();
       if (cancelled || done) return;
 
@@ -49,7 +69,7 @@ export default function TabLayout() {
       router.replace('/onboarding/swipe' as any);
     })();
     return () => { cancelled = true; };
-  }, [sdk, user?.id, router]);
+  }, [sdk, user?.id, user?.username, router]);
 
   // Poll unread notification count
   const [unreadCount, setUnreadCount] = React.useState(0);

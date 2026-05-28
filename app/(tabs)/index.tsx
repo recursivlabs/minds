@@ -221,7 +221,15 @@ export default function FeedScreen() {
                   backgroundColor: colors.surface,
                   borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
                 }}>
-                  <Pressable onPress={() => { const slug = user?.username || user?.id; router.push(slug ? `/(tabs)/user/${slug}` as any : '/(tabs)/profile'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 }}>
+                  <Pressable onPress={() => {
+                    // Prefer user.id (UUID, always URL-safe) over username.
+                    // Right after signup the client may still hold an email-derived
+                    // fallback like `jack+minds+1` which 404s when looked up by
+                    // username. The profile route falls back to ID lookup if
+                    // getByUsername fails, so passing the UUID always resolves.
+                    const slug = user?.id || user?.username;
+                    router.push(slug ? `/(tabs)/user/${slug}` as any : '/(tabs)/profile');
+                  }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 }}>
                     <Ionicons name="person-circle-outline" size={28} color={colors.accent} />
                     <View style={{ flex: 1 }}>
                       <Text variant="bodyMedium" color={colors.text}>Complete your profile</Text>
@@ -265,17 +273,31 @@ export default function FeedScreen() {
           ListEmptyComponent={
             !postsLoading ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], gap: spacing['2xl'] }}>
-                <Ionicons name={activeTab === 'following' ? 'people-outline' : 'newspaper-outline'} size={40} color={colors.accent} />
+                {activeTab === 'foryou' && refreshing ? (
+                  <ActivityIndicator color={colors.accent} size="large" />
+                ) : (
+                  <Ionicons name={activeTab === 'following' ? 'people-outline' : 'newspaper-outline'} size={40} color={colors.accent} />
+                )}
                 <Text variant="h2" color={colors.text} align="center">
-                  {activeTab === 'following' ? 'Following' : activeTab === 'foryou' ? 'Your agent is warming up' : 'Latest'}
+                  {activeTab === 'following' ? 'Following' : activeTab === 'foryou' ? (refreshing ? 'Your agent is working on it…' : 'Your agent is warming up') : 'Latest'}
                 </Text>
                 <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
-                  {activeTab === 'following' ? 'Follow people to see their posts here.' : activeTab === 'foryou' ? 'Pull to refresh and your agent will curate fresh links from the open web.' : 'No posts yet. Be the first.'}
+                  {activeTab === 'following'
+                    ? 'Follow people to see their posts here.'
+                    : activeTab === 'foryou'
+                      ? (refreshing ? 'This usually takes 5-15 seconds.' : 'Tap below and your agent will curate fresh links from the open web.')
+                      : 'No posts yet. Be the first.'}
                 </Text>
                 <View style={{ alignSelf: 'center' }}>
-                  <Button onPress={() => router.push(activeTab === 'following' ? '/(tabs)/explore' : '/(tabs)/create')} size="sm">
-                    {activeTab === 'following' ? 'Discover people' : 'Write a post'}
-                  </Button>
+                  {activeTab === 'foryou' ? (
+                    <Button onPress={recurate} disabled={refreshing} size="sm">
+                      {refreshing ? 'Curating…' : 'Curate now'}
+                    </Button>
+                  ) : (
+                    <Button onPress={() => router.push(activeTab === 'following' ? '/(tabs)/explore' : '/(tabs)/create')} size="sm">
+                      {activeTab === 'following' ? 'Discover people' : 'Write a post'}
+                    </Button>
+                  )}
                 </View>
               </View>
             ) : null
