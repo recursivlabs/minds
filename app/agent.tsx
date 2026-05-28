@@ -25,14 +25,6 @@ const MODELS: Array<{ key: string; label: string; sub: string }> = [
   { key: 'google/gemini-3.1-pro', label: 'Gemini 3.1 Pro', sub: 'Strong at multi-step tools.' },
 ];
 
-const PERSONAS = [
-  { key: 'curious', label: 'Curious', desc: 'Leads with the most surprising or counterintuitive thing.' },
-  { key: 'skeptical', label: 'Skeptical', desc: 'Flags what is unproven, contested, or missing.' },
-  { key: 'playful', label: 'Playful', desc: 'One sharp observation with a touch of wit.' },
-  { key: 'calm', label: 'Calm', desc: 'Short factual phrase. Lets the source speak.' },
-] as const;
-type PersonaKey = typeof PERSONAS[number]['key'];
-
 const DEFAULT_SYSTEM_PROMPT = [
   'You are a personal AI agent. You are an AI and you always say so when asked.',
   'You work for the user who owns you, no one else. You do not post publicly on their behalf.',
@@ -66,7 +58,6 @@ export default function AgentSetupScreen() {
   const [isExistingAgent, setIsExistingAgent] = React.useState(false);
   const [name, setName] = React.useState('');
   const [model, setModel] = React.useState(MODELS[0].key);
-  const [persona, setPersona] = React.useState<PersonaKey>('curious');
   const [systemPrompt, setSystemPrompt] = React.useState(DEFAULT_SYSTEM_PROMPT);
   const [interests, setInterests] = React.useState('');
   const [contextDoc, setContextDoc] = React.useState('');
@@ -75,6 +66,37 @@ export default function AgentSetupScreen() {
   const [saving, setSaving] = React.useState(false);
   const [stepMsg, setStepMsg] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
+
+  // Fun status cycle while the curator step runs (5-15s typical).
+  // Rotates through plausible-sounding work so the button doesn't feel
+  // frozen on "Curating your first feed."
+  const CURATOR_STATUS_LINES = React.useMemo(
+    () => [
+      'Searching the open web…',
+      'Reading top stories on Minds…',
+      'Picking the most interesting threads…',
+      'Filtering noise from signal…',
+      'Reading what people are sharing…',
+      'Almost there…',
+    ],
+    [],
+  );
+  const cycleStopRef = React.useRef<null | (() => void)>(null);
+  const startStatusCycle = React.useCallback(() => {
+    cycleStopRef.current?.();
+    let i = 0;
+    setStepMsg(CURATOR_STATUS_LINES[0]);
+    const id = setInterval(() => {
+      i = (i + 1) % CURATOR_STATUS_LINES.length;
+      setStepMsg(CURATOR_STATUS_LINES[i]);
+    }, 1800);
+    cycleStopRef.current = () => clearInterval(id);
+  }, [CURATOR_STATUS_LINES]);
+  const stopStatusCycle = React.useCallback(() => {
+    cycleStopRef.current?.();
+    cycleStopRef.current = null;
+  }, []);
+  React.useEffect(() => stopStatusCycle, [stopStatusCycle]);
 
   // Detect first-time vs edit. If a personal agent already exists for
   // this user, treat as edit. Otherwise treat as setup. Pre-fill fields
@@ -101,7 +123,6 @@ export default function AgentSetupScreen() {
         } else {
           setName('Agent');
         }
-        setPersona((stored?.persona as PersonaKey) || 'curious');
         setInterests((stored?.free_text_interests as string) || '');
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Failed to load');
@@ -126,7 +147,7 @@ export default function AgentSetupScreen() {
         interests: stored?.interests || [],
         free_text_interests: interests.trim() || '',
         vibes: stored?.vibes || [],
-        persona,
+        persona: 'curious', // default — persona picker removed; system prompt is the full control surface
         agent_name: name.trim() || undefined,
         paste_sources: stored?.paste_sources || {},
       });
@@ -138,7 +159,6 @@ export default function AgentSetupScreen() {
           interests: stored?.interests || [],
           free_text_interests: interests.trim() || '',
           vibes: stored?.vibes || [],
-          persona,
           context_document: contextDoc.trim() || null,
         },
         overrides: {
@@ -151,8 +171,9 @@ export default function AgentSetupScreen() {
       if (newAgentId && !agentId) setAgentId(newAgentId);
 
       // 3. Trigger an initial curator run so the feed has content waiting
-      //    when they land back. Non-fatal if it fails — feed still works.
-      setStepMsg('Curating your first feed');
+      //    when they land back. Cycle status lines so the user has
+      //    something to read while the curator does its 5-15s thing.
+      startStatusCycle();
       try {
         // Fold free-text interests into the interests array so the
         // curator picks them up. buildCuratorRequest only consumes the
@@ -169,13 +190,14 @@ export default function AgentSetupScreen() {
           fresh: true,
           interests: mergedInterests,
           vibes: stored?.vibes || [],
-          persona,
           pasteSources: (stored?.paste_sources as any) || {},
         });
         await (sdk as any).curator.run(curatorReq);
         await markCuratedNow();
       } catch {
         // Curator blip — agent still works, feed will populate on refresh
+      } finally {
+        stopStatusCycle();
       }
 
       // 4. Send intro DM (only on first-time setup — don't spam on edits)
@@ -295,32 +317,6 @@ export default function AgentSetupScreen() {
                     >
                       <Text variant="bodyMedium" color={selected ? colors.accent : colors.text}>{m.label}</Text>
                       <Text variant="caption" color={colors.textSecondary}>{m.sub}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={{ gap: spacing.sm }}>
-              {sectionLabel('VOICE', "How your agent talks in the feed and DMs.")}
-              <View style={{ gap: spacing.sm }}>
-                {PERSONAS.map((p) => {
-                  const selected = persona === p.key;
-                  return (
-                    <Pressable
-                      key={p.key}
-                      onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync(); setPersona(p.key); }}
-                      style={{
-                        padding: spacing.lg,
-                        borderRadius: radius.md,
-                        borderWidth: 0.5,
-                        borderColor: selected ? colors.accent : colors.border,
-                        backgroundColor: selected ? colors.surface : 'transparent',
-                        gap: 4,
-                      }}
-                    >
-                      <Text variant="bodyMedium" color={selected ? colors.accent : colors.text}>{p.label}</Text>
-                      <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>{p.desc}</Text>
                     </Pressable>
                   );
                 })}
