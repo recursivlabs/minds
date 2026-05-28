@@ -169,6 +169,13 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   // The ID used for all actions that target the content — vote, reply, nav.
   // Reposts forward these to the original post.
   const actionPostId = repostedFrom ? displayPost.id : post.id;
+
+  // Log a view once per session for any post that mounts inside a
+  // feed. Dedup in logSignal keeps this from double-counting when
+  // the same card renders in multiple surfaces (e.g. feed + search).
+  React.useEffect(() => {
+    if (actionPostId) logSignal('view', { postId: actionPostId, metadata: { surface: 'postcard' } });
+  }, [actionPostId]);
   const communityId = displayPost.communityId || displayPost.community_id;
   const communityName = React.useMemo(() => {
     if (!communityId) return null;
