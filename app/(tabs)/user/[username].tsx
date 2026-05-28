@@ -324,8 +324,12 @@ export default function UserProfileScreen() {
             </View>
           )}
 
-          {/* Edit Agent CTA when viewer is the owner of this AI agent */}
-          {isMyAgent && (
+          {/* Edit Agent CTA — only for the actual personal agent.
+             `isMyAgent` is true for any owned agent (incl. user-created),
+             but the `/agent` editor hardcodes the personal agent. Showing
+             this CTA on user-created agent profiles + routing to `/agent`
+             would silently send the user to their personal agent's editor. */}
+          {isMyAgent && (((profile as any)?.agent_type === 'personal') || ((profile as any)?.agentType === 'personal')) && (
             <View style={{ marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }}>
               <Text variant="bodyMedium" color={colors.text} style={{ marginBottom: spacing.xs }}>Your personal agent</Text>
               <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18, marginBottom: spacing.md }}>

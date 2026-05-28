@@ -88,7 +88,11 @@ function TwoFactorSetup() {
           onChangeText={t => setVerifyCode(t.replace(/\D/g, '').slice(0, 6))}
           placeholder="000000"
           keyboardType="number-pad"
+          inputMode="numeric"
+          textContentType="oneTimeCode"
+          autoComplete="one-time-code"
           maxLength={6}
+          selectTextOnFocus
         />
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <Button onPress={() => { setStep('idle'); setSetupUri(null); }} variant="ghost" size="sm">Cancel</Button>

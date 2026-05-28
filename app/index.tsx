@@ -567,8 +567,12 @@ export default function LandingScreen() {
             value={otpCode}
             onChangeText={(t) => { setOtpCode(t.replace(/\D/g, '').slice(0, 6)); setError(''); }}
             keyboardType="number-pad"
+            inputMode="numeric"
+            textContentType="oneTimeCode"
+            autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
             maxLength={6}
             autoFocus
+            selectTextOnFocus
             onSubmitEditing={handleVerifyOtp}
             style={{
               ...inputStyle,
