@@ -141,27 +141,28 @@ export const LinkPreview = React.memo(function LinkPreview({ content, url: urlPr
   // down. Net effect: content "jumps." With the skeleton the layout
   // stays put and the image just fills in.
   if (!loaded) {
+    // Compact skeleton (favicon + text rows) so the layout reservation
+    // matches the most common case — a no-OG-image preview. If the
+    // eventual card is the hero variant it'll grow downward, which
+    // reads as a smooth reveal; if it ends up compact (or null) the
+    // layout barely moves.
     return (
       <View
         style={{
           marginTop: spacing.md,
+          flexDirection: 'row',
           backgroundColor: colors.surface,
-          borderRadius: radius.xl,
+          borderRadius: radius.md,
           borderWidth: 0.5,
           borderColor: colors.borderSubtle,
           overflow: 'hidden',
+          minHeight: 64,
         }}
       >
-        <View
-          style={{
-            width: '100%',
-            aspectRatio: 1.91,
-            backgroundColor: colors.surfaceRaised,
-          }}
-        />
-        <View style={{ padding: spacing.lg, gap: spacing.xs }}>
-          <View style={{ height: 16, width: '60%', backgroundColor: colors.surfaceRaised, borderRadius: 4 }} />
-          <View style={{ height: 12, width: '90%', backgroundColor: colors.surfaceRaised, borderRadius: 4, marginTop: spacing.xs }} />
+        <View style={{ width: 64, backgroundColor: colors.surfaceRaised }} />
+        <View style={{ flex: 1, padding: spacing.md, gap: 6, justifyContent: 'center' }}>
+          <View style={{ height: 10, width: '40%', backgroundColor: colors.surfaceRaised, borderRadius: 4 }} />
+          <View style={{ height: 14, width: '80%', backgroundColor: colors.surfaceRaised, borderRadius: 4 }} />
         </View>
       </View>
     );
