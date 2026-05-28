@@ -575,19 +575,23 @@ export default function LandingScreen() {
             }}
             keyboardType="number-pad"
             inputMode="numeric"
-            // iOS uses textContentType for "From Messages" suggestion.
-            // Android uses autoComplete="sms-otp" for SMS Retriever API.
-            // Web: do NOT set autoComplete="one-time-code" — it activates
-            // Chrome's WebOTP API which hijacks the input on desktop and
-            // prevents normal typing/pasting. Leave web autoComplete off.
-            textContentType="oneTimeCode"
+            // textContentType is iOS-only in intent — but React Native
+            // Web maps textContentType="oneTimeCode" to the HTML
+            // autocomplete="one-time-code" attribute, which RE-activates
+            // Chrome's WebOTP API even when we set autoComplete='off'
+            // (RN Web applies textContentType after autoComplete in some
+            // versions). WebOTP then steals focus every time the browser
+            // thinks an SMS just arrived, which is what Jack was hitting.
+            // Set textContentType ONLY on iOS so web never gets the
+            // hijacking autocomplete value.
+            {...(Platform.OS === 'ios' ? { textContentType: 'oneTimeCode' as const } : {})}
             {...(Platform.OS === 'android' ? { autoComplete: 'sms-otp' as const } : {})}
             maxLength={6}
             autoFocus
             onSubmitEditing={handleVerifyOtp}
-            // Block Bitwarden / 1Password / LastPass from grabbing focus and
-            // re-filling on every keystroke. Set autoComplete="off" on web
-            // explicitly so the browser doesn't apply any special handling.
+            // Block Bitwarden / 1Password / LastPass from grabbing focus
+            // and re-filling on every keystroke. Set autoComplete="off"
+            // on web so the browser doesn't apply any special handling.
             {...(Platform.OS === 'web' ? { autoComplete: 'off', 'data-bwignore': 'true', 'data-lpignore': 'true', 'data-form-type': 'other', name: 'otp-code' } as any : {})}
             style={{
               ...inputStyle,
