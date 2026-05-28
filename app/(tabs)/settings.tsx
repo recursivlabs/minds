@@ -340,7 +340,27 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="AI">
-          <View style={{ paddingVertical: spacing.xs }}>
+          {/* Entry point back to the agent setup/edit screen. Lives here
+             so users who dismissed the For You CTA can still find the
+             setup flow (or edit their existing agent's name, model,
+             system prompt, etc.). */}
+          <Pressable
+            onPress={() => router.push('/agent' as any)}
+            style={({ pressed }) => ({
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              paddingVertical: spacing.md,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <View style={{ flex: 1, paddingRight: spacing.lg }}>
+              <Text variant="body">Set up your personal AI agent</Text>
+              <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, lineHeight: 18 }}>
+                Name, model, system prompt, secure context, and curation preferences. You can change anything anytime.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </Pressable>
+          <View style={{ paddingVertical: spacing.xs, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ flex: 1, paddingRight: spacing.lg }}>
                 <Text variant="body">Use my personal AI agent</Text>
