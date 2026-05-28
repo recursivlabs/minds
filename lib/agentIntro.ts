@@ -8,8 +8,12 @@
 // messages. Caller is responsible for invalidating the conversations
 // cache afterwards so the Recent sidebar refetches.
 
-export const INTRO_DM_TEMPLATE = (firstName: string): string => [
-  `Hey ${firstName || 'there'}, I'm your personal AI agent on Minds.`,
+// Plain, no-possessive greeting. Earlier version templated the user's
+// first name ("Hey jack, ...") but Jack's stored display name had a
+// trailing 's, so the intro rendered "Hey jack's, I'm...". Generic
+// greeting dodges the whole class of name-parsing bugs.
+const INTRO_DM_BODY = [
+  "Hey, I'm your personal AI agent on Minds.",
   '',
   'I curate your "For You" feed by learning your preferences and finding you the best content across Minds and the full internet each day.',
   '',
@@ -20,20 +24,31 @@ export const INTRO_DM_TEMPLATE = (firstName: string): string => [
   "Let me know where you'd like to start.",
 ].join('\n');
 
+export const INTRO_DM_TEMPLATE = (_firstName?: string): string => INTRO_DM_BODY;
+
 export function firstName(name: string | null | undefined): string {
   if (!name) return 'there';
-  return name.trim().split(/\s+/)[0] || 'there';
+  // Strip trailing possessive ('s) and other punctuation so a stored
+  // name of "jack's" doesn't render as "Hey jack's, ..." anywhere
+  // else that uses this helper.
+  const first = name.trim().split(/\s+/)[0] || 'there';
+  return first.replace(/['’]s$/i, '').replace(/[^\p{L}\p{N}-]+$/u, '') || 'there';
 }
 
 /**
  * Ensure a personal agent's DM thread has at least one agent-authored
  * message. No-ops if the thread already has one. Returns the
  * conversation id when present so callers can route the user into it.
+ *
+ * Dedup check uses the SDK's `sender` field shape (server returns
+ * `sender: { id, name, is_ai }`, NOT `author`). Earlier code looked
+ * at `author.id` which was always undefined — so every back-fill
+ * reposted the intro. Jack's thread ended up with 4 copies.
  */
 export async function ensureIntroDM(
   sdk: any,
   agentId: string,
-  userName: string | null | undefined,
+  _userName?: string | null | undefined,
 ): Promise<string | null> {
   if (!sdk || !agentId) return null;
   const dmRes: any = await sdk.chat.dm({ user_id: agentId });
@@ -41,15 +56,17 @@ export async function ensureIntroDM(
   if (!conversationId) return null;
   try {
     const existing: any = await sdk.chat.messages?.(conversationId, { limit: 50 });
-    const messages: Array<{ author?: { id?: string; is_ai?: boolean; isAi?: boolean } }> = existing?.data ?? [];
-    const alreadyPosted = messages.some(
-      (m) => m.author?.id === agentId || m.author?.is_ai === true || m.author?.isAi === true,
-    );
+    const messages: any[] = existing?.data ?? [];
+    const alreadyPosted = messages.some((m) => {
+      const sid = m.sender?.id ?? m.author?.id ?? m.sender_id ?? m.senderId;
+      const isAi = m.sender?.is_ai ?? m.sender?.isAi ?? m.author?.is_ai ?? m.author?.isAi;
+      return sid === agentId || isAi === true;
+    });
     if (alreadyPosted) return conversationId;
     await sdk.chat.sendAsAgent({
       agent_id: agentId,
       conversation_id: conversationId,
-      content: INTRO_DM_TEMPLATE(firstName(userName)),
+      content: INTRO_DM_BODY,
     });
   } catch (err) {
     console.warn('[ensureIntroDM] failed to post intro', err);

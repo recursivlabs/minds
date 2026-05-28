@@ -527,59 +527,54 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
         || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
 
-      if (wsConnectedRef.current) {
-        // WebSocket connected — server handles agent auto-reply and broadcasts it.
-        // We just show typing indicator and wait for the WS message event.
-        if (isAgent) {
-          setAgentTyping(true);
-          setTimeout(() => setAgentTyping(false), 30000); // safety timeout
-        }
-      } else {
-        // No WebSocket — manually trigger agent response via SSE
-        if (isAgent && otherId) {
-          setAgentTyping(true);
+      // Agent reply path. The server's POST /chat/messages does NOT
+      // auto-trigger an agent response — the client is responsible
+      // for kicking off /agents/:id/chat/stream when the recipient
+      // is an agent. The earlier "WS connected → wait for server"
+      // branch silently dropped every message Jack sent.
+      if (isAgent && otherId) {
+        setAgentTyping(true);
+        try {
+          const result = await sdk.agents.chatStreamText(otherId, {
+            message: messageText,
+            ...(conversationId ? { conversation_id: conversationId } : {}),
+          });
+          // When WS is connected the server-side agent stream also
+          // emits a chat-message broadcast for our reply — dedupe
+          // against the WS path by id rather than appending here.
+          if (result?.content && !wsConnectedRef.current) {
+            setMessages(prev => [...prev, {
+              id: 'agent-' + Date.now(),
+              content: result.content,
+              sender: { id: otherId, name: otherName, is_ai: true },
+              createdAt: new Date().toISOString(),
+            }]);
+          }
+        } catch (streamErr) {
+          console.warn('[chat] agent stream failed, falling back to non-streaming', streamErr);
           try {
-            const result = await sdk.agents.chatStreamText(otherId, { message: messageText, ...(conversationId ? { conversation_id: conversationId } : {}) });
-            if (result.content) {
+            const agentRes = await sdk.agents.chat(otherId, {
+              message: messageText,
+              ...(conversationId ? { conversation_id: conversationId } : {}),
+            });
+            const agentData = agentRes?.data || agentRes;
+            const reply = (agentData as any)?.content
+              || (agentData as any)?.message
+              || (agentData as any)?.response
+              || (typeof agentData === 'string' ? agentData : null);
+            if (reply && !wsConnectedRef.current) {
               setMessages(prev => [...prev, {
                 id: 'agent-' + Date.now(),
-                content: result.content,
-                sender: { id: otherId, name: otherName },
+                content: reply,
+                sender: { id: otherId, name: otherName, is_ai: true },
                 createdAt: new Date().toISOString(),
               }]);
             }
-          } catch {
-            try {
-              const agentRes = await sdk.agents.chat(otherId, { message: messageText });
-              const agentData = agentRes?.data || agentRes;
-              const reply = (agentData as any)?.content || (agentData as any)?.message || (agentData as any)?.response || (typeof agentData === 'string' ? agentData : null);
-              if (reply) {
-                setMessages(prev => [...prev, {
-                  id: 'agent-' + Date.now(),
-                  content: reply,
-                  sender: { id: otherId, name: otherName },
-                  createdAt: new Date().toISOString(),
-                }]);
-              }
-            } catch {}
-          }
-          setAgentTyping(false);
-        } else if (otherId) {
-          // Try SSE in case it's an unlabeled agent — but don't show typing for humans
-          try {
-            const result = await sdk.agents.chatStreamText(otherId, { message: messageText, ...(conversationId ? { conversation_id: conversationId } : {}) });
-            if (result.content) {
-              setMessages(prev => [...prev, {
-                id: 'agent-' + Date.now(),
-                content: result.content,
-                sender: { id: otherId, name: otherName },
-                createdAt: new Date().toISOString(),
-              }]);
-            }
-          } catch {
-            // Not an agent — human will respond via WebSocket/polling
+          } catch (err) {
+            console.warn('[chat] agent fallback also failed', err);
           }
         }
+        setAgentTyping(false);
       }
     } catch {
       // Send failed — nothing to remove since we didn't add optimistically
