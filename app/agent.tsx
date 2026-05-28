@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, ScrollView, TextInput, Pressable, Platform, Alert } from 'react-native';
+import { View, ScrollView, TextInput, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -7,16 +7,30 @@ import { Text, Button } from '../components';
 import { Container } from '../components/Container';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { useAuth } from '../lib/auth';
-import { loadPreferences, savePreferences } from '../lib/onboarding';
+import {
+  loadPreferences,
+  savePreferences,
+  markAgentSetUp,
+  isAgentSetUp,
+  markCuratedNow,
+} from '../lib/onboarding';
+import { buildCuratorRequest } from '../lib/curator';
 import { colors, spacing, radius, typography } from '../constants/theme';
+
+// Model options (small curated list — keep the picker simple, premium feel).
+const MODELS: Array<{ key: string; label: string; sub: string }> = [
+  { key: 'anthropic/claude-sonnet-4-7', label: 'Claude Sonnet 4.7', sub: 'Sharp, balanced. Default.' },
+  { key: 'anthropic/claude-opus-4-7', label: 'Claude Opus 4.7', sub: 'Most thoughtful, slower.' },
+  { key: 'openai/gpt-5.4', label: 'GPT-5.4', sub: 'Versatile, broad context.' },
+  { key: 'google/gemini-3.1-pro', label: 'Gemini 3.1 Pro', sub: 'Strong at multi-step tools.' },
+];
 
 const PERSONAS = [
   { key: 'curious', label: 'Curious', desc: 'Leads with the most surprising or counterintuitive thing.' },
   { key: 'skeptical', label: 'Skeptical', desc: 'Flags what is unproven, contested, or missing.' },
   { key: 'playful', label: 'Playful', desc: 'One sharp observation with a touch of wit.' },
-  { key: 'calm', label: 'Calm', desc: 'A short factual phrase. Lets the source speak.' },
+  { key: 'calm', label: 'Calm', desc: 'Short factual phrase. Lets the source speak.' },
 ] as const;
-
 type PersonaKey = typeof PERSONAS[number]['key'];
 
 const DEFAULT_SYSTEM_PROMPT = [
@@ -27,39 +41,70 @@ const DEFAULT_SYSTEM_PROMPT = [
   'Your conversations with the user are private and never train a shared model.',
 ].join(' ');
 
-export default function AgentScreen() {
+const INTRO_DM_TEMPLATE = (firstName: string) => [
+  `Hey ${firstName || 'there'}, I'm your personal AI agent on Minds.`,
+  '',
+  'I curate your "For You" feed by learning your preferences and finding you the best content across Minds and the full internet each day.',
+  '',
+  'I can perform scheduled tasks or reminders, help you write new posts, answer questions about Minds, teach you about your engagement patterns, or talk about anything you want really.',
+  '',
+  "Our conversation is private between us and doesn't train any models. You can change my name, model, or personality anytime in settings. You are free to disable me anytime.",
+  '',
+  "Let me know where you'd like to start.",
+].join('\n');
+
+function firstName(name: string | null | undefined): string {
+  if (!name) return 'there';
+  return name.trim().split(/\s+/)[0] || 'there';
+}
+
+export default function AgentSetupScreen() {
   const router = useRouter();
-  const { sdk } = useAuth();
+  const { sdk, user } = useAuth();
 
   const [agentId, setAgentId] = React.useState<string | null>(null);
+  const [isExistingAgent, setIsExistingAgent] = React.useState(false);
   const [name, setName] = React.useState('');
+  const [model, setModel] = React.useState(MODELS[0].key);
   const [persona, setPersona] = React.useState<PersonaKey>('curious');
-  const [systemPrompt, setSystemPrompt] = React.useState('');
+  const [systemPrompt, setSystemPrompt] = React.useState(DEFAULT_SYSTEM_PROMPT);
+  const [interests, setInterests] = React.useState('');
+  const [contextDoc, setContextDoc] = React.useState('');
+
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [stepMsg, setStepMsg] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 
-  // Load the user's personal agent + their saved preferences.
+  // Detect first-time vs edit. If a personal agent already exists for
+  // this user, treat as edit. Otherwise treat as setup. Pre-fill fields
+  // from whatever's already there.
   React.useEffect(() => {
     if (!sdk) return;
     let cancelled = false;
     (async () => {
       try {
         const list = await sdk.agents.list({ limit: 50 });
-        const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
+        const personal = (list.data || []).find(
+          (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
+        );
         const stored = await loadPreferences();
         if (cancelled) return;
         if (personal) {
+          setIsExistingAgent(true);
           setAgentId(personal.id);
-          setName(personal.name || stored?.agent_name || 'Agent');
-          setSystemPrompt((personal as any).ai_system_prompt || (personal as any).aiSystemPrompt || DEFAULT_SYSTEM_PROMPT);
+          setName(personal.name || 'Agent');
+          setModel((personal as any).ai_model || (personal as any).model || MODELS[0].key);
+          setSystemPrompt(
+            (personal as any).ai_system_prompt || (personal as any).aiSystemPrompt || DEFAULT_SYSTEM_PROMPT,
+          );
         } else {
-          setName(stored?.agent_name || 'Agent');
-          setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+          setName('Agent');
         }
         setPersona((stored?.persona as PersonaKey) || 'curious');
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message || 'Failed to load agent');
+        setInterests((stored?.free_text_interests as string) || '');
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Failed to load');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -72,57 +117,130 @@ export default function AgentScreen() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSaving(true);
     setError(null);
+
     try {
-      // Persist preferences locally so pull-to-refresh on the home feed
-      // continues to use the latest persona / paste sources.
+      // 1. Persist client-side preferences (used by buildCuratorRequest)
+      setStepMsg('Saving your preferences');
       const stored = await loadPreferences();
       await savePreferences({
         interests: stored?.interests || [],
-        free_text_interests: stored?.free_text_interests || '',
+        free_text_interests: interests.trim() || '',
         vibes: stored?.vibes || [],
         persona,
         agent_name: name.trim() || undefined,
         paste_sources: stored?.paste_sources || {},
       });
 
-      // Push name + system prompt to the agent row, and persona via
-      // ensurePersonal which idempotently updates agent_preferences.
-      if (agentId) {
-        await (sdk as any).agents.update(agentId, {
-          name: name.trim() || undefined,
-          system_prompt: systemPrompt.trim() || null,
-        });
-      }
-      await (sdk as any).agents.ensurePersonal({
+      // 2. Ensure personal agent exists + push name/model/prompt
+      setStepMsg('Configuring your agent');
+      const ensureRes: any = await (sdk as any).agents.ensurePersonal({
         preferences: {
           interests: stored?.interests || [],
-          free_text_interests: stored?.free_text_interests || '',
+          free_text_interests: interests.trim() || '',
           vibes: stored?.vibes || [],
           persona,
+          context_document: contextDoc.trim() || null,
         },
-        overrides: name.trim() ? { name: name.trim() } : undefined,
+        overrides: {
+          name: name.trim() || undefined,
+          model,
+          system_prompt: systemPrompt.trim() || null,
+        },
       });
+      const newAgentId: string | undefined = ensureRes?.data?.agent_id || ensureRes?.data?.id || agentId;
+      if (newAgentId && !agentId) setAgentId(newAgentId);
 
+      // 3. Trigger an initial curator run so the feed has content waiting
+      //    when they land back. Non-fatal if it fails — feed still works.
+      setStepMsg('Curating your first feed');
+      try {
+        // Fold free-text interests into the interests array so the
+        // curator picks them up. buildCuratorRequest only consumes the
+        // typed shape — no `free_text_interests` field.
+        const freeTextChunks = interests
+          .split(/[,\n]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const mergedInterests = Array.from(new Set([
+          ...(stored?.interests || []),
+          ...freeTextChunks,
+        ]));
+        const curatorReq = buildCuratorRequest({
+          fresh: true,
+          interests: mergedInterests,
+          vibes: stored?.vibes || [],
+          persona,
+          pasteSources: (stored?.paste_sources as any) || {},
+        });
+        await (sdk as any).curator.run(curatorReq);
+        await markCuratedNow();
+      } catch {
+        // Curator blip — agent still works, feed will populate on refresh
+      }
+
+      // 4. Send intro DM (only on first-time setup — don't spam on edits)
+      if (!isExistingAgent && newAgentId) {
+        setStepMsg('Sending welcome message');
+        try {
+          const dmRes: any = await sdk.chat.dm({ user_id: newAgentId });
+          const conversationId: string | undefined = dmRes?.data?.id;
+          if (conversationId) {
+            const existing: any = await (sdk as any).chat.messages?.(conversationId, { limit: 50 });
+            const messages: Array<{ author?: { id?: string; is_ai?: boolean; isAi?: boolean } }> = existing?.data ?? [];
+            const agentAlreadyPosted = messages.some(
+              (m) => m.author?.id === newAgentId || m.author?.is_ai === true || m.author?.isAi === true,
+            );
+            if (!agentAlreadyPosted) {
+              await (sdk as any).chat.sendAsAgent({
+                agent_id: newAgentId,
+                conversation_id: conversationId,
+                content: INTRO_DM_TEMPLATE(firstName(user?.name)),
+              });
+            }
+          }
+        } catch {
+          // DM seeding blip — agent + feed still work
+        }
+      }
+
+      // 5. Flag setup complete + back to feed
+      await markAgentSetUp();
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save');
+      router.replace('/(tabs)' as any);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save');
     } finally {
       setSaving(false);
+      setStepMsg('');
     }
   };
 
-  const handleResetPrompt = () => {
-    if (Platform.OS !== 'web') Haptics.selectionAsync();
-    setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+  const inputBase = {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    color: colors.text,
+    fontSize: typography.body.fontSize,
+    borderWidth: 0.5,
+    borderColor: colors.border,
   };
+
+  const sectionLabel = (label: string, hint?: string) => (
+    <View style={{ gap: 2, marginBottom: spacing.xs }}>
+      <Text variant="label" color={colors.textMuted}>{label}</Text>
+      {hint ? (
+        <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>{hint}</Text>
+      ) : null}
+    </View>
+  );
 
   return (
     <Container safeTop safeBottom>
-      <ScreenHeader title="Your agent" showBack />
+      <ScreenHeader title={isExistingAgent ? 'Your agent' : 'Set up your agent'} showBack />
 
       <ScrollView
-        contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['4xl'], gap: spacing.xl }}
+        contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['4xl'], gap: spacing['2xl'] }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -130,54 +248,53 @@ export default function AgentScreen() {
           <Text variant="body" color={colors.textMuted}>Loading…</Text>
         ) : (
           <>
+            {!isExistingAgent && (
+              <View style={{ gap: spacing.sm, paddingBottom: spacing.md, borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle }}>
+                <Text variant="h2" color={colors.text}>Build your AI on Minds</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22 }}>
+                  Your personal agent works for you and only you. Curates your feed, helps you write, answers questions, and remembers what matters. You control every setting and can change it anytime.
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm }}>
+                  <Ionicons name="lock-closed" size={12} color={colors.textMuted} />
+                  <Text variant="caption" color={colors.textMuted}>
+                    Private. Never trains a shared model. Read-only on what you grant.
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <View style={{ gap: spacing.sm }}>
-              <Text variant="label" color={colors.textMuted}>NAME</Text>
+              {sectionLabel('NAME', 'What you call this agent. Appears in chat.')}
               <TextInput
                 value={name}
                 onChangeText={setName}
-                placeholder="What should we call your agent?"
+                placeholder="e.g. Neo, Sage, Mira"
                 placeholderTextColor={colors.textMuted}
                 maxLength={48}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: radius.md,
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  color: colors.text,
-                  fontSize: typography.body.fontSize,
-                  borderWidth: 0.5,
-                  borderColor: colors.border,
-                }}
+                style={inputBase}
               />
             </View>
 
             <View style={{ gap: spacing.sm }}>
-              <Text variant="label" color={colors.textMuted}>VOICE</Text>
+              {sectionLabel('MODEL', "Which AI powers this agent. You can change anytime.")}
               <View style={{ gap: spacing.sm }}>
-                {PERSONAS.map((p) => {
-                  const selected = persona === p.key;
+                {MODELS.map((m) => {
+                  const selected = model === m.key;
                   return (
                     <Pressable
-                      key={p.key}
-                      onPress={() => {
-                        if (Platform.OS !== 'web') Haptics.selectionAsync();
-                        setPersona(p.key);
-                      }}
+                      key={m.key}
+                      onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync(); setModel(m.key); }}
                       style={{
                         padding: spacing.lg,
                         borderRadius: radius.md,
                         borderWidth: 0.5,
                         borderColor: selected ? colors.accent : colors.border,
                         backgroundColor: selected ? colors.surface : 'transparent',
-                        gap: spacing.xs,
+                        gap: 4,
                       }}
                     >
-                      <Text variant="bodyMedium" color={selected ? colors.accent : colors.text}>
-                        {p.label}
-                      </Text>
-                      <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>
-                        {p.desc}
-                      </Text>
+                      <Text variant="bodyMedium" color={selected ? colors.accent : colors.text}>{m.label}</Text>
+                      <Text variant="caption" color={colors.textSecondary}>{m.sub}</Text>
                     </Pressable>
                   );
                 })}
@@ -185,44 +302,126 @@ export default function AgentScreen() {
             </View>
 
             <View style={{ gap: spacing.sm }}>
+              {sectionLabel('VOICE', "How your agent talks in the feed and DMs.")}
+              <View style={{ gap: spacing.sm }}>
+                {PERSONAS.map((p) => {
+                  const selected = persona === p.key;
+                  return (
+                    <Pressable
+                      key={p.key}
+                      onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync(); setPersona(p.key); }}
+                      style={{
+                        padding: spacing.lg,
+                        borderRadius: radius.md,
+                        borderWidth: 0.5,
+                        borderColor: selected ? colors.accent : colors.border,
+                        backgroundColor: selected ? colors.surface : 'transparent',
+                        gap: 4,
+                      }}
+                    >
+                      <Text variant="bodyMedium" color={selected ? colors.accent : colors.text}>{p.label}</Text>
+                      <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>{p.desc}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={{ gap: spacing.sm }}>
+              {sectionLabel('INTERESTS', "Topics, fields, communities — what should your agent be reading for you?")}
+              <TextInput
+                value={interests}
+                onChangeText={setInterests}
+                placeholder="AI agents, biotech, design systems, climate, finance…"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                textAlignVertical="top"
+                style={{ ...inputBase, minHeight: 90 }}
+              />
+            </View>
+
+            <View style={{ gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text variant="label" color={colors.textMuted}>SECURE CONTEXT</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="lock-closed" size={11} color={colors.textMuted} />
+                  <Text variant="caption" color={colors.textMuted}>Private</Text>
+                </View>
+              </View>
+              <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>
+                Drop in anything your agent should know about you — bio, projects, working style, "always answer this way", etc. Stays private. Never shared.
+              </Text>
+              <TextInput
+                value={contextDoc}
+                onChangeText={setContextDoc}
+                placeholder="I'm a builder working on… My writing voice is… When recommending content, always…"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                textAlignVertical="top"
+                maxLength={8000}
+                style={{ ...inputBase, minHeight: 120 }}
+              />
+            </View>
+
+            <View style={{ gap: spacing.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text variant="label" color={colors.textMuted}>SYSTEM PROMPT</Text>
-                <Pressable onPress={handleResetPrompt} hitSlop={8}>
+                <Pressable onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync(); setSystemPrompt(DEFAULT_SYSTEM_PROMPT); }} hitSlop={8}>
                   <Text variant="caption" color={colors.accent}>Reset</Text>
                 </Pressable>
               </View>
               <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>
-                Full control of your agent's behavior. Edit anything you'd put into a custom GPT or Claude project. Persona above only changes the curator voice.
+                Full control of behavior. Edit anything you'd put in a custom GPT or Claude project.
               </Text>
               <TextInput
                 value={systemPrompt}
                 onChangeText={setSystemPrompt}
-                placeholder={DEFAULT_SYSTEM_PROMPT}
-                placeholderTextColor={colors.textMuted}
                 multiline
                 textAlignVertical="top"
                 maxLength={16000}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: radius.md,
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  color: colors.text,
-                  fontSize: typography.body.fontSize,
-                  borderWidth: 0.5,
-                  borderColor: colors.border,
-                  minHeight: 180,
-                }}
+                style={{ ...inputBase, minHeight: 160 }}
               />
             </View>
 
-            {error && (
+            {/* Connectors — stubbed for v1. Coming-soon badges set expectation. */}
+            <View style={{ gap: spacing.sm }}>
+              {sectionLabel('CONNECTORS', "Let your agent read from your accounts. Coming soon.")}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                {[
+                  { name: 'X / Twitter', icon: 'logo-twitter' },
+                  { name: 'YouTube', icon: 'logo-youtube' },
+                  { name: 'Spotify', icon: 'musical-notes' },
+                  { name: 'GitHub', icon: 'logo-github' },
+                  { name: 'Reddit', icon: 'logo-reddit' },
+                  { name: 'Gmail', icon: 'mail' },
+                ].map((c) => (
+                  <View key={c.name} style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    paddingHorizontal: spacing.md, paddingVertical: 8,
+                    borderRadius: radius.full || 999,
+                    borderWidth: 0.5, borderColor: colors.border,
+                    opacity: 0.5,
+                  }}>
+                    <Ionicons name={c.icon as any} size={14} color={colors.textMuted} />
+                    <Text variant="caption" color={colors.textMuted}>{c.name}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {error ? (
               <Text variant="body" color={colors.error || '#ef4444'}>{error}</Text>
-            )}
+            ) : null}
 
             <Button onPress={handleSave} fullWidth size="lg" loading={saving} disabled={saving}>
-              Save changes
+              {saving ? (stepMsg || 'Working…') : isExistingAgent ? 'Save changes' : 'Create my agent'}
             </Button>
+
+            {!isExistingAgent && (
+              <Text variant="caption" color={colors.textMuted} align="center" style={{ lineHeight: 18 }}>
+                You can change everything later. Curate, chat, or just observe — your agent is yours.
+              </Text>
+            )}
           </>
         )}
       </ScrollView>

@@ -57,6 +57,8 @@ const ONBOARDING_COMPLETE_KEY = 'minds:onboarding:complete';
 const ONBOARDING_PREFS_KEY = 'minds:onboarding:preferences';
 const LAST_CURATE_AT_KEY = 'minds:lastCurateAt';
 const USERNAME_PICKED_KEY = 'minds:onboarding:usernamePicked';
+const AGENT_SET_UP_KEY = 'minds:agent:setUp';
+const AGENT_CTA_DISMISSED_KEY = 'minds:agent:ctaDismissed';
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<OnboardingState>(DEFAULT_STATE);
@@ -97,6 +99,24 @@ export async function markUsernamePicked() {
 
 export async function isUsernamePicked(): Promise<boolean> {
   const v = await getItem(USERNAME_PICKED_KEY);
+  return v === '1';
+}
+
+export async function markAgentSetUp() {
+  await setItem(AGENT_SET_UP_KEY, '1');
+}
+
+export async function isAgentSetUp(): Promise<boolean> {
+  const v = await getItem(AGENT_SET_UP_KEY);
+  return v === '1';
+}
+
+export async function markAgentCtaDismissed() {
+  await setItem(AGENT_CTA_DISMISSED_KEY, '1');
+}
+
+export async function isAgentCtaDismissed(): Promise<boolean> {
+  const v = await getItem(AGENT_CTA_DISMISSED_KEY);
   return v === '1';
 }
 
