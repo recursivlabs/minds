@@ -50,7 +50,7 @@ export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sdk, user, signOut, refreshUser } = useAuth();
-  const { profile, loading, error, isFollowing, setIsFollowing } = useProfile(username);
+  const { profile, loading, error, isFollowing, setIsFollowing, refresh: refreshProfile } = useProfile(username);
   const { refresh: refreshMyProfile } = useMyProfile();
 
   const isOwnProfile = !!user?.id && (user.id === profile?.id || user.username === username);
@@ -174,6 +174,17 @@ export default function UserProfileScreen() {
     try {
       if (wasFollowing) await sdk.profiles.unfollow(profile.id);
       else await sdk.profiles.follow(profile.id);
+      // Server is the source of truth for counts (computed from the
+      // follow table on read, no denorm). Pull a fresh profile so the
+      // header reflects reality the moment the optimistic offset goes
+      // away. Reset the offset once the new count lands so we don't
+      // double-count.
+      await refreshProfile();
+      setFollowerOffset(0);
+      // Followers/Following lists drawn lazily — drop any cached
+      // copy so the next tap re-pulls.
+      setFollowersList(null);
+      setFollowingList(null);
     } catch (err: any) {
       setIsFollowing(wasFollowing);
       setFollowerOffset(prev => wasFollowing ? prev + 1 : prev - 1);

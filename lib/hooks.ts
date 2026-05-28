@@ -400,7 +400,22 @@ export function useProfile(username: string) {
     return () => { cancelled = true; };
   }, [username, sdk]);
 
-  return { profile, setProfile, loading, error, isFollowing, setIsFollowing };
+  const refresh = React.useCallback(async () => {
+    if (!username) return;
+    invalidatePrefix(cacheKey);
+    try {
+      const s = sdk || getSdk();
+      let res;
+      try { res = await s.profiles.getByUsername(username); }
+      catch { res = await s.profiles.get(username); }
+      if (res?.data) {
+        setProfile(res.data);
+        setCache(cacheKey, res.data);
+      }
+    } catch {}
+  }, [username, sdk, cacheKey]);
+
+  return { profile, setProfile, loading, error, isFollowing, setIsFollowing, refresh };
 }
 
 /**
