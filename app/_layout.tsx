@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from '../lib/theme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/Toast';
 import { NetworkBanner } from '../components/NetworkBanner';
+import { CommandPalette } from '../components/CommandPalette';
 import { initSentry } from '../lib/sentry';
 import { injectWebStyles } from '../lib/webStyles';
 import { initKeyboardShortcuts } from '../lib/keyboard';
@@ -96,6 +97,10 @@ export default function RootLayout() {
                       <NotificationWiring />
                       <NetworkBanner />
                       <Slot />
+                      {/* Cmd+K palette stays mounted at root so it
+                         can open from any screen. Web-only for now;
+                         the component returns null on native. */}
+                      <CommandPalette />
                     </ToastProvider>
                   </AuthProvider>
                 </ProjectProvider>

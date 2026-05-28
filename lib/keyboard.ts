@@ -20,13 +20,18 @@ export function initKeyboardShortcuts() {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
 
   window.addEventListener('keydown', (e: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in input fields
     const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+    const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
     const mod = e.metaKey || e.ctrlKey;
     let key = e.key.toLowerCase();
     if (mod) key = `mod+${key}`;
+
+    // Non-mod shortcuts (j / k / n etc.) should NOT fire while the
+    // user is typing into an input. Modified shortcuts (mod+k, etc.)
+    // and Escape always fire so the user can open the command
+    // palette or dismiss a modal from anywhere.
+    if (inInput && !mod && key !== 'escape') return;
 
     const handler = handlers.get(key);
     if (handler) {
