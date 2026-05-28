@@ -61,7 +61,10 @@ export default function PickUsernameScreen() {
       await (sdk as any).profiles.update({ username: v });
       await markUsernamePicked();
       await refreshUser();
-      router.replace('/onboarding/swipe' as any);
+      // No swipe-deck onboarding — land in the feed. The agent-setup CTA
+      // at the top of For You invites them to provision a personal agent
+      // when they're ready.
+      router.replace('/(tabs)' as any);
     } catch (e: any) {
       const status = e?.statusCode || e?.status || 0;
       if (status === 409) setError('Username is taken. Try another.');

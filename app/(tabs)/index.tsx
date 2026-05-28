@@ -11,11 +11,22 @@ import { usePosts } from '../../lib/hooks';
 import { getPreference } from '../../lib/preferences';
 import { registerShortcut } from '../../lib/keyboard';
 import { getItem, setItem } from '../../lib/storage';
-import { loadPreferences } from '../../lib/onboarding';
+import { loadPreferences, isAgentCtaDismissed, markAgentCtaDismissed, isAgentSetUp } from '../../lib/onboarding';
 import { colors, spacing } from '../../constants/theme';
 
 const PROFILE_NUDGE_DISMISSED_KEY = 'minds:profileNudge:dismissed';
-const CALIBRATION_NUDGE_DISMISSED_KEY = 'minds:calibrationNudge:dismissed';
+const LAST_CURATE_AT_KEY = 'minds:lastCurateAt';
+
+function formatRelativeTime(ts: number): string {
+  const diffMs = Date.now() - ts;
+  if (diffMs < 60_000) return 'just now';
+  const m = Math.floor(diffMs / 60_000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
 
 type FeedTab = 'foryou' | 'latest' | 'following' | 'trending';
 
@@ -42,31 +53,45 @@ export default function FeedScreen() {
   }, [user?.id]);
 
   // Calibration nudge: legacy users land on For You with no saved taste
-  // signals. Show one inline banner pointing at the swipe deck. Once
-  // dismissed (or once preferences exist), it stays gone.
-  const [calibrationDismissed, setCalibrationDismissed] = React.useState(true);
-  const [hasPreferences, setHasPreferences] = React.useState(true);
+  // Agent-setup CTA: show at top of For You feed when user has no
+  // personal agent AND hasn't dismissed. Once they set one up OR dismiss,
+  // it stays gone. Hard-default to "hide" so we don't flash the CTA
+  // before storage + agents.list resolve.
+  const [agentCtaState, setAgentCtaState] = React.useState<'hidden' | 'show'>('hidden');
+  const [lastCurateAt, setLastCurateAt] = React.useState<number | null>(null);
+  const [, forceTick] = React.useReducer((x: number) => x + 1, 0);
+
+  // Tick once a minute so "5m ago" stays accurate without a remount.
   React.useEffect(() => {
-    if (!user?.id) return;
+    const id = setInterval(() => forceTick(), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  React.useEffect(() => {
+    if (!user?.id || !sdk) return;
     let active = true;
     (async () => {
-      const [dismissed, prefs] = await Promise.all([
-        getItem(`${CALIBRATION_NUDGE_DISMISSED_KEY}:${user.id}`),
-        loadPreferences(),
+      const [dismissed, setUp, lastTs, agentsList] = await Promise.all([
+        isAgentCtaDismissed(),
+        isAgentSetUp(),
+        getItem(LAST_CURATE_AT_KEY),
+        sdk.agents.list({ limit: 50 }).catch(() => ({ data: [] as any[] })),
       ]);
       if (!active) return;
-      setCalibrationDismissed(dismissed === 'true');
-      setHasPreferences(!!prefs && (prefs.interests?.length ?? 0) > 0);
+      const hasPersonal = ((agentsList as any).data || []).some(
+        (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
+      );
+      setAgentCtaState(dismissed || setUp || hasPersonal ? 'hidden' : 'show');
+      const parsed = lastTs ? Number(lastTs) : NaN;
+      setLastCurateAt(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
     })();
     return () => { active = false; };
-  }, [user?.id]);
+  }, [user?.id, sdk]);
 
-  const dismissCalibration = React.useCallback(() => {
-    setCalibrationDismissed(true);
-    if (user?.id) {
-      setItem(`${CALIBRATION_NUDGE_DISMISSED_KEY}:${user.id}`, 'true');
-    }
-  }, [user?.id]);
+  const dismissAgentCta = React.useCallback(() => {
+    setAgentCtaState('hidden');
+    void markAgentCtaDismissed();
+  }, []);
 
   // For You uses the personal-agent curator feed. When the user has
   // disabled AI in Settings, fall back to chronological so they still
@@ -194,25 +219,60 @@ export default function FeedScreen() {
           )}
           ListHeaderComponent={
             <>
-              {activeTab === 'foryou' && !calibrationDismissed && !hasPreferences && (
+              {activeTab === 'foryou' && agentCtaState === 'show' && (
                 <Pressable
-                  onPress={() => router.push('/onboarding/swipe' as any)}
+                  onPress={() => router.push('/agent' as any)}
                   style={({ pressed }) => ({
-                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
                     paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
                     backgroundColor: pressed ? colors.surfaceHover : colors.surface,
                     borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                    gap: spacing.md,
                   })}
                 >
-                  <Ionicons name="sparkles-outline" size={22} color={colors.accent} />
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyMedium" color={colors.text}>Tune your feed</Text>
-                    <Text variant="caption" color={colors.textMuted}>Swipe through 30 items so we know what you'd read.</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+                    <Ionicons name="sparkles" size={22} color={colors.accent} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text variant="bodyMedium" color={colors.text}>Set up your personal AI agent</Text>
+                      <Text variant="caption" color={colors.textSecondary} style={{ lineHeight: 18 }}>
+                        Your agent can curate this feed and help with anything you need on Minds. You control everything.
+                      </Text>
+                    </View>
+                    <Pressable onPress={(e) => { e.stopPropagation?.(); dismissAgentCta(); }} hitSlop={12}>
+                      <Ionicons name="close" size={18} color={colors.textMuted} />
+                    </Pressable>
                   </View>
-                  <Pressable onPress={(e) => { e.stopPropagation?.(); dismissCalibration(); }} hitSlop={12}>
-                    <Ionicons name="close" size={18} color={colors.textMuted} />
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: 34 }}>
+                    <View style={{
+                      paddingHorizontal: spacing.md, paddingVertical: 6,
+                      borderRadius: 999, backgroundColor: colors.accent,
+                    }}>
+                      <Text variant="caption" color="#ffffff">Set up</Text>
+                    </View>
+                    <Pressable onPress={(e) => { e.stopPropagation?.(); dismissAgentCta(); }}>
+                      <Text variant="caption" color={colors.textMuted}>Not now</Text>
+                    </Pressable>
+                  </View>
                 </Pressable>
+              )}
+              {activeTab === 'foryou' && agentCtaState === 'hidden' && lastCurateAt && posts.length > 0 && (
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+                  paddingHorizontal: spacing.xl, paddingVertical: spacing.md,
+                  borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+                  backgroundColor: colors.surface,
+                }}>
+                  <Ionicons name="sparkles" size={14} color={colors.accent} />
+                  <Text variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
+                    Your agent curated this {formatRelativeTime(lastCurateAt)}
+                  </Text>
+                  <Pressable onPress={recurate} disabled={refreshing} hitSlop={8}>
+                    <Ionicons
+                      name={refreshing ? 'sync' : 'refresh-outline'}
+                      size={16}
+                      color={refreshing ? colors.textMuted : colors.accent}
+                    />
+                  </Pressable>
+                </View>
               )}
               {profileIncomplete && !nudgeDismissed && (
                 <View style={{

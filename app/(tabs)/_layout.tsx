@@ -7,7 +7,7 @@ import { spacing } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
-import { isOnboardingComplete, markOnboardingComplete, isUsernamePicked } from '../../lib/onboarding';
+import { isUsernamePicked } from '../../lib/onboarding';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
@@ -19,20 +19,18 @@ export default function TabLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // Onboarding gate. New authenticated users go to swipe calibration.
-  // Legacy users (any prior post or follow on this account) bypass it
-  // entirely — they want their feed, not a 60-second tutorial.
+  // Username gate. Forced redirect for users without a clean URL-safe
+  // username (signup may have written email-prefix garbage; legacy
+  // accounts may have no username). Once picked, the flag prevents loops.
   //
-  // Username gate runs BEFORE onboarding. If the server hasn't assigned
-  // a clean username yet (legacy auto-fallback wrote email-prefix garbage,
-  // OR signup never ran the pick-username step), force the user to pick
-  // one. Once picked we set a flag so we don't loop back. Legacy users
-  // who already have a username skip this entirely.
+  // No swipe-deck onboarding gate. New signups land straight in the For
+  // You feed with our best default content. A top-of-feed CTA invites
+  // them to set up a personal AI agent when they're ready — but that's
+  // optional. Dismissing the CTA leaves the default feed working fine.
   React.useEffect(() => {
     if (!sdk || !user?.id) return;
     let cancelled = false;
     (async () => {
-      // 1. Username gate
       const picked = await isUsernamePicked();
       const currentUsername = (user.username || '').toLowerCase();
       const needsUsername = !picked && (
@@ -42,31 +40,7 @@ export default function TabLayout() {
       if (cancelled) return;
       if (needsUsername) {
         router.replace('/auth/pick-username' as any);
-        return;
       }
-
-      // 2. Onboarding gate (existing)
-      const done = await isOnboardingComplete();
-      if (cancelled || done) return;
-
-      try {
-        const [posts, following] = await Promise.all([
-          sdk.posts.list({ author_id: user.id, limit: 1 }).catch(() => null),
-          sdk.users.following(user.id, { limit: 1 } as any).catch(() => null),
-        ]);
-        const hasPost = (posts?.data?.length ?? 0) > 0;
-        const hasFollow = (following?.data?.length ?? 0) > 0;
-        if (cancelled) return;
-        if (hasPost || hasFollow) {
-          await markOnboardingComplete();
-          return;
-        }
-      } catch {
-        // Detection failure → fall through to onboarding (safer default).
-      }
-
-      if (cancelled) return;
-      router.replace('/onboarding/swipe' as any);
     })();
     return () => { cancelled = true; };
   }, [sdk, user?.id, user?.username, router]);
