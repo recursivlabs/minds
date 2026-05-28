@@ -560,20 +560,29 @@ export default function LandingScreen() {
           <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.7, marginBottom: spacing.xs }}>
             We sent a 6-digit code to {otpEmail}
           </Text>
-          {error ? <Text variant="caption" color={colors.error} align="center">{error}</Text> : null}
+          {/* Stable-height error slot — empty string instead of null keeps
+             children indices fixed across error toggles, preventing the
+             sibling TextInput from looking like it moved (which triggers a
+             remount on RN Web and steals focus mid-type). */}
+          <Text variant="caption" color={colors.error} align="center">{error || ' '}</Text>
           <TextInput
             placeholder="000000"
             placeholderTextColor={c.subtleText}
             value={otpCode}
-            onChangeText={(t) => { setOtpCode(t.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+            onChangeText={(t) => {
+              setOtpCode(t.replace(/\D/g, '').slice(0, 6));
+              if (error) setError('');
+            }}
             keyboardType="number-pad"
             inputMode="numeric"
             textContentType="oneTimeCode"
             autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
             maxLength={6}
             autoFocus
-            selectTextOnFocus
             onSubmitEditing={handleVerifyOtp}
+            // Block Bitwarden / 1Password / LastPass from grabbing focus and
+            // re-filling on every keystroke.
+            {...(Platform.OS === 'web' ? { 'data-bwignore': 'true', 'data-lpignore': 'true', 'data-form-type': 'other', name: 'otp-code' } as any : {})}
             style={{
               ...inputStyle,
               fontSize: 24, letterSpacing: 8, textAlign: 'center' as const,
@@ -608,16 +617,21 @@ export default function LandingScreen() {
           <Text variant="body" color={c.subtleText} align="center" style={{ opacity: 0.7, marginBottom: spacing.xs }}>
             We'll send you a sign-in code
           </Text>
-          {error ? <Text variant="caption" color={colors.error} align="center">{error}</Text> : null}
+          <Text variant="caption" color={colors.error} align="center">{error || ' '}</Text>
           <TextInput
             placeholder="Email"
             placeholderTextColor={c.subtleText}
             value={otpEmail}
-            onChangeText={(t) => { setOtpEmail(t); setError(''); }}
+            onChangeText={(t) => { setOtpEmail(t); if (error) setError(''); }}
             keyboardType="email-address"
+            inputMode="email"
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
             autoFocus
             onSubmitEditing={handleSendOtp}
+            {...(Platform.OS === 'web' ? { 'data-bwignore': 'true', 'data-lpignore': 'true', 'data-form-type': 'other', name: 'otp-email' } as any : {})}
             style={inputStyle}
           />
           <Pressable onPress={handleSendOtp} disabled={loading} style={({ pressed }) => primaryButtonStyle(pressed)}>
