@@ -84,17 +84,43 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const [lastMessageConvoId, setLastMessageConvoId] = React.useState<string | null>(null);
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
 
-  // Fetch unread notification count
+  // Fetch unread notification count + subscribe to live updates.
+  const refreshNotifs = React.useCallback(async () => {
+    if (!sdk) return;
+    try {
+      const res = await sdk.notifications.list({ limit: 10, organization_id: ORG_ID || undefined });
+      const notifs = res.data || [];
+      setUnreadNotifs(notifs.filter((n: any) => n.status === 'unread').length);
+    } catch {}
+  }, [sdk]);
+
+  React.useEffect(() => {
+    refreshNotifs();
+  }, [sdk, pathname]); // Refetch when navigating (cheap, cached)
+
+  // Live notification badge. The server emits a 'notification' event
+  // via WebSocket whenever a new in-app notification is inserted
+  // (NotificationConsumer.ts:269). The SDK doesn't expose a typed
+  // onNotification helper yet, so subscribe via the underlying
+  // socket.io socket directly. Fires for new followers, new replies
+  // to the user's posts, agent task completions, etc.
   React.useEffect(() => {
     if (!sdk) return;
+    let unsub: (() => void) | undefined;
     (async () => {
       try {
-        const res = await sdk.notifications.list({ limit: 10, organization_id: ORG_ID || undefined });
-        const notifs = res.data || [];
-        setUnreadNotifs(notifs.filter((n: any) => n.status === 'unread').length);
+        await sdk.realtime.connect();
+        const sock = (sdk as any).realtime?.socket;
+        if (!sock) return;
+        const handler = () => {
+          refreshNotifs();
+        };
+        sock.on('notification', handler);
+        unsub = () => sock.off?.('notification', handler);
       } catch {}
     })();
-  }, [sdk, pathname]); // Refetch when navigating (cheap, cached)
+    return () => { unsub?.(); };
+  }, [sdk, refreshNotifs]);
 
   // Personal-agent intro back-fill. Runs once per app load. If the
   // user has a personal agent and that thread has no agent-authored
