@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, TextInput, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { View, FlatList, TextInput, Platform, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, Skeleton, PostCard } from '../../components';
@@ -121,7 +121,6 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
   const memberCount = community.memberCount || community.member_count || 0;
   const postCount = community.postCount || community.post_count || 0;
   const privacy = community.privacy;
-  const createdAt = community.createdAt || community.created_at;
 
   return (
     <Pressable
@@ -161,9 +160,6 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
               <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
             </View>
           )}
-          {/* Heuristic "active" badge: communities with >50 posts are
-              flagged as active. Tighter signal would come from a
-              recent-activity field on the server. */}
           {postCount >= 50 && (
             <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: 4 }}>
               <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>ACTIVE</Text>
@@ -217,6 +213,172 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
   );
 }
 
+// ── Compact carousel tiles used on the editorial canvas. ──
+// These are deliberately smaller than the full row cards above so a
+// horizontal scroll preview fits three to four items on a phone and six
+// on web without feeling cramped.
+
+const TILE_WIDTH = 220;
+
+function PersonTile({ person, onPress }: { person: any; onPress: () => void }) {
+  const name = person.name || 'Unknown';
+  const username = person.username;
+  const bio = person.bio || person.description || '';
+  const avatar = person.image || person.avatar;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        width: TILE_WIDTH,
+        padding: spacing.lg,
+        marginRight: spacing.md,
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.sm }}>{name}</Text>
+      {username && <Text variant="caption" color={colors.textMuted} numberOfLines={1}>@{username}</Text>}
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 18 }}>
+          {bio}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function CommunityTile({ community, onPress }: { community: any; onPress: () => void }) {
+  const name = community.name || 'Unnamed';
+  const description = community.description || community.bio || '';
+  const avatar = community.image || community.avatar;
+  const memberCount = community.memberCount || community.member_count || 0;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        width: TILE_WIDTH,
+        padding: spacing.lg,
+        marginRight: spacing.md,
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.sm }}>{name}</Text>
+      {description ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 18 }}>
+          {description}
+        </Text>
+      ) : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm }}>
+        <Ionicons name="people-outline" size={11} color={colors.textMuted} />
+        <Text variant="caption" color={colors.textMuted}>{memberCount.toLocaleString()} members</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function AgentTile({ agent, onPress }: { agent: any; onPress: () => void }) {
+  const name = agent.name || 'Agent';
+  const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
+  const avatar = agent.image || agent.avatar;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        width: TILE_WIDTH,
+        padding: spacing.lg,
+        marginRight: spacing.md,
+        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Avatar uri={avatar} name={name} size="lg" />
+        <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
+          <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
+        </View>
+      </View>
+      <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.sm }}>{name}</Text>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 18 }}>
+          {bio}
+        </Text>
+      ) : null}
+      <Text variant="caption" color={colors.accent} style={{ marginTop: spacing.sm }}>Chat now →</Text>
+    </Pressable>
+  );
+}
+
+function SectionHeader({ title, subtitle, onSeeAll }: { title: string; subtitle?: string; onSeeAll?: () => void }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing['2xl'],
+        paddingBottom: spacing.md,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <Text variant="h3">{title}</Text>
+        {subtitle ? (
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>{subtitle}</Text>
+        ) : null}
+      </View>
+      {onSeeAll ? (
+        <Pressable onPress={onSeeAll} hitSlop={8}>
+          <Text variant="caption" color={colors.accent}>See all →</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function HorizontalCarousel({ children, loading }: { children: React.ReactNode; loading?: boolean }) {
+  if (loading) {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}
+      >
+        {[1, 2, 3, 4].map((i) => (
+          <View
+            key={i}
+            style={{
+              width: TILE_WIDTH,
+              height: 160,
+              marginRight: spacing.md,
+              borderRadius: radius.lg,
+            }}
+          >
+            <Skeleton width={TILE_WIDTH} height={160} borderRadius={radius.lg} />
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
 export default function DiscoverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; mode?: string; userId?: string; q?: string }>();
@@ -226,7 +388,7 @@ export default function DiscoverScreen() {
   );
   const [searchQuery, setSearchQuery] = React.useState(params.q || '');
 
-  // Followers/following mode
+  // Followers/following mode — kept as-is, takes over the screen
   const [followList, setFollowList] = React.useState<any[]>([]);
   const [followListLoading, setFollowListLoading] = React.useState(false);
   const followMode = params.mode as 'followers' | 'following' | undefined;
@@ -254,20 +416,16 @@ export default function DiscoverScreen() {
 
   // Search people via SDK when searching
   const [searchedPeople, setSearchedPeople] = React.useState<any[]>([]);
-  const [searchPeopleLoading, setSearchPeopleLoading] = React.useState(false);
   React.useEffect(() => {
     if (!searchQuery.trim() || activeTab !== 'people' || !sdk) { setSearchedPeople([]); return; }
     let cancelled = false;
-    setSearchPeopleLoading(true);
     const timer = setTimeout(async () => {
       try {
         const res = await sdk.profiles.search({ q: searchQuery, limit: 20 });
         if (!cancelled) setSearchedPeople(res.data || []);
       } catch {
-        // Fall back to client-side filter
         if (!cancelled) setSearchedPeople([]);
       }
-      if (!cancelled) setSearchPeopleLoading(false);
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [searchQuery, activeTab, sdk]);
@@ -276,7 +434,6 @@ export default function DiscoverScreen() {
     if (!sdk) return;
     try {
       if (followMode) {
-        // In following list — toggle (unfollow)
         await sdk.profiles.unfollow(userId);
       } else {
         await sdk.profiles.follow(userId);
@@ -294,6 +451,132 @@ export default function DiscoverScreen() {
 
   const isSearching = searchQuery.trim().length > 0;
 
+  // ── Editorial canvas view (no search query, no follow mode) ──
+  const renderCanvas = () => {
+    const trendingPosts = (posts || []).slice(0, 3);
+    const featuredCommunities = (communities || []).slice(0, 8);
+    const featuredAgents = (agents || []).slice(0, 8);
+    const featuredPeople = (profiles || []).slice(0, 8);
+
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['3xl'] }}>
+        {/* Trending posts — vertical list, lead card on top */}
+        <SectionHeader
+          title="Trending on Minds"
+          subtitle="What people are reading and talking about"
+          onSeeAll={() => setActiveTab('posts')}
+        />
+        {postsLoading && trendingPosts.length === 0 ? (
+          <View style={{ paddingHorizontal: spacing.xl, gap: spacing.lg }}>
+            {[1, 2, 3].map((i) => (
+              <View key={i} style={{ gap: spacing.sm }}>
+                <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+                  <Skeleton width={36} height={36} borderRadius={18} />
+                  <View style={{ flex: 1, gap: spacing.xs }}>
+                    <Skeleton width={140} height={12} />
+                    <Skeleton width={80} height={10} />
+                  </View>
+                </View>
+                <Skeleton width="100%" height={50} />
+              </View>
+            ))}
+          </View>
+        ) : trendingPosts.length === 0 ? (
+          <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }}>
+            <Text variant="body" color={colors.textMuted}>No trending posts yet.</Text>
+          </View>
+        ) : (
+          trendingPosts.map((p: any, index: number) => {
+            if (index === 0) {
+              return (
+                <View key={p.id} style={{ borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle }}>
+                  <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg }}>
+                    <View style={{ alignSelf: 'flex-start', backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4, marginBottom: spacing.sm }}>
+                      <Text variant="caption" color={colors.accent} style={{ fontSize: 10, letterSpacing: 0.5 }}>TRENDING NOW</Text>
+                    </View>
+                  </View>
+                  <PostCard post={p} />
+                </View>
+              );
+            }
+            return <PostCard key={p.id} post={p} compact />;
+          })
+        )}
+
+        {/* Communities */}
+        <SectionHeader
+          title="Communities to join"
+          subtitle="Find your people"
+          onSeeAll={() => setActiveTab('communities')}
+        />
+        <HorizontalCarousel loading={commLoading && featuredCommunities.length === 0}>
+          {featuredCommunities.map((c: any) => (
+            <CommunityTile
+              key={c.id}
+              community={c}
+              onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
+            />
+          ))}
+          <Pressable
+            onPress={() => router.push('/(tabs)/create?mode=community' as any)}
+            style={({ pressed }) => ({
+              width: TILE_WIDTH,
+              padding: spacing.lg,
+              marginRight: spacing.md,
+              backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+              borderRadius: radius.lg,
+              borderWidth: 0.5,
+              borderColor: colors.borderSubtle,
+              borderStyle: 'dashed',
+              alignItems: 'flex-start',
+              justifyContent: 'center',
+              minHeight: 160,
+            })}
+          >
+            <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="add" size={22} color={colors.accent} />
+            </View>
+            <Text variant="bodyMedium" color={colors.accent} style={{ marginTop: spacing.sm }}>Start a community</Text>
+            <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>Gather people around an interest</Text>
+          </Pressable>
+        </HorizontalCarousel>
+
+        {/* Agents */}
+        <SectionHeader
+          title="Agents to chat with"
+          subtitle="AIs people on Minds have built"
+          onSeeAll={() => setActiveTab('agents')}
+        />
+        <HorizontalCarousel loading={agentsLoading && featuredAgents.length === 0}>
+          {featuredAgents.map((a: any) => (
+            <AgentTile
+              key={a.id}
+              agent={a}
+              onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
+            />
+          ))}
+        </HorizontalCarousel>
+
+        {/* People */}
+        <SectionHeader
+          title="People to follow"
+          subtitle="New voices on the network"
+          onSeeAll={() => setActiveTab('people')}
+        />
+        <HorizontalCarousel loading={profilesLoading && featuredPeople.length === 0}>
+          {featuredPeople.map((p: any) => (
+            <PersonTile
+              key={p.id}
+              person={p}
+              onPress={() => router.push(`/(tabs)/user/${p.username || p.id}` as any)}
+            />
+          ))}
+        </HorizontalCarousel>
+      </ScrollView>
+    );
+  };
+
+  // ── List view (search results or specific tab) ──
   const getData = (): { type: string; data: any; key: string }[] => {
     if (activeTab === 'posts') {
       const filtered = isSearching ? searchResults : filterByQuery(posts || [], ['content', 'title']);
@@ -322,24 +605,8 @@ export default function DiscoverScreen() {
 
   const items = getData();
 
-  const renderItem = ({ item, index }: { item: { type: string; data: any; key: string }; index: number }) => {
+  const renderItem = ({ item }: { item: { type: string; data: any; key: string } }) => {
     if (item.type === 'post') {
-      // First post in the Posts tab is rendered as a "lead" card —
-      // larger padding, non-compact mode, accent badge above. Mixed-
-      // size hierarchy is what separates a Discover from a flat list.
-      const isLead = activeTab === 'posts' && index === 0 && !isSearching;
-      if (isLead) {
-        return (
-          <View style={{ borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle }}>
-            <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg }}>
-              <View style={{ alignSelf: 'flex-start', backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4, marginBottom: spacing.sm }}>
-                <Text variant="caption" color={colors.accent} style={{ fontSize: 10, letterSpacing: 0.5 }}>TRENDING NOW</Text>
-              </View>
-            </View>
-            <PostCard post={item.data} />
-          </View>
-        );
-      }
       return <PostCard post={item.data} compact />;
     }
     if (item.type === 'person') {
@@ -368,42 +635,17 @@ export default function DiscoverScreen() {
         />
       );
     }
-    if (item.type === 'app') {
-      const app = item.data;
-      const deployUrl = app.slug ? `https://${app.slug}.on.recursiv.io` : null;
-      return (
-        <Pressable
-          onPress={() => deployUrl && (Platform.OS === 'web' ? window.open(deployUrl, '_blank') : import('react-native').then(m => m.Linking.openURL(deployUrl)))}
-          style={({ pressed }) => ({
-            paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-            borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="rocket-outline" size={22} color={colors.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text variant="bodyMedium" numberOfLines={1}>{app.name}</Text>
-              <Text variant="caption" color={colors.textMuted}>{app.slug}.on.recursiv.io</Text>
-            </View>
-            {deployUrl && <Ionicons name="open-outline" size={16} color={colors.textMuted} />}
-          </View>
-          {app.organization?.name && (
-            <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs, marginLeft: 56 }}>
-              by {app.organization.name}
-            </Text>
-          )}
-        </Pressable>
-      );
-    }
     return null;
   };
 
+  // Show the editorial canvas when we're on the default landing — no
+  // search, no follow-list, no explicit tab filter. Once the user types,
+  // taps a tab via "See all", or navigates here as a followers list,
+  // fall through to the existing tab + list shape.
+  const showCanvas = !isSearching && !followMode && !params.tab;
+
   return (
     <Container safeTop padded={false}>
-      {/* Header + Search + Tabs — solid bg so content doesn't bleed through */}
       <View style={{ backgroundColor: colors.bg, zIndex: 1 }}>
         <View
           style={{
@@ -422,7 +664,6 @@ export default function DiscoverScreen() {
           <Text variant="h3" style={{ flex: 1 }}>{followMode === 'followers' ? 'Followers' : followMode === 'following' ? 'Following' : 'Discover'}</Text>
         </View>
 
-        {/* Search */}
         <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
           <View
             style={{
@@ -438,7 +679,7 @@ export default function DiscoverScreen() {
           >
             <Ionicons name="search" size={18} color={colors.textMuted} />
             <TextInput
-              placeholder="Search..."
+              placeholder="Search posts, people, communities, agents..."
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -458,12 +699,14 @@ export default function DiscoverScreen() {
           </View>
         </View>
 
-        {/* Tabs */}
-        <TabBar tabs={TABS} active={activeTab} onChange={(k) => setActiveTab(k as DiscoverTab)} scrollable />
+        {!showCanvas && (
+          <TabBar tabs={TABS} active={activeTab} onChange={(k) => setActiveTab(k as DiscoverTab)} scrollable />
+        )}
       </View>
 
-      {/* List */}
-      {loading ? (
+      {showCanvas ? (
+        renderCanvas()
+      ) : loading ? (
         <View style={{ padding: spacing.xl, gap: spacing.xl }}>
           {[1, 2, 3, 4, 5].map(i => (
             <View key={i} style={{ gap: spacing.sm }}>
@@ -492,11 +735,6 @@ export default function DiscoverScreen() {
           ) : null}
           ListHeaderComponent={
             <>
-              {/* Per-tab "+ New X" affordance. Communities and Agents
-                  get inline create entry points so users discover the
-                  creation flow at the same place they discover existing
-                  ones. Posts/People don't need this — Posts uses the
-                  Create tab; following People is the discover action. */}
               {activeTab === 'communities' && !isSearching && (
                 <Pressable
                   onPress={() => router.push('/(tabs)/create?mode=community' as any)}
