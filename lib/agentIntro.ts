@@ -8,6 +8,8 @@
 // messages. Caller is responsible for invalidating the conversations
 // cache afterwards so the Recent sidebar refetches.
 
+import { ORG_ID } from './recursiv';
+
 // Plain, no-possessive greeting. Earlier version templated the user's
 // first name ("Hey jack, ...") but Jack's stored display name had a
 // trailing 's, so the intro rendered "Hey jack's, I'm...". Generic
@@ -51,7 +53,7 @@ export async function ensureIntroDM(
   _userName?: string | null | undefined,
 ): Promise<string | null> {
   if (!sdk || !agentId) return null;
-  const dmRes: any = await sdk.chat.dm({ user_id: agentId });
+  const dmRes: any = await sdk.chat.dm({ user_id: agentId, organization_id: ORG_ID || undefined } as any);
   const conversationId: string | undefined = dmRes?.data?.id;
   if (!conversationId) return null;
   try {

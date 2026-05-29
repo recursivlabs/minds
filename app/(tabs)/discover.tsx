@@ -9,6 +9,7 @@ import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from
 import { useAuth } from '../../lib/auth';
 import { getPreference } from '../../lib/preferences';
 import { logSignal } from '../../lib/signals';
+import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
@@ -768,7 +769,7 @@ export default function DiscoverScreen() {
               const list = await sdk.agents.list({ limit: 50 });
               const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
               if (!personal) { router.push('/agent' as any); return; }
-              const dm = await sdk.chat.dm({ user_id: personal.id });
+              const dm = await sdk.chat.dm({ user_id: personal.id, organization_id: ORG_ID || undefined } as any);
               if (dm.data?.id) router.push(`/(tabs)/chat?id=${dm.data.id}` as any);
             } catch {}
           }}

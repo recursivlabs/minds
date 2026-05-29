@@ -6,6 +6,7 @@ import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { ORG_ID } from '../lib/recursiv';
 
 interface Props {
   agent: any;
@@ -34,7 +35,7 @@ export function AgentCard({ agent, onChat }: Props) {
     // Default: create DM with agent and navigate
     if (!sdk) return;
     try {
-      const res = await sdk.chat.dm({ user_id: agent.id });
+      const res = await sdk.chat.dm({ user_id: agent.id, organization_id: ORG_ID || undefined } as any);
       if (res.data?.id) {
         router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
       }

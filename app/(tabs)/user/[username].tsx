@@ -421,7 +421,7 @@ export default function UserProfileScreen() {
                 onPress={async () => {
                   if (!sdk || !profile?.id) return;
                   try {
-                    const res = await sdk.chat.dm({ user_id: profile.id });
+                    const res = await sdk.chat.dm({ user_id: profile.id, organization_id: ORG_ID || undefined } as any);
                     if (res.data?.id) {
                       router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
                     }

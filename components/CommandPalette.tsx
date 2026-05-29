@@ -124,7 +124,7 @@ export function CommandPalette() {
       const profileRes = await sdk.profiles.getByUsername(username);
       const userId = profileRes.data?.id;
       if (!userId) return;
-      const dm = await sdk.chat.dm({ user_id: userId });
+      const dm = await sdk.chat.dm({ user_id: userId, organization_id: ORG_ID || undefined } as any);
       if (dm.data?.id) {
         close();
         router.push(`/(tabs)/chat?id=${dm.data.id}` as any);
@@ -144,7 +144,7 @@ export function CommandPalette() {
         router.push('/agent' as any);
         return;
       }
-      const dm = await sdk.chat.dm({ user_id: personal.id });
+      const dm = await sdk.chat.dm({ user_id: personal.id, organization_id: ORG_ID || undefined } as any);
       const convoId = dm.data?.id;
       if (!convoId) return;
       // Send the prompt as a user message right away so the agent

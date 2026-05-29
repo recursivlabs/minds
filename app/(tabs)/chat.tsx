@@ -8,6 +8,7 @@ import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
 import { getPreference } from '../../lib/preferences';
+import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 import { getCached, setCache, invalidate } from '../../lib/cache';
@@ -118,7 +119,7 @@ export default function ChatScreen() {
         } catch (e) { /* agent lookup failed */ }
       }
       if (!userId) { setDmError('User or agent not found. Check the username.'); return; }
-      const res = await sdk.chat.dm({ user_id: userId });
+      const res = await sdk.chat.dm({ user_id: userId, organization_id: ORG_ID || undefined } as any);
       if (res.data?.id) {
         setActiveConvoId(res.data.id);
         setShowNewChat(false);
