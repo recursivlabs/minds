@@ -10,7 +10,15 @@ type CacheEntry = {
 };
 
 const store = new Map<string, CacheEntry>();
-const STORAGE_KEY = 'minds:cache';
+// Bumped 2026-05-29: stale localStorage entries from before the strict
+// community-membership filter were causing a flash of phantom-joined
+// communities on refresh (cache rendered first, then the fresh fetch
+// corrected). Bumping the key drops all old entries for everyone.
+const STORAGE_KEY = 'minds:cache:v2';
+// Sweep the legacy key out of localStorage so it doesn't sit around.
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  try { window.localStorage.removeItem('minds:cache'); } catch {}
+}
 
 // Data is "fresh" for 30 seconds — won't refetch at all
 const FRESH_MS = 30_000;
