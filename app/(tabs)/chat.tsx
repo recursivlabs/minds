@@ -495,10 +495,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             const incomingContent = newMsg.content?.trim();
             const incomingSenderId = newMsg.sender?.id;
             const filtered = prev.filter(m => {
-              if (!m.id.startsWith('temp-') && !m.id.startsWith('agent-')) return true;
+              // Optimistic placeholders: 'temp-*' (user send), 'agent-*'
+              // (SSE fallback append), 'streaming-*' (live agent stream).
+              // Drop any whose content matches the WS-arrived row.
+              const isOptimistic = m.id.startsWith('temp-')
+                || m.id.startsWith('agent-')
+                || m.id.startsWith('streaming-');
+              if (!isOptimistic) return true;
               if (m.content?.trim() !== incomingContent) return true;
-              // Content match — same sender? If sender can't be
-              // disambiguated, fall back to content-only match.
               const optimisticSenderId = m.sender?.id;
               if (!optimisticSenderId || !incomingSenderId) return false;
               return optimisticSenderId !== incomingSenderId;
@@ -561,7 +565,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   React.useEffect(() => {
     if (sdk && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
-      if (lastMsg?.id && !lastMsg.id.startsWith('temp-') && !lastMsg.id.startsWith('agent-')) {
+      if (lastMsg?.id && !lastMsg.id.startsWith('temp-') && !lastMsg.id.startsWith('agent-') && !lastMsg.id.startsWith('streaming-')) {
         sdk.chat.markAsRead(conversationId, { message_id: lastMsg.id }).catch(() => {});
       }
     }
@@ -609,28 +613,68 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       // Agent reply path. The server's POST /chat/messages does NOT
       // auto-trigger an agent response — the client is responsible
       // for kicking off /agents/:id/chat/stream when the recipient
-      // is an agent. The earlier "WS connected → wait for server"
-      // branch silently dropped every message Jack sent.
+      // is an agent.
+      //
+      // Streaming render: insert a placeholder bubble immediately
+      // ('streaming: true') and append text_delta chunks to it as
+      // they arrive. The bubble shows a blinking caret while
+      // streaming. Net effect: Claude-style typed-out reply instead
+      // of a long pause followed by a paste.
       if (isAgent && otherId) {
-        setAgentTyping(true);
+        const streamingId = 'streaming-' + Date.now();
+        setMessages(prev => [...prev, {
+          id: streamingId,
+          content: '',
+          sender: { id: otherId, name: otherName, is_ai: true },
+          createdAt: new Date().toISOString(),
+          streaming: true,
+        }]);
+        let acc = '';
+        let streamedAny = false;
         try {
-          const result = await sdk.agents.chatStreamText(otherId, {
+          // chatStream() is an async generator yielding text_delta
+          // chunks. Requires ReadableStream — available on web and on
+          // RN 0.72+. Fall back to chatStreamText() if the platform
+          // can't iterate.
+          const stream = sdk.agents.chatStream(otherId, {
             message: messageText,
             ...(conversationId ? { conversation_id: conversationId } : {}),
           });
-          // When WS is connected the server-side agent stream also
-          // emits a chat-message broadcast for our reply — dedupe
-          // against the WS path by id rather than appending here.
-          if (result?.content && !wsConnectedRef.current) {
-            setMessages(prev => [...prev, {
-              id: 'agent-' + Date.now(),
-              content: result.content,
-              sender: { id: otherId, name: otherName, is_ai: true },
-              createdAt: new Date().toISOString(),
-            }]);
+          for await (const chunk of stream) {
+            if (chunk?.type === 'text_delta' && typeof chunk.delta === 'string') {
+              acc += chunk.delta;
+              streamedAny = true;
+              setMessages(prev => prev.map(m => m.id === streamingId
+                ? { ...m, content: acc }
+                : m));
+            }
           }
+          // Mark complete. WS broadcast of the final stored message
+          // may arrive after this; the dedup in the onMessage handler
+          // (content + sender match for agent-* / streaming-* ids)
+          // drops it.
+          setMessages(prev => prev.map(m => m.id === streamingId
+            ? { ...m, streaming: false }
+            : m));
         } catch (streamErr) {
-          console.warn('[chat] agent stream failed, falling back to non-streaming', streamErr);
+          console.warn('[chat] agent stream failed, falling back to chatStreamText', streamErr);
+          if (!streamedAny) {
+            try {
+              const result = await sdk.agents.chatStreamText(otherId, {
+                message: messageText,
+                ...(conversationId ? { conversation_id: conversationId } : {}),
+              });
+              if (result?.content) {
+                setMessages(prev => prev.map(m => m.id === streamingId
+                  ? { ...m, content: result.content, streaming: false }
+                  : m));
+                streamedAny = true;
+              }
+            } catch {}
+          }
+        }
+        if (!streamedAny) {
+          // Last-ditch fallback to non-streaming chat endpoint.
           try {
             const agentRes = await sdk.agents.chat(otherId, {
               message: messageText,
@@ -641,13 +685,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
               || (agentData as any)?.message
               || (agentData as any)?.response
               || (typeof agentData === 'string' ? agentData : null);
-            if (reply && !wsConnectedRef.current) {
-              setMessages(prev => [...prev, {
-                id: 'agent-' + Date.now(),
-                content: reply,
-                sender: { id: otherId, name: otherName, is_ai: true },
-                createdAt: new Date().toISOString(),
-              }]);
+            if (reply) {
+              setMessages(prev => prev.map(m => m.id === streamingId
+                ? { ...m, content: reply, streaming: false }
+                : m));
             }
           } catch (err) {
             console.warn('[chat] agent fallback also failed', err);

@@ -15,6 +15,10 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
   const content = message.content || message.text || message.body || '';
   const timestamp = message.createdAt || message.created_at || '';
   const hasMarkdown = /[*`#\[\]]/.test(content);
+  // Streaming bubbles show a caret + skip the trailing timestamp so the
+  // bubble doesn't bounce-resize as new chunks land. Once `streaming`
+  // goes false the timestamp + final layout render normally.
+  const isStreaming = message.streaming === true;
 
   const formattedTime = timestamp
     ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -72,11 +76,14 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
           borderRadius: radius.lg,
           borderBottomRightRadius: isOwn ? radius.sm : radius.lg,
           borderBottomLeftRadius: isOwn ? radius.lg : radius.sm,
+          flexDirection: 'row',
+          alignItems: 'flex-end',
         }}
       >
-        {renderContent()}
+        <View style={{ flexShrink: 1 }}>{renderContent()}</View>
+        {isStreaming ? <StreamingCaret color={textColor} /> : null}
       </View>
-      {formattedTime ? (
+      {!isStreaming && formattedTime ? (
         <Text
           variant="caption"
           color={colors.textMuted}
@@ -92,3 +99,57 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
     </View>
   );
 });
+
+// Blinking block caret rendered at the end of a streaming bubble.
+// Plain CSS @keyframes on web; alpha fade via Animated on native.
+function StreamingCaret({ color }: { color: string }) {
+  if (Platform.OS === 'web') {
+    return (
+      <>
+        <style>{`@keyframes mindsCaretBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }`}</style>
+        <span
+          style={{
+            display: 'inline-block',
+            width: 7,
+            height: 16,
+            marginLeft: 4,
+            marginBottom: 2,
+            backgroundColor: color,
+            animationName: 'mindsCaretBlink',
+            animationDuration: '900ms',
+            animationIterationCount: 'infinite',
+            verticalAlign: 'middle',
+          } as any}
+        />
+      </>
+    );
+  }
+  return <NativeBlinkCaret color={color} />;
+}
+
+function NativeBlinkCaret({ color }: { color: string }) {
+  const { Animated } = require('react-native');
+  const opacity = React.useRef(new Animated.Value(1)).current;
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.15, duration: 450, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 450, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return (
+    <Animated.View
+      style={{
+        width: 7,
+        height: 16,
+        marginLeft: 4,
+        marginBottom: 2,
+        backgroundColor: color,
+        opacity,
+      }}
+    />
+  );
+}
