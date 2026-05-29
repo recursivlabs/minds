@@ -241,7 +241,15 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // - Strict membership check. Only is_member === true. Earlier
   //   permissive check (`c.is_member || c.isMember`) accepted any
   //   truthy value and Jack saw communities he hadn't joined.
-  const recentDMs = (conversations || [])
+  // Sort by latest activity before mapping so the freshest DMs surface
+  // in the top-4 slice. Server now also orders by this, but this
+  // belt-and-suspenders keeps things sane on older API versions.
+  const recentDMs = [...(conversations || [])]
+    .sort((a: any, b: any) => {
+      const aT = a.lastMessage?.createdAt || a.last_message?.created_at || a.updatedAt || a.createdAt || 0;
+      const bT = b.lastMessage?.createdAt || b.last_message?.created_at || b.updatedAt || b.createdAt || 0;
+      return new Date(bT).getTime() - new Date(aT).getTime();
+    })
     .map((c: any) => {
       const participants: any[] = c.participants || c.members || [];
       const others = participants.filter((p: any) => (p?.id ?? p?.userId) && (p?.id ?? p?.userId) !== user?.id);
