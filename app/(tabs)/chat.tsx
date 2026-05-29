@@ -11,6 +11,8 @@ import { getPreference } from '../../lib/preferences';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 import { getCached, setCache, invalidate } from '../../lib/cache';
+import { useSetActiveConvoId } from '../../lib/activeConvo';
+import { ThinkingPill } from '../../components/ThinkingPill';
 import { ensureIntroDM } from '../../lib/agentIntro';
 
 export default function ChatScreen() {
@@ -371,6 +373,13 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
   const colors = useColors();
+  const setActiveConvoId = useSetActiveConvoId();
+  // Mark this conversation as active so the SideNav's unread badge
+  // ignores incoming messages for it. Cleared on unmount.
+  React.useEffect(() => {
+    setActiveConvoId(conversationId);
+    return () => setActiveConvoId(null);
+  }, [conversationId, setActiveConvoId]);
   const cachedMsgs = getCached(`messages:${conversationId}`);
   const cachedSorted = React.useMemo(() => {
     if (!cachedMsgs) return [];
@@ -386,6 +395,8 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
   const [agentTyping, setAgentTyping] = React.useState(false);
+  const [agentStatus, setAgentStatus] = React.useState<'thinking' | 'generating' | 'done' | null>(null);
+  const [humanTyping, setHumanTyping] = React.useState<{ userId: string; userName: string } | null>(null);
   const flatListRef = React.useRef<FlatList>(null);
   // Try to get partner info from cached conversation list for instant name
   const cachedConvo = React.useMemo(() => {
@@ -528,6 +539,61 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       }
     };
   }, [conversationId, sdk, loading]);
+
+  // Rich agent thinking state. Server emits `agent_thinking` events
+  // with status ('thinking' | 'generating' | 'done') during a stream.
+  // Surface them in the ThinkingPill below the message list.
+  React.useEffect(() => {
+    if (!sdk) return;
+    let unsub: (() => void) | undefined;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        unsub = sdk.realtime.onAgentThinking?.((evt: any) => {
+          if (evt?.conversationId && evt.conversationId !== conversationId) return;
+          if (evt?.status === 'done') {
+            setAgentStatus('done');
+            setAgentTyping(false);
+          } else {
+            setAgentStatus(evt?.status ?? 'thinking');
+            setAgentTyping(true);
+          }
+        });
+      } catch {}
+    })();
+    return () => { unsub?.(); };
+  }, [conversationId, sdk]);
+
+  // Bidirectional human typing indicator.
+  // Subscribe to `chat_typing` events for THIS conversation and render
+  // a "X is typing…" pill below the list. Emit our own on debounced
+  // user input below.
+  React.useEffect(() => {
+    if (!sdk) return;
+    let unsub: (() => void) | undefined;
+    let clearTimer: ReturnType<typeof setTimeout> | null = null;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        unsub = sdk.realtime.onTyping?.((evt: any) => {
+          if (evt?.conversationId !== conversationId) return;
+          if (evt?.userId === user?.id) return;
+          if (evt?.isTyping) {
+            setHumanTyping({ userId: evt.userId, userName: evt.userName || 'Someone' });
+            if (clearTimer) clearTimeout(clearTimer);
+            // Auto-clear after 5s of no further typing events.
+            clearTimer = setTimeout(() => setHumanTyping(null), 5000);
+          } else {
+            setHumanTyping(null);
+          }
+        });
+      } catch {}
+    })();
+    return () => {
+      unsub?.();
+      if (clearTimer) clearTimeout(clearTimer);
+    };
+  }, [conversationId, sdk, user?.id]);
 
   // Fallback polling — only if WebSocket didn't connect
   React.useEffect(() => {
@@ -751,7 +817,22 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             justifyContent: messages.length === 0 ? 'center' : 'flex-end',
           }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          ListFooterComponent={agentTyping ? <TypingIndicator /> : null}
+          ListFooterComponent={
+            <>
+              <ThinkingPill
+                visible={agentTyping}
+                status={agentStatus}
+                agentName={partnerInfo?.name || partnerInfo?.user?.name || 'Agent'}
+              />
+              {humanTyping ? (
+                <View style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
+                  <Text variant="caption" color={colors.textMuted} style={{ fontStyle: 'italic' }}>
+                    {humanTyping.userName} is typing…
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          }
           ListEmptyComponent={
             <View style={{ alignItems: 'center' }}>
               <Text variant="body" color={colors.textMuted}>Start the conversation</Text>
@@ -831,7 +912,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           placeholder="Type a message..."
           placeholderTextColor={colors.textMuted}
           value={text}
-          onChangeText={setText}
+          onChangeText={(t) => {
+            setText(t);
+            // Emit chat_typing to the conversation on debounced input.
+            // Other members see "X is typing…" below the message list.
+            if (sdk && conversationId && t.trim().length > 0) {
+              try { sdk.realtime.sendTyping?.(conversationId); } catch {}
+            }
+          }}
           multiline
           onKeyPress={(e: any) => {
             if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {

@@ -11,6 +11,7 @@ import { useConversations, useCommunities } from '../lib/hooks';
 import { ensureIntroDM } from '../lib/agentIntro';
 import { invalidate } from '../lib/cache';
 import { getPreference } from '../lib/preferences';
+import { useActiveConvoId } from '../lib/activeConvo';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
 
 const COLLAPSED_WIDTH = 60;
@@ -122,29 +123,35 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     return () => clearInterval(id);
   }, [sdk, refreshConvos]);
 
-  // Live notification badge. The server emits a 'notification' event
-  // via WebSocket whenever a new in-app notification is inserted
-  // (NotificationConsumer.ts:269). The SDK doesn't expose a typed
-  // onNotification helper yet, so subscribe via the underlying
-  // socket.io socket directly. Fires for new followers, new replies
-  // to the user's posts, agent task completions, etc.
+  // Live notification badge AND live conversation-created refresh.
+  // Server emits 'notification' on any in-app notification insert,
+  // and 'conversation_created' the instant a new DM thread is opened
+  // (so the recipient sees the thread before any messages land).
+  // SDK doesn't expose typed helpers yet — use the underlying socket.
   React.useEffect(() => {
     if (!sdk) return;
-    let unsub: (() => void) | undefined;
+    let cleanups: Array<() => void> = [];
     (async () => {
       try {
         await sdk.realtime.connect();
         const sock = (sdk as any).realtime?.socket;
         if (!sock) return;
-        const handler = () => {
-          refreshNotifs();
+        const onNotif = () => refreshNotifs();
+        sock.on('notification', onNotif);
+        cleanups.push(() => sock.off?.('notification', onNotif));
+
+        const onConvoCreated = () => {
+          // Drop any cached conversations snapshot + refetch so the
+          // newly-created thread shows up in Recents immediately.
+          invalidate('conversations');
+          refreshConvos();
         };
-        sock.on('notification', handler);
-        unsub = () => sock.off?.('notification', handler);
+        sock.on('conversation_created', onConvoCreated);
+        cleanups.push(() => sock.off?.('conversation_created', onConvoCreated));
       } catch {}
     })();
-    return () => { unsub?.(); };
-  }, [sdk, refreshNotifs]);
+    return () => { cleanups.forEach(fn => fn()); };
+  }, [sdk, refreshNotifs, refreshConvos]);
 
   // Personal-agent intro back-fill. Runs once per app load. If the
   // user has a personal agent and that thread has no agent-authored
@@ -173,23 +180,11 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     })();
   }, [sdk, user?.id, user?.name, refreshConvos]);
 
-  // The currently-viewed conversation id, derived from the URL. Used
-  // to suppress the unread badge on the sidebar item the user is
-  // actively reading.
-  const activeConvoIdFromPath = React.useMemo(() => {
-    // Routes that point at a conversation:
-    //   /chat?id=<uuid>
-    //   /(tabs)/chat?id=<uuid>
-    // pathname doesn't include the query string in expo-router, so
-    // we also check the global location on web.
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      try {
-        const url = new URL(window.location.href);
-        return url.searchParams.get('id');
-      } catch { return null; }
-    }
-    return null;
-  }, [pathname]);
+  // Active conversation id — set by ConversationView on mount via
+  // the shared ActiveConvoProvider context. Replaces the earlier
+  // window.location parse which only worked on web. One source of
+  // truth, works the same on web + native.
+  const activeConvoIdFromPath = useActiveConvoId();
 
   // Real-time unread tracking + conversation reordering
   React.useEffect(() => {

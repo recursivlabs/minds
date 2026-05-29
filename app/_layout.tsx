@@ -14,6 +14,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/Toast';
 import { NetworkBanner } from '../components/NetworkBanner';
 import { CommandPalette } from '../components/CommandPalette';
+import { ActiveConvoProvider } from '../lib/activeConvo';
 import { initSentry } from '../lib/sentry';
 import { injectWebStyles } from '../lib/webStyles';
 import { initKeyboardShortcuts } from '../lib/keyboard';
@@ -93,15 +94,17 @@ export default function RootLayout() {
               <ThemedRoot>
                 <ProjectProvider>
                   <AuthProvider>
-                    <ToastProvider>
-                      <NotificationWiring />
-                      <NetworkBanner />
-                      <Slot />
-                      {/* Cmd+K palette stays mounted at root so it
-                         can open from any screen. Web-only for now;
-                         the component returns null on native. */}
-                      <CommandPalette />
-                    </ToastProvider>
+                    <ActiveConvoProvider>
+                      <ToastProvider>
+                        <NotificationWiring />
+                        <NetworkBanner />
+                        <Slot />
+                        {/* Cmd+K palette stays mounted at root so it
+                           can open from any screen. Web-only for now;
+                           the component returns null on native. */}
+                        <CommandPalette />
+                      </ToastProvider>
+                    </ActiveConvoProvider>
                   </AuthProvider>
                 </ProjectProvider>
               </ThemedRoot>
