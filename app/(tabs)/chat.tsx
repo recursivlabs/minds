@@ -398,6 +398,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [agentStatus, setAgentStatus] = React.useState<'thinking' | 'generating' | 'done' | null>(null);
   const [humanTyping, setHumanTyping] = React.useState<{ userId: string; userName: string } | null>(null);
   const flatListRef = React.useRef<FlatList>(null);
+  // Throttle outbound chat_typing events. Fires every 3s while the
+  // user is actively typing, not on every keystroke (which would
+  // hammer the WS and the other side's UI).
+  const lastTypingEmitRef = React.useRef(0);
   // Try to get partner info from cached conversation list for instant name
   const cachedConvo = React.useMemo(() => {
     const convos = getCached('conversations') || [];
@@ -914,10 +918,15 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           value={text}
           onChangeText={(t) => {
             setText(t);
-            // Emit chat_typing to the conversation on debounced input.
-            // Other members see "X is typing…" below the message list.
+            // Emit chat_typing at most once every 3s while the user is
+            // actively typing. Other members see "X is typing…" below
+            // the message list.
             if (sdk && conversationId && t.trim().length > 0) {
-              try { sdk.realtime.sendTyping?.(conversationId); } catch {}
+              const now = Date.now();
+              if (now - lastTypingEmitRef.current > 3000) {
+                lastTypingEmitRef.current = now;
+                try { sdk.realtime.sendTyping?.(conversationId); } catch {}
+              }
             }
           }}
           multiline
