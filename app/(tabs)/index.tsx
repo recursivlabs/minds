@@ -176,6 +176,22 @@ export default function FeedScreen() {
     return unsub;
   }, [navigation]);
 
+  // Per-tab scroll memory. When the user switches between For You and
+  // Following and back, restore the offset they left. iMessage / X
+  // expectation: tabs feel like separate stacks, not one shared scroll.
+  const scrollOffsets = React.useRef<Record<FeedTab, number>>({ foryou: 0, following: 0 });
+  const prevTabRef = React.useRef<FeedTab>(activeTab);
+  React.useEffect(() => {
+    if (prevTabRef.current === activeTab) return;
+    prevTabRef.current = activeTab;
+    const offset = scrollOffsets.current[activeTab] || 0;
+    // Defer one tick so the new tab's list has mounted with its data.
+    const t = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset, animated: false });
+    }, 0);
+    return () => clearTimeout(t);
+  }, [activeTab]);
+
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -211,6 +227,11 @@ export default function FeedScreen() {
           initialNumToRender={8}
           maxToRenderPerBatch={5}
           windowSize={7}
+          // Throttled scroll capture for per-tab offset memory.
+          onScroll={(e) => {
+            scrollOffsets.current[activeTab] = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={250}
           renderItem={({ item }) => (
             <PostCard
               post={item}
