@@ -3,6 +3,7 @@ import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
 import { registerPushToken, registerTokenWithServer } from './notifications';
+import { clearAll as clearCacheAll } from './cache';
 
 function registerPushTokenBackground(sdk: Recursiv) {
   registerPushToken().then(token => {
@@ -128,6 +129,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function persistSession(apiKey: string, authUser: User) {
+    // If the previously-stored user differs from the one we're about
+    // to persist (different browser session, same machine, different
+    // account), wipe the cache so audience-scoped data from the old
+    // user doesn't bleed into this one.
+    try {
+      const prior = await storage.getItem(KEYS.user);
+      if (prior) {
+        const parsed = JSON.parse(prior);
+        if (parsed?.id && parsed.id !== authUser.id) clearCacheAll();
+      }
+    } catch {}
     const sdk = createAuthedSdk(apiKey);
     await Promise.all([
       storage.setItem(KEYS.apiKey, apiKey),
@@ -249,6 +261,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = React.useCallback(async () => {
     await clearStorage();
+    // Drop all cached data so the next user in this browser doesn't
+    // inherit the previous user's personal feed / conversations /
+    // messages / profile. Without this jack signs out, jacktest1
+    // signs in, and sees jack's audience-scoped Discover posts +
+    // 404s when clicking them.
+    clearCacheAll();
     setUser(null);
     setAuthedSdk(null);
     setProjectId(null);

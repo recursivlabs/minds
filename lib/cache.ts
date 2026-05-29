@@ -92,6 +92,19 @@ export function invalidate(key: string): void {
   notify(key);
 }
 
+/**
+ * Wipe the entire cache. Called on auth-state changes (sign-in /
+ * sign-out / user-id swap) so a new user in the same browser doesn't
+ * inherit the previous user's audience-scoped data (personal feed,
+ * conversations, profile, etc.).
+ */
+export function clearAll(): void {
+  store.clear();
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
+}
+
 export function invalidatePrefix(prefix: string): void {
   const removed: string[] = [];
   for (const key of store.keys()) {
