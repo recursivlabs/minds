@@ -985,13 +985,18 @@ export default function LandingScreen() {
       {/* Content — KeyboardAvoidingView shifts the form above the
           on-screen keyboard so submit buttons stay tappable while
           typing. TouchableWithoutFeedback dismisses the keyboard
-          when the user taps outside an input. */}
+          when the user taps outside an input — NATIVE ONLY. On web
+          there's no soft keyboard to dismiss, and Keyboard.dismiss()
+          translates to blur() on the currently focused TextInput, so
+          clicks inside the form bubble up to the wrapper and blur
+          the OTP input mid-type/paste. */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
         keyboardVerticalOffset={0}
       >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      {(() => {
+        const body = (
       <View style={{
         flex: 1, alignItems: 'center', justifyContent: 'center',
         paddingHorizontal: spacing['2xl'],
@@ -1058,7 +1063,13 @@ export default function LandingScreen() {
 
         {renderForm()}
       </View>
-      </TouchableWithoutFeedback>
+        );
+        return Platform.OS === 'web' ? body : (
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            {body}
+          </TouchableWithoutFeedback>
+        );
+      })()}
       </KeyboardAvoidingView>
     </View>
   );
