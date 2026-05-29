@@ -98,6 +98,30 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     refreshNotifs();
   }, [sdk, pathname]); // Refetch when navigating (cheap, cached)
 
+  // Chat-list safety net. WS fan-out (PR #1461) is the primary path
+  // for new DM delivery, but if a recipient's socket missed the event
+  // (reconnecting, just opened the tab, etc.) the conversation would
+  // be invisible until they navigated. Three defenses:
+  //   1. Refetch on pathname change (cheap, debounced via cache)
+  //   2. Refetch when the tab regains visibility
+  //   3. Light poll every 30s as a final fallback
+  React.useEffect(() => {
+    refreshConvos();
+  }, [sdk, pathname, refreshConvos]);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const onVis = () => { if (document.visibilityState === 'visible') refreshConvos(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [refreshConvos]);
+
+  React.useEffect(() => {
+    if (!sdk) return;
+    const id = setInterval(() => { refreshConvos(); }, 30_000);
+    return () => clearInterval(id);
+  }, [sdk, refreshConvos]);
+
   // Live notification badge. The server emits a 'notification' event
   // via WebSocket whenever a new in-app notification is inserted
   // (NotificationConsumer.ts:269). The SDK doesn't expose a typed
