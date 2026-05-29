@@ -5,13 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
-import { colors, spacing, radius } from '../../constants/theme';
+import { spacing, radius } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 type Job = { id: string; name: string; cron: string; status?: string; handler_code?: string };
 
 export default function JobsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
+  const colors = useColors();
 
   const [loading, setLoading] = React.useState(true);
   const [jobs, setJobs] = React.useState<Job[]>([]);

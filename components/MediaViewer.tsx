@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View, Image, Pressable, Modal, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -30,6 +31,7 @@ function PostImage({ uri, onPress, badge, initialWidth, initialHeight }: {
   initialWidth?: number;
   initialHeight?: number;
 }) {
+  const colors = useColors();
   const [size, setSize] = React.useState<{ w: number; h: number } | null>(
     initialWidth && initialHeight ? { w: initialWidth, h: initialHeight } : null
   );
@@ -79,6 +81,7 @@ interface Props {
  * Handles single items, arrays, and string URLs.
  */
 export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }: Props) {
+  const colors = useColors();
   const [lightboxVisible, setLightboxVisible] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
 

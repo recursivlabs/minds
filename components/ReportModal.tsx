@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Button } from './Button';
 import { Input } from './Input';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   visible: boolean;
@@ -23,6 +24,7 @@ const REASONS = [
 ];
 
 export function ReportModal({ visible, onClose, onSubmit }: Props) {
+  const colors = useColors();
   const [selectedReason, setSelectedReason] = React.useState('');
   const [details, setDetails] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);

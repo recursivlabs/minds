@@ -3,7 +3,8 @@ import { View, Pressable, Platform, Linking, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { BASE_URL } from '../lib/recursiv';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
 
@@ -92,6 +93,7 @@ interface Props {
  * get a useless pill at the bottom.
  */
 export const LinkPreview = React.memo(function LinkPreview({ content, url: urlProp }: Props) {
+  const colors = useColors();
   const url = urlProp ?? (content ? extractFirstUrl(content) : null);
   const [preview, setPreview] = React.useState<Preview | null>(
     url ? (previewCache.get(url) ?? null) : null,

@@ -23,7 +23,8 @@ import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
-import { colors, spacing, radius, typography } from '../../constants/theme';
+import { spacing, radius, typography } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 // Consumer Create surface: Post is the only first-class mode. Community
 // stays as a reachable mode via ?mode=community deep-link from Discover's
@@ -41,6 +42,7 @@ export default function CreateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string; mode?: string }>();
   const { sdk, user } = useAuth();
+  const colors = useColors();
   const initialMode: Mode = (params.mode === 'community' || params.mode === 'blog' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
   const [mode, setMode] = React.useState<Mode>(initialMode);
 

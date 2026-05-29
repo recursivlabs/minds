@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius, type ColorTokens } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 type BadgeType = 'verified' | 'admin' | 'agent' | 'pro' | 'plus';
 
@@ -11,16 +12,20 @@ interface Props {
   size?: 'sm' | 'md';
 }
 
-const BADGE_CONFIG: Record<BadgeType, { icon: string; color: string; label: string; bg: string }> = {
-  verified: { icon: 'checkmark-circle', color: '#4DA6FF', label: 'Verified', bg: 'rgba(77,166,255,0.12)' },
-  admin: { icon: 'shield', color: colors.accent, label: 'Admin', bg: colors.accentMuted },
-  agent: { icon: 'hardware-chip', color: colors.accent, label: 'AI', bg: colors.accentMuted },
-  pro: { icon: 'star', color: '#FFD700', label: 'Pro', bg: 'rgba(255,215,0,0.12)' },
-  plus: { icon: 'add-circle', color: colors.accent, label: 'Plus', bg: colors.accentMuted },
-};
+// Built per-render so accent/accentMuted track the active theme.
+function badgeConfig(colors: ColorTokens): Record<BadgeType, { icon: string; color: string; label: string; bg: string }> {
+  return {
+    verified: { icon: 'checkmark-circle', color: '#4DA6FF', label: 'Verified', bg: 'rgba(77,166,255,0.12)' },
+    admin: { icon: 'shield', color: colors.accent, label: 'Admin', bg: colors.accentMuted },
+    agent: { icon: 'hardware-chip', color: colors.accent, label: 'AI', bg: colors.accentMuted },
+    pro: { icon: 'star', color: '#FFD700', label: 'Pro', bg: 'rgba(255,215,0,0.12)' },
+    plus: { icon: 'add-circle', color: colors.accent, label: 'Plus', bg: colors.accentMuted },
+  };
+}
 
 export const Badge = React.memo(function Badge({ type, size = 'sm' }: Props) {
-  const config = BADGE_CONFIG[type];
+  const colors = useColors();
+  const config = badgeConfig(colors)[type];
   if (!config) return null;
 
   if (size === 'sm') {

@@ -6,11 +6,13 @@ import { Text, Button, Card, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
-import { colors, spacing } from '../../constants/theme';
+import { spacing } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 export default function InvitesScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
+  const colors = useColors();
 
   const [loading, setLoading] = React.useState(true);
   const [codes, setCodes] = React.useState<any[]>([]);

@@ -17,7 +17,8 @@ import {
 import { buildCuratorRequest } from '../lib/curator';
 import { invalidate } from '../lib/cache';
 import { ensureIntroDM, INTRO_DM_TEMPLATE as _IDT, firstName as _FN } from '../lib/agentIntro';
-import { colors, spacing, radius, typography } from '../constants/theme';
+import { spacing, radius, typography } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 // Model options — must match server allowlist in lib/modelAllowlist.ts.
 // IDs are dotted (OpenRouter convention), not dashed. Keep list short to
@@ -45,6 +46,7 @@ const firstName = _FN;
 export default function AgentSetupScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const colors = useColors();
 
   const [agentId, setAgentId] = React.useState<string | null>(null);
   const [isExistingAgent, setIsExistingAgent] = React.useState(false);

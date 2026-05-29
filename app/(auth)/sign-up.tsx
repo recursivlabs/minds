@@ -3,11 +3,13 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../lib/auth';
 import { Text, Input, Button } from '../../components';
-import { colors, spacing } from '../../constants/theme';
+import { spacing } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 export default function SignUpScreen() {
   const router = useRouter();
   const { signUp } = useAuth();
+  const colors = useColors();
   const [username, setUsername] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');

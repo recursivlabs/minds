@@ -5,7 +5,8 @@ import { Text } from './Text';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Avatar } from './Avatar';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   visible: boolean;
@@ -18,6 +19,7 @@ interface Props {
 const PRESET_AMOUNTS = [1, 5, 10, 25];
 
 export function TipModal({ visible, onClose, recipientName, recipientAvatar, onSend }: Props) {
+  const colors = useColors();
   const [amount, setAmount] = React.useState('1');
   const [message, setMessage] = React.useState('');
   const [sending, setSending] = React.useState(false);

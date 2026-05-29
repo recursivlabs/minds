@@ -2,7 +2,8 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Card } from './Card';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   balance: number;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function WalletCard({ balance, label = 'MINDS Tokens' }: Props) {
+  const colors = useColors();
   return (
     <Card variant="raised">
       <View style={{ alignItems: 'center', gap: spacing.md }}>

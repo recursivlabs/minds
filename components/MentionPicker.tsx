@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 import { getCached } from '../lib/cache';
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
  * Reads from cached profiles and agents list.
  */
 export const MentionPicker = React.memo(function MentionPicker({ query, onSelect, visible }: Props) {
+  const colors = useColors();
   if (!visible || !query) return null;
 
   const q = query.toLowerCase();

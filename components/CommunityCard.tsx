@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   community: any;
@@ -12,6 +13,7 @@ interface Props {
 
 export function CommunityCard({ community, variant = 'card' }: Props) {
   const router = useRouter();
+  const colors = useColors();
   const name = community.name || 'Community';
   const description = community.description || '';
   const memberCount = community.memberCount || community.member_count || 0;

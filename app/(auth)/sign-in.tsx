@@ -3,11 +3,13 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../lib/auth';
 import { Text, Input, Button } from '../../components';
-import { colors, spacing } from '../../constants/theme';
+import { spacing } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 export default function SignInScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
+  const colors = useColors();
   const [identifier, setIdentifier] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');

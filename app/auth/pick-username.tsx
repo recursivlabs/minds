@@ -6,7 +6,8 @@ import { Text } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { markUsernamePicked } from '../../lib/onboarding';
-import { colors, spacing, radius, typography } from '../../constants/theme';
+import { spacing, radius, typography } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 const USERNAME_RE = /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/;
 
@@ -15,6 +16,7 @@ type AvailabilityState = 'idle' | 'checking' | 'available' | 'taken' | 'invalid'
 export default function PickUsernameScreen() {
   const router = useRouter();
   const { sdk, user, refreshUser } = useAuth();
+  const colors = useColors();
   // Pre-fill with server-assigned slug if it looks reasonable. Strip
   // anything that isn't URL-safe so the user can edit cleanly.
   const seed = (user?.username || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);

@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { TextInput, TextInputProps, View, Platform } from 'react-native';
 import { Text } from './Text';
-import { colors, spacing, radius, typography } from '../constants/theme';
+import { spacing, radius, typography } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props extends TextInputProps {
   label?: string;
@@ -9,6 +10,7 @@ interface Props extends TextInputProps {
 }
 
 export function Input({ label, error, style, ...props }: Props) {
+  const colors = useColors();
   const [focused, setFocused] = React.useState(false);
 
   return (

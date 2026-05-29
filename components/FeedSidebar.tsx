@@ -6,7 +6,8 @@ import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
 import { usePosts, useCommunities, useProfiles, useAgents } from '../lib/hooks';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
 
@@ -16,6 +17,7 @@ function SidebarSection({ title, icon, children, onSeeAll }: {
   children: React.ReactNode;
   onSeeAll?: () => void;
 }) {
+  const colors = useColors();
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
@@ -42,6 +44,7 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
   onPress: () => void;
   badge?: string;
 }) {
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -71,6 +74,7 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
 
 export function FeedSidebar() {
   const router = useRouter();
+  const colors = useColors();
   const { posts } = usePosts('score', 5);
   const { profiles } = useProfiles(5);
   const { communities } = useCommunities(5);

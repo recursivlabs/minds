@@ -8,12 +8,14 @@ import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
 import { getPreference } from '../../lib/preferences';
-import { colors, spacing, radius, typography } from '../../constants/theme';
+import { spacing, radius, typography } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 import { getCached, setCache, invalidate } from '../../lib/cache';
 import { ensureIntroDM } from '../../lib/agentIntro';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
+  const colors = useColors();
   const params = useLocalSearchParams<{ id?: string }>();
   const { conversations, loading, refresh } = useConversations();
   const [activeConvoId, setActiveConvoId] = React.useState<string | null>(params.id || null);
@@ -320,6 +322,7 @@ export default function ChatScreen() {
 // Three dots that pulse in sequence while the agent is composing a
 // reply. Generic CSS animation on web, RN Animated on native.
 function TypingIndicator() {
+  const colors = useColors();
   const dot = (delay: number, key: number) => (
     <View
       key={key}
@@ -367,6 +370,7 @@ function TypingIndicator() {
 function ConversationView({ conversationId, onBack }: { conversationId: string; onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
+  const colors = useColors();
   const cachedMsgs = getCached(`messages:${conversationId}`);
   const cachedSorted = React.useMemo(() => {
     if (!cachedMsgs) return [];

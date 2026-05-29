@@ -12,7 +12,8 @@ import { useProfile, useMyProfile, useCommunities } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { getBookmarks } from '../../../lib/bookmarks';
 import { getCached } from '../../../lib/cache';
-import { colors, spacing, radius, typography } from '../../../constants/theme';
+import { spacing, radius, typography } from '../../../constants/theme';
+import { useColors } from '../../../lib/theme';
 
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 
@@ -23,6 +24,7 @@ const OTHER_TABS = ['posts', 'replies', 'communities', 'followers', 'following']
 type ProfileTab = typeof OWNER_TABS[number];
 
 function SavedPostsTab() {
+  const colors = useColors();
   const bookmarkIds = getBookmarks();
   const savedPosts = bookmarkIds.map(id => getCached(`post:${id}`)).filter(Boolean);
   if (savedPosts.length === 0) {
@@ -50,6 +52,7 @@ export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sdk, user, signOut, refreshUser } = useAuth();
+  const colors = useColors();
   const { profile, loading, error, isFollowing, setIsFollowing, refresh: refreshProfile } = useProfile(username);
   const { refresh: refreshMyProfile } = useMyProfile();
 
@@ -677,6 +680,7 @@ export default function UserProfileScreen() {
 }
 
 function UserRow({ u, onPress }: { u: any; onPress: () => void }) {
+  const colors = useColors();
   const displayName = u.name || u.username || 'Unnamed user';
   const handle = u.username ? `@${u.username}` : '';
   return (

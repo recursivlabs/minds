@@ -9,7 +9,8 @@ import { TabBar } from '../../components/TabBar';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID, BASE_URL } from '../../lib/recursiv';
 import { getItem } from '../../lib/storage';
-import { colors, spacing, radius, typography } from '../../constants/theme';
+import { spacing, radius, typography } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 type Tab = 'dashboard' | 'users' | 'content' | 'reports' | 'communities' | 'invites' | 'network';
 
@@ -17,6 +18,7 @@ const BUSINESS_AI_AGENT_ID = '411ac3a9-dfbc-4463-8963-2e26a645211e';
 
 /* --- AI Chat --- */
 function AITab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const [messages, setMessages] = React.useState<{ role: 'user' | 'agent'; text: string }[]>([]);
   const [input, setInput] = React.useState('');
   const [sending, setSending] = React.useState(false);
@@ -114,6 +116,7 @@ function AITab({ sdk }: { sdk: any }) {
 }
 
 function TabButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -130,6 +133,7 @@ function TabButton({ label, active, onPress }: { label: string; active: boolean;
 }
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
+  const colors = useColors();
   return (
     <Card style={{ flex: 1, minWidth: 100 }}>
       <Text variant="h2" color={colors.accent}>{value}</Text>
@@ -140,6 +144,7 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 
 /* --- Dashboard --- */
 function DashboardTab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const [stats, setStats] = React.useState<any>(null);
   const [signups, setSignups] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -213,6 +218,7 @@ function DashboardTab({ sdk }: { sdk: any }) {
 
 /* --- Users --- */
 function UsersTab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const [users, setUsers] = React.useState<any[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
@@ -309,6 +315,7 @@ function UsersTab({ sdk }: { sdk: any }) {
 
 /* --- Content --- */
 function ContentTab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const [posts, setPosts] = React.useState<any[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
@@ -387,6 +394,7 @@ function ContentTab({ sdk }: { sdk: any }) {
 /* --- Invites --- */
 /* --- Reports --- */
 function ReportsTab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const [reports, setReports] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const router = useRouter();
@@ -449,6 +457,7 @@ function ReportsTab({ sdk }: { sdk: any }) {
 
 /* --- Communities --- */
 function CommunitiesTab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const router = useRouter();
   const [communities, setCommunities] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -515,6 +524,7 @@ function CommunitiesTab({ sdk }: { sdk: any }) {
 }
 
 function InvitesTab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const [codes, setCodes] = React.useState<any[]>([]);
   const [waitlist, setWaitlist] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -586,6 +596,7 @@ function InvitesTab({ sdk }: { sdk: any }) {
 
 /* --- Network --- */
 function NetworkTab({ sdk }: { sdk: any }) {
+  const colors = useColors();
   const [settings, setSettings] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -637,6 +648,7 @@ function NetworkTab({ sdk }: { sdk: any }) {
 
 /* --- Main --- */
 export default function AdminScreen() {
+  const colors = useColors();
   const router = useRouter();
   const { sdk } = useAuth();
   const [tab, setTab] = React.useState<Tab>('dashboard');

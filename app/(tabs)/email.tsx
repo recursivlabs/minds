@@ -5,11 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
-import { colors, spacing, radius } from '../../constants/theme';
+import { spacing, radius } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 type Campaign = { id: string; name: string; subject: string; status: string; from_email?: string };
 
 function StatusBadge({ status }: { status: string }) {
+  const colors = useColors();
   const map: Record<string, { bg: string; text: string }> = {
     draft: { bg: colors.glass, text: colors.textMuted },
     sending: { bg: colors.warningMuted, text: colors.warning },
@@ -28,6 +30,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function EmailScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
+  const colors = useColors();
 
   const [loading, setLoading] = React.useState(true);
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);

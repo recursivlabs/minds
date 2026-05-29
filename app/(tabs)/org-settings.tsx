@@ -6,11 +6,13 @@ import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
-import { colors, spacing, radius } from '../../constants/theme';
+import { spacing, radius } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 export default function OrgSettingsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
+  const colors = useColors();
 
   const [loading, setLoading] = React.useState(true);
   const [orgSettings, setOrgSettings] = React.useState<any>(null);

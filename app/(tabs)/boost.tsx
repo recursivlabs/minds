@@ -2,9 +2,11 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../components';
 import { Container } from '../../components/Container';
-import { colors, spacing } from '../../constants/theme';
+import { spacing } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 export default function BoostScreen() {
+  const colors = useColors();
   return (
     <Container safeTop centered>
       <View style={{ alignItems: 'center', gap: spacing['2xl'], padding: spacing['3xl'] }}>

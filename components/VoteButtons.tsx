@@ -2,7 +2,8 @@ import * as React from 'react';
 import { View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   score: number;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export const VoteButtons = React.memo(function VoteButtons({ score, userVote, onUpvote, onDownvote, compact = false }: Props) {
+  const colors = useColors();
   const iconSize = compact ? 18 : 22;
 
   return (

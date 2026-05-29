@@ -12,7 +12,8 @@ import { getPreference } from '../../lib/preferences';
 import { registerShortcut } from '../../lib/keyboard';
 import { getItem, setItem } from '../../lib/storage';
 import { loadPreferences, isAgentCtaDismissed, markAgentCtaDismissed, isAgentSetUp } from '../../lib/onboarding';
-import { colors, spacing } from '../../constants/theme';
+import { spacing } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 const PROFILE_NUDGE_DISMISSED_KEY = 'minds:profileNudge:dismissed';
 const LAST_CURATE_AT_KEY = 'minds:lastCurateAt';
@@ -33,6 +34,7 @@ type FeedTab = 'foryou' | 'following';
 export default function FeedScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const colors = useColors();
   // Honor the user's saved default. New accounts land on 'foryou'; if
   // a user flips the preference in Settings, this is what runs on
   // every cold open.

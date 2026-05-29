@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from './Text';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 type FeedTab = 'foryou' | 'following';
 
@@ -21,6 +22,7 @@ const TABS: { key: FeedTab; label: string }[] = [
 ];
 
 export function FeedTabs({ active, onChange, unread }: Props) {
+  const colors = useColors();
   return (
     <View
       style={{

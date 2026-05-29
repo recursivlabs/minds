@@ -1,13 +1,15 @@
 import * as React from 'react';
 import { View, Platform } from 'react-native';
 import { Text } from './Text';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 /**
  * Shows a banner when the device appears to be offline.
  * Web: checks navigator.onLine. Native: would use NetInfo.
  */
 export function NetworkBanner() {
+  const colors = useColors();
   const [isOffline, setIsOffline] = React.useState(false);
 
   React.useEffect(() => {

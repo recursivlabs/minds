@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { View, Animated, Platform } from 'react-native';
 import { Text } from './Text';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -53,6 +54,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastItem({ toast }: { toast: Toast }) {
+  const colors = useColors();
   const opacity = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(20)).current;
 

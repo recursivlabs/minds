@@ -3,7 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '../../lib/auth';
 import { Container } from '../../components/Container';
-import { colors } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 /**
  * /profile is a hard redirect to the unified /user/<username> page. It
@@ -14,6 +14,7 @@ import { colors } from '../../constants/theme';
  */
 export default function ProfileRedirectScreen() {
   const { user, isLoading } = useAuth();
+  const colors = useColors();
 
   if (isLoading) {
     return (

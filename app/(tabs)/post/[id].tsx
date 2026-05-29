@@ -10,13 +10,15 @@ import { useAuth } from '../../../lib/auth';
 import { usePost } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { setCache, invalidate } from '../../../lib/cache';
-import { colors, spacing, radius, typography } from '../../../constants/theme';
+import { spacing, radius, typography } from '../../../constants/theme';
+import { useColors } from '../../../lib/theme';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const colors = useColors();
   const { post, setPost, loading, error } = usePost(id);
   const [replies, setReplies] = React.useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = React.useState(true);

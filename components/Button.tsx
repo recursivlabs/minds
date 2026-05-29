@@ -1,6 +1,7 @@
 import { Pressable, ActivityIndicator, ViewStyle, Platform } from 'react-native';
 import { Text } from './Text';
-import { colors, spacing, radius } from '../constants/theme';
+import { radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 type Size = 'sm' | 'md' | 'lg';
@@ -34,6 +35,7 @@ export function Button({
   fullWidth = false,
   style,
 }: Props) {
+  const colors = useColors();
   const s = sizeStyles[size];
   const isDisabled = disabled || loading;
 

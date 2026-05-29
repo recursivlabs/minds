@@ -5,13 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
-import { colors, spacing, radius } from '../../constants/theme';
+import { spacing, radius } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 type Protocol = { id: string; name: string; enabled: boolean; type?: string };
 
 export default function ProtocolsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
+  const colors = useColors();
 
   const [loading, setLoading] = React.useState(true);
   const [protocols, setProtocols] = React.useState<Protocol[]>([]);

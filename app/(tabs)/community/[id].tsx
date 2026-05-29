@@ -8,12 +8,14 @@ import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
 import { invalidatePrefix } from '../../../lib/cache';
-import { colors, spacing, radius } from '../../../constants/theme';
+import { spacing, radius } from '../../../constants/theme';
+import { useColors } from '../../../lib/theme';
 
 export default function CommunityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const colors = useColors();
 
   const [community, setCommunity] = React.useState<any>(null);
   const [posts, setPosts] = React.useState<any[]>([]);

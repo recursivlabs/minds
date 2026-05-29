@@ -6,11 +6,13 @@ import { Text, Button, Input, Card, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
-import { colors, spacing, radius } from '../../constants/theme';
+import { spacing, radius } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 type Project = { id: string; name: string; description?: string; status?: string; subdomain?: string };
 
 function StatusDot({ status }: { status?: string }) {
+  const colors = useColors();
   const c = status === 'deployed' ? colors.success : status === 'building' ? colors.warning : colors.textMuted;
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c }} />;
 }
@@ -18,6 +20,7 @@ function StatusDot({ status }: { status?: string }) {
 export default function AppsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
+  const colors = useColors();
 
   const [loading, setLoading] = React.useState(true);
   const [projects, setProjects] = React.useState<Project[]>([]);

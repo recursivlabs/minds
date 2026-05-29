@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
-import { colors, spacing } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   onPost?: (data: { content: string; title?: string; tags: string[] }) => Promise<void>;
@@ -15,6 +16,7 @@ interface Props {
 export function ComposePost({ placeholder = "What's on your mind?" }: Props) {
   const { user } = useAuth();
   const router = useRouter();
+  const colors = useColors();
 
   return (
     <Pressable

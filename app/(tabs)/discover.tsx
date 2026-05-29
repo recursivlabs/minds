@@ -9,9 +9,11 @@ import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from
 import { useAuth } from '../../lib/auth';
 import { getPreference } from '../../lib/preferences';
 import { logSignal } from '../../lib/signals';
-import { colors, spacing, radius, typography } from '../../constants/theme';
+import { spacing, radius, typography } from '../../constants/theme';
+import { useColors } from '../../lib/theme';
 
 function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
+  const colors = useColors();
   const [toggled, setToggled] = React.useState(!!isFollowed);
   return (
     <Pressable
@@ -99,6 +101,7 @@ function postAITake(post: any): string {
 }
 
 function DiscoverHero({ post, onPress }: { post: any; onPress: () => void }) {
+  const colors = useColors();
   const image = post.image || post.previewImage;
   const source = postSource(post);
   const category = postCategory(post);
@@ -152,6 +155,7 @@ function DiscoverHero({ post, onPress }: { post: any; onPress: () => void }) {
 }
 
 function DenseHeadline({ post, onPress }: { post: any; onPress: () => void }) {
+  const colors = useColors();
   const source = postSource(post);
   const category = postCategory(post);
   const take = postAITake(post);
@@ -207,6 +211,7 @@ function DenseHeadline({ post, onPress }: { post: any; onPress: () => void }) {
 }
 
 function TopicChipRow({ chips, active, onChange }: { chips: typeof TOPIC_CHIPS; active: string; onChange: (k: string) => void }) {
+  const colors = useColors();
   return (
     <ScrollView
       horizontal
@@ -241,6 +246,7 @@ function TopicChipRow({ chips, active, onChange }: { chips: typeof TOPIC_CHIPS; 
 }
 
 function EndOfBrief({ onAsk }: { onAsk: () => void }) {
+  const colors = useColors();
   return (
     <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing['3xl'], gap: spacing.md, alignItems: 'center' }}>
       <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.5, fontSize: 10 }}>
@@ -277,6 +283,7 @@ const TABS: { key: DiscoverTab; label: string }[] = [
 ];
 
 function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
+  const colors = useColors();
   const name = person.name || 'Unknown';
   const username = person.username;
   const bio = person.bio || person.description || '';
@@ -352,6 +359,7 @@ function timeAgoShort(dateStr?: string): string {
 }
 
 function CommunityCard({ community, onPress }: { community: any; onPress: () => void }) {
+  const colors = useColors();
   const name = community.name || 'Unnamed';
   const description = community.description || community.bio || '';
   const avatar = community.image || community.avatar;
@@ -409,6 +417,7 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
 }
 
 function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
+  const colors = useColors();
   const name = agent.name || 'Agent';
   const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
   const avatar = agent.image || agent.avatar;
@@ -458,6 +467,7 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
 const TILE_WIDTH = 220;
 
 function PersonTile({ person, onPress }: { person: any; onPress: () => void }) {
+  const colors = useColors();
   const name = person.name || 'Unknown';
   const username = person.username;
   const bio = person.bio || person.description || '';
@@ -488,6 +498,7 @@ function PersonTile({ person, onPress }: { person: any; onPress: () => void }) {
 }
 
 function CommunityTile({ community, onPress }: { community: any; onPress: () => void }) {
+  const colors = useColors();
   const name = community.name || 'Unnamed';
   const description = community.description || community.bio || '';
   const avatar = community.image || community.avatar;
@@ -521,6 +532,7 @@ function CommunityTile({ community, onPress }: { community: any; onPress: () => 
 }
 
 function AgentTile({ agent, onPress }: { agent: any; onPress: () => void }) {
+  const colors = useColors();
   const name = agent.name || 'Agent';
   const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
   const avatar = agent.image || agent.avatar;
@@ -555,6 +567,7 @@ function AgentTile({ agent, onPress }: { agent: any; onPress: () => void }) {
 }
 
 function SectionHeader({ title, subtitle, onSeeAll }: { title: string; subtitle?: string; onSeeAll?: () => void }) {
+  const colors = useColors();
   return (
     <View
       style={{
@@ -582,6 +595,7 @@ function SectionHeader({ title, subtitle, onSeeAll }: { title: string; subtitle?
 }
 
 function HorizontalCarousel({ children, loading }: { children: React.ReactNode; loading?: boolean }) {
+  const colors = useColors();
   if (loading) {
     return (
       <ScrollView
@@ -620,6 +634,7 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; mode?: string; userId?: string; q?: string }>();
   const { sdk } = useAuth();
+  const colors = useColors();
   const [activeTab, setActiveTab] = React.useState<DiscoverTab>(
     (params.tab as DiscoverTab) || 'posts'
   );

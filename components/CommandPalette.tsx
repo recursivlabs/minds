@@ -34,7 +34,8 @@ import { useAuth } from '../lib/auth';
 import { registerShortcut } from '../lib/keyboard';
 import { getCached, setCache } from '../lib/cache';
 import { ORG_ID } from '../lib/recursiv';
-import { colors, spacing, radius, typography } from '../constants/theme';
+import { spacing, radius, typography } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 type ResultKind = 'post' | 'user' | 'community' | 'agent' | 'command' | 'recent';
 interface Result {
@@ -67,6 +68,7 @@ function pushRecent(query: string) {
 export function CommandPalette() {
   const router = useRouter();
   const { sdk, user } = useAuth();
+  const colors = useColors();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState<Result[]>([]);

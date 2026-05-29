@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { Button } from './Button';
-import { colors, spacing, radius } from '../constants/theme';
+import { spacing, radius } from '../constants/theme';
+import { useColors } from '../lib/theme';
 
 interface Props {
   user: any;
@@ -13,6 +14,7 @@ interface Props {
 
 export function UserCard({ user, onFollow, compact = false }: Props) {
   const router = useRouter();
+  const colors = useColors();
   const name = user.name || user.username || 'User';
   const username = user.username || user.name || 'user';
   const avatar = user.image || user.avatar || null;
