@@ -2,12 +2,13 @@ import * as React from 'react';
 import { View, Image, Pressable, Modal, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
+import { VideoPlayer } from './VideoPlayer';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.m4v', '.avi'];
+const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.m4v', '.avi', '.m3u8'];
 const isVideoUrl = (url: string): boolean =>
   VIDEO_EXTENSIONS.some(ext => url.toLowerCase().includes(ext)) ||
   url.includes('cloudflarestream') ||
@@ -113,28 +114,7 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
           if (item.type === 'video') {
             return (
               <View key={i} style={{ position: 'relative' }}>
-                {Platform.OS === 'web' ? (
-                  <video
-                    src={item.url}
-                    controls
-                    preload="metadata"
-                    style={{
-                      width: '100%',
-                      maxHeight: 400,
-                      borderRadius: radius.md,
-                      backgroundColor: '#000',
-                      objectFit: 'contain' as any,
-                    }}
-                  />
-                ) : (
-                  <View style={{
-                    width: '100%', height: 200, borderRadius: radius.md,
-                    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Ionicons name="play-circle-outline" size={48} color={colors.accent} />
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>Video</Text>
-                  </View>
-                )}
+                <VideoPlayer uri={item.url} height={Platform.OS === 'web' ? 360 : 240} />
               </View>
             );
           }
