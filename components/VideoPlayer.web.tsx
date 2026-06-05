@@ -31,9 +31,24 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
     }
     // HLS on Chrome/Firefox → hls.js.
     if (Hls.isSupported()) {
-      const hls = new Hls({ enableWorker: true });
+      const hls = new Hls({
+        enableWorker: true,
+        // hls.js otherwise starts at the lowest rendition and only climbs after
+        // measuring bandwidth — so short clips play 240/360p upscaled and look
+        // soft. Assume good bandwidth up front so it opens at the top rendition
+        // (e.g. 720p), then let ABR drop down only if it actually stalls.
+        abrEwmaDefaultEstimate: 6_000_000,
+        startLevel: -1,
+      });
       hls.loadSource(uri);
       hls.attachMedia(video);
+      // Bias the very first segment to the highest rendition for instant sharpness.
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (hls.levels.length) {
+          const top = hls.levels.reduce((b, l, i) => (l.height > hls.levels[b].height ? i : b), 0);
+          hls.nextLevel = top;
+        }
+      });
       return () => hls.destroy();
     }
     video.src = uri; // last resort
