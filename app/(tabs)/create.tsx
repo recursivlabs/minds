@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { uploadVideo, VideoNotEntitledError } from '../../lib/video';
+import { VideoPlayer } from '../../components/VideoPlayer';
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 import { Text, Button, Input } from '../../components';
 import { Container } from '../../components/Container';
@@ -72,6 +74,8 @@ export default function CreateScreen() {
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState('');
   const [mediaUri, setMediaUri] = React.useState<string | null>(null);
+  const [mediaIsVideo, setMediaIsVideo] = React.useState(false);
+  const [videoPct, setVideoPct] = React.useState<number | null>(null);
   const { mentionQuery, showMentions, insertMention } = useMentions(content, setContent);
   const [selectedCommunity, setSelectedCommunity] = React.useState<any>(
     params.communityId ? { id: params.communityId, name: params.communityName || 'Community' } : null
@@ -180,18 +184,24 @@ export default function CreateScreen() {
       const picker = getImagePicker();
       if (picker) {
         const result = await picker.launchImageLibraryAsync({
-          mediaTypes: picker.MediaTypeOptions.Images,
-          allowsEditing: true,
+          mediaTypes: picker.MediaTypeOptions.All, // image OR video
           quality: 0.8,
         });
-        if (!result.canceled && result.assets[0]) setMediaUri(result.assets[0].uri);
+        if (!result.canceled && result.assets[0]) {
+          const asset = result.assets[0];
+          setMediaUri(asset.uri);
+          setMediaIsVideo(asset.type === 'video');
+        }
       } else if (Platform.OS === 'web') {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/*';
+        input.accept = 'image/*,video/*';
         input.onchange = (e: any) => {
           const file = e.target?.files?.[0];
-          if (file) setMediaUri(URL.createObjectURL(file));
+          if (file) {
+            setMediaUri(URL.createObjectURL(file));
+            setMediaIsVideo((file.type || '').startsWith('video/'));
+          }
         };
         input.click();
       }
@@ -212,7 +222,7 @@ export default function CreateScreen() {
           return;
         }
         let mediaUrls: string[] | undefined;
-        if (mediaUri) {
+        if (mediaUri && !mediaIsVideo) {
           try {
             const response = await fetch(mediaUri);
             const blob = await response.blob();
@@ -236,12 +246,33 @@ export default function CreateScreen() {
             Alert.alert('Image Upload', err?.message || 'Image could not be uploaded. Post will be created without media.');
           }
         }
+        if (mediaUri && mediaIsVideo) {
+          try {
+            setVideoPct(0);
+            const { hlsUrl } = await uploadVideo({
+              fileUri: mediaUri,
+              title: content.trim().slice(0, 80) || 'Video',
+              onProgress: setVideoPct,
+            });
+            mediaUrls = [...(mediaUrls || []), hlsUrl];
+          } catch (err: any) {
+            setVideoPct(null);
+            setSubmitting(false);
+            Alert.alert(
+              err instanceof VideoNotEntitledError ? 'Video' : 'Video Upload',
+              err?.message || 'Video could not be uploaded.',
+            );
+            return;
+          }
+          setVideoPct(null);
+        }
         await sdk.posts.create({
           content: content.trim() || ' ',
           organization_id: ORG_ID || undefined,
           community_id: selectedCommunity?.id || undefined,
           media_urls: mediaUrls,
         } as any);
+        setMediaIsVideo(false);
         if (draftRef.current) deleteDraft(draftRef.current);
         router.back();
       } else if (mode === 'blog') {
@@ -607,13 +638,17 @@ export default function CreateScreen() {
 
           {mediaUri && (
             <View style={{ marginTop: spacing.lg, position: 'relative' }}>
-              <Image
-                source={{ uri: mediaUri }}
-                style={{ width: '100%', aspectRatio: 16 / 9, maxHeight: 300, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
-                resizeMode="contain"
-              />
+              {mediaIsVideo ? (
+                <VideoPlayer uri={mediaUri} autoplay={false} height={220} />
+              ) : (
+                <Image
+                  source={{ uri: mediaUri }}
+                  style={{ width: '100%', aspectRatio: 16 / 9, maxHeight: 300, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
+                  resizeMode="contain"
+                />
+              )}
               <Pressable
-                onPress={() => setMediaUri(null)}
+                onPress={() => { setMediaUri(null); setMediaIsVideo(false); }}
                 style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: spacing.sm }}
               >
                 <Ionicons name="close" size={18} color="#ffffff" />
@@ -785,8 +820,11 @@ export default function CreateScreen() {
           }}
         >
           <Pressable onPress={handlePickImage} hitSlop={8}>
-            <Ionicons name="image-outline" size={22} color={mediaUri ? colors.accent : colors.textMuted} />
+            <Ionicons name={mediaIsVideo ? 'videocam' : 'image-outline'} size={22} color={mediaUri ? colors.accent : colors.textMuted} />
           </Pressable>
+          {videoPct !== null && (
+            <Text variant="caption" color={colors.textMuted}>{`Uploading ${videoPct}%`}</Text>
+          )}
           <Pressable onPress={() => setShowTags(!showTags)} hitSlop={8}>
             <Ionicons name="pricetag-outline" size={22} color={tags.length > 0 ? colors.accent : colors.textMuted} />
           </Pressable>
