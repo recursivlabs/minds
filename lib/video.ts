@@ -43,6 +43,33 @@ async function apiKey(): Promise<string> {
   return (await storage.getItem('minds:api_key')) || '';
 }
 
+/** Pull the Bunny video guid out of a stored HLS url (…/{guid}/playlist.m3u8). */
+export function extractVideoGuid(url: string): string | null {
+  const m = url.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return m ? m[0] : null;
+}
+
+export interface VideoStatus {
+  status: 'processing' | 'ready' | 'failed' | null;
+  progress: number;
+  thumbnailUrl: string | null;
+  hlsUrl: string | null;
+}
+
+/** Live encode status for a video (processing→ready), used to gate playback. */
+export async function getVideoStatus(guid: string): Promise<VideoStatus | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/video/${guid}/status`, {
+      headers: { Authorization: `Bearer ${await apiKey()}` },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data as VideoStatus;
+  } catch {
+    return null;
+  }
+}
+
 async function createUpload(title: string): Promise<CreateUploadResponse> {
   const res = await fetch(`${BASE_URL}/video/create-upload`, {
     method: 'POST',

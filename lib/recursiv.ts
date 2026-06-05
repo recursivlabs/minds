@@ -7,6 +7,15 @@ export const BASE_URL =
 
 export const BASE_ORIGIN = BASE_URL.replace(/\/api\/v1$/, '');
 
+// The site's own origin, used as the Referer for Bunny video requests (Bunny's
+// "Block Direct URL Access" gates on referer). On web the browser sends this
+// automatically; on native we attach it explicitly to the video/thumbnail
+// requests. Falls back to the prod domain when there's no window (native).
+export const SITE_URL =
+  (typeof window !== 'undefined' && window.location?.origin) ||
+  process.env.EXPO_PUBLIC_SITE_URL ||
+  'https://minds.on.recursiv.io';
+
 export const API_KEY = process.env.EXPO_PUBLIC_RECURSIV_API_KEY || '';
 
 // Hardcoded fallbacks point at the Minds 2.0 project on prod. Expo's bundler
