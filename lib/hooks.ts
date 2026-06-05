@@ -37,9 +37,11 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
         try {
           const followingRes = await s.profiles.following(user.id, { limit: 500 });
           const ids = new Set((followingRes.data || []).map((p: any) => p.id));
+          ids.add(user.id); // your own posts belong in your Following feed
           followingIdsRef.current = ids;
         } catch {
-          followingIdsRef.current = new Set();
+          // Fall back to a set with just you, so at minimum your own posts show.
+          followingIdsRef.current = new Set([user.id]);
         }
       }
 
