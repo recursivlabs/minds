@@ -114,7 +114,7 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
           if (item.type === 'video') {
             return (
               <View key={i} style={{ position: 'relative' }}>
-                <VideoPlayer uri={item.url} height={Platform.OS === 'web' ? 360 : 240} />
+                <VideoPlayer uri={item.url} height={Platform.OS === 'web' ? 560 : 240} />
               </View>
             );
           }

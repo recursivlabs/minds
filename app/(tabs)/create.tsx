@@ -639,7 +639,7 @@ export default function CreateScreen() {
           {mediaUri && (
             <View style={{ marginTop: spacing.lg, position: 'relative' }}>
               {mediaIsVideo ? (
-                <VideoPlayer uri={mediaUri} autoplay={false} height={220} />
+                <VideoPlayer uri={mediaUri} autoplay={false} height={400} />
               ) : (
                 <Image
                   source={{ uri: mediaUri }}
