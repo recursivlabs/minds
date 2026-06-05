@@ -5,7 +5,6 @@ import {
   Pressable,
   Image,
   Platform,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Modal,
@@ -146,6 +145,9 @@ export default function CreateScreen() {
 
   const [submitting, setSubmitting] = React.useState(false);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
+  // Inline error banner. Alert.alert is a no-op on web (React Native Web),
+  // so failures were silent — this surfaces them in-UI on every platform.
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   // Avatar state for agent/app/community creation
   const [avatarUri, setAvatarUri] = React.useState<string | null>(null);
@@ -153,6 +155,10 @@ export default function CreateScreen() {
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 2000);
+  };
+  const showError = (msg: string) => {
+    setErrorMsg(msg);
+    setTimeout(() => setErrorMsg(null), 5000);
   };
 
   const handlePickAvatar = async () => {
@@ -236,14 +242,14 @@ export default function CreateScreen() {
               const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
               if (!putRes.ok) {
                 console.error('Media upload PUT failed:', putRes.status, putRes.statusText);
-                Alert.alert('Upload Error', `Upload failed: ${putRes.status}`);
+                showError(`Image upload failed (${putRes.status}).`);
               } else {
                 mediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
               }
             }
           } catch (err: any) {
             console.error('Media upload error:', err);
-            Alert.alert('Image Upload', err?.message || 'Image could not be uploaded. Post will be created without media.');
+            showError(err?.message || 'Image could not be uploaded. Post will be created without media.');
           }
         }
         if (mediaUri && mediaIsVideo) {
@@ -258,10 +264,7 @@ export default function CreateScreen() {
           } catch (err: any) {
             setVideoPct(null);
             setSubmitting(false);
-            Alert.alert(
-              err instanceof VideoNotEntitledError ? 'Video' : 'Video Upload',
-              err?.message || 'Video could not be uploaded.',
-            );
+            showError(err?.message || 'Video could not be uploaded.');
             return;
           }
           setVideoPct(null);
@@ -377,7 +380,7 @@ export default function CreateScreen() {
     } catch (err: any) {
       const errMsg = err?.message || 'Something went wrong';
       setSuccessMsg(null);
-      Alert.alert('Error', errMsg);
+      showError(errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -716,6 +719,13 @@ export default function CreateScreen() {
             <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' }}>
               <Text variant="body" color={colors.success}>{successMsg}</Text>
             </View>
+          )}
+
+          {errorMsg && (
+            <Pressable onPress={() => setErrorMsg(null)} style={{ backgroundColor: colors.errorMuted, padding: spacing.md, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Ionicons name="alert-circle" size={18} color={colors.error} />
+              <Text variant="body" color={colors.error} style={{ flex: 1 }}>{errorMsg}</Text>
+            </Pressable>
           )}
 
           {mode === 'agent' && (

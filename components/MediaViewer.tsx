@@ -1,10 +1,102 @@
 import * as React from 'react';
-import { View, Image, Pressable, Modal, Platform, Dimensions } from 'react-native';
+import { View, Image, Pressable, Modal, Platform, Dimensions, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { VideoPlayer } from './VideoPlayer';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { SITE_URL } from '../lib/recursiv';
+import { extractVideoGuid, getVideoStatus, type VideoStatus } from '../lib/video';
+
+/**
+ * Video media that gates playback on encode status: while Bunny is still
+ * transcoding it shows the thumbnail + a "Processing…" overlay (polling until
+ * ready) instead of a dead 0:00 player, then swaps in the real player.
+ */
+function VideoMedia({ url, height }: { url: string; height: number }) {
+  const guid = React.useMemo(() => extractVideoGuid(url), [url]);
+  // Non-Bunny URL (no guid) → play directly, no status gating.
+  const [status, setStatus] = React.useState<VideoStatus | null>(
+    guid ? null : { status: 'ready', progress: 100, thumbnailUrl: null, hlsUrl: url },
+  );
+
+  React.useEffect(() => {
+    if (!guid) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      const s = await getVideoStatus(guid);
+      if (!alive) return;
+      // If the status lookup fails outright, optimistically try to play.
+      setStatus(s ?? { status: 'ready', progress: 100, thumbnailUrl: null, hlsUrl: url });
+      if (s && (s.status === 'processing' || s.status === null)) {
+        timer = setTimeout(poll, 4000);
+      }
+    };
+    poll();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [guid, url]);
+
+  if (status?.status === 'ready') {
+    return <VideoPlayer uri={status.hlsUrl || url} poster={status.thumbnailUrl || undefined} height={height} />;
+  }
+  if (status?.status === 'failed') {
+    return <VideoStatusBox thumbnail={status.thumbnailUrl} label="Video couldn't be processed" icon="alert-circle-outline" height={height} />;
+  }
+  // Unknown (first fetch in flight) or processing.
+  return (
+    <VideoStatusBox
+      thumbnail={status?.thumbnailUrl ?? null}
+      label={status ? `Processing… ${status.progress || 0}%` : 'Loading…'}
+      height={height}
+      spinner
+    />
+  );
+}
+
+function VideoStatusBox({
+  thumbnail,
+  label,
+  icon,
+  height,
+  spinner,
+}: {
+  thumbnail: string | null;
+  label: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  height: number;
+  spinner?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        width: '100%',
+        aspectRatio: 16 / 9,
+        maxHeight: height,
+        borderRadius: radius.md,
+        overflow: 'hidden',
+        backgroundColor: '#000',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {thumbnail ? (
+        <Image
+          source={{ uri: thumbnail, headers: { Referer: SITE_URL } }}
+          style={[StyleSheet.absoluteFillObject, { opacity: 0.45 }]}
+          resizeMode="cover"
+        />
+      ) : null}
+      <View style={{ alignItems: 'center', gap: spacing.sm }}>
+        {spinner ? <ActivityIndicator color="#fff" /> : icon ? <Ionicons name={icon} size={30} color="#fff" /> : null}
+        <Text variant="caption" style={{ color: '#fff' }}>{label}</Text>
+      </View>
+    </View>
+  );
+}
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -114,7 +206,7 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
           if (item.type === 'video') {
             return (
               <View key={i} style={{ position: 'relative' }}>
-                <VideoPlayer uri={item.url} height={Platform.OS === 'web' ? 560 : 240} />
+                <VideoMedia url={item.url} height={Platform.OS === 'web' ? 560 : 240} />
               </View>
             );
           }

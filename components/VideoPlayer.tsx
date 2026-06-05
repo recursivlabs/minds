@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { SITE_URL } from '../lib/recursiv';
 
 export interface VideoPlayerProps {
   uri: string;
@@ -16,7 +17,9 @@ export interface VideoPlayerProps {
 export function VideoPlayer({ uri, autoplay = true, height = 260 }: VideoPlayerProps) {
   const [muted, setMuted] = useState(autoplay);
 
-  const player = useVideoPlayer({ uri }, (p) => {
+  // Bunny gates direct file access on Referer; native has no browser referer,
+  // so attach it explicitly or HLS 403s on device.
+  const player = useVideoPlayer({ uri, headers: { Referer: SITE_URL } }, (p) => {
     p.loop = true;
     p.muted = autoplay;
     if (autoplay) p.play();
