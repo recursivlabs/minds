@@ -272,9 +272,16 @@ export default function CreateScreen() {
           community_id: selectedCommunity?.id || undefined,
           media_urls: mediaUrls,
         } as any);
+        // Reset the composer — it's a persistent tab, so without this the old
+        // text/media would still be sitting there next time you open it.
+        setContent('');
+        setMediaUri(null);
         setMediaIsVideo(false);
+        setVideoPct(null);
         if (draftRef.current) deleteDraft(draftRef.current);
-        router.back();
+        // Land on the Following feed so you see your just-posted content as
+        // immediate proof it worked (your own posts now show there).
+        router.replace({ pathname: '/(tabs)', params: { tab: 'following' } });
       } else if (mode === 'blog') {
         if (!blogTitle.trim() || !blogContent.trim()) {
           setSubmitting(false);

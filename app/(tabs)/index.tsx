@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header, FeedTabs, PostCard, Text, Container, FeedSidebar, Button, Avatar } from '../../components';
 import { FeedSkeletons } from '../../components/PostSkeleton';
@@ -39,6 +39,12 @@ export default function FeedScreen() {
   // a user flips the preference in Settings, this is what runs on
   // every cold open.
   const [activeTab, setActiveTab] = React.useState<FeedTab>(() => getPreference('defaultFeed'));
+  // Allow other screens to deep-link a tab (e.g. the composer sends you to
+  // 'following' after posting so you see your new post).
+  const params = useLocalSearchParams<{ tab?: string }>();
+  React.useEffect(() => {
+    if (params.tab === 'following' || params.tab === 'foryou') setActiveTab(params.tab);
+  }, [params.tab]);
   const [nudgeDismissed, setNudgeDismissed] = React.useState(true); // start true to avoid flash before storage read
 
   // Load persisted nudge dismissal so it stays dismissed across refreshes.
