@@ -1,53 +1,75 @@
-// Web video player: <video> + hls.js (Safari plays HLS natively; Chrome/Firefox
-// need hls.js). Autoplays muted in-feed; native controls for unmute/seek.
-import React, { useEffect, useRef } from 'react';
+// Web video player: <video> + hls.js for HLS streams; native <video src> for
+// progressive files (the local blob/mp4 shown in the composer preview — hls.js
+// can't parse a raw mp4). Sizes itself to the video's real aspect ratio so it
+// never squashes or crops: landscape fills the width, portrait is centered and
+// letterboxed on black (the X/Twitter behavior), capped by maxHeight.
+import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 
 export interface VideoPlayerProps {
   uri: string;
   poster?: string;
   autoplay?: boolean;
+  /** Max rendered height in px. Default 480. */
   height?: number;
 }
 
-export function VideoPlayer({ uri, poster, autoplay = true, height = 260 }: VideoPlayerProps) {
+const isHlsUri = (uri: string) => /\.m3u8(\?|$)/i.test(uri) || uri.includes('/playlist');
+
+export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: VideoPlayerProps) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [ratio, setRatio] = useState(16 / 9);
 
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
 
-    // Safari / iOS play HLS natively.
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Progressive file (local blob / mp4) or Safari's native HLS → just set src.
+    if (!isHlsUri(uri) || video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = uri;
       return;
     }
-    // Everyone else: hls.js.
+    // HLS on Chrome/Firefox → hls.js.
     if (Hls.isSupported()) {
       const hls = new Hls({ enableWorker: true });
       hls.loadSource(uri);
       hls.attachMedia(video);
       return () => hls.destroy();
     }
-    video.src = uri; // last-resort
+    video.src = uri; // last resort
   }, [uri]);
 
+  const onLoadedMetadata = () => {
+    const v = ref.current;
+    if (v?.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
+  };
+
   return (
-    <video
-      ref={ref}
-      poster={poster}
-      muted={autoplay}
-      autoPlay={autoplay}
-      loop
-      playsInline
-      controls
+    <div
       style={{
         width: '100%',
-        height,
-        borderRadius: 12,
+        aspectRatio: String(ratio),
+        maxHeight: height,
+        margin: '0 auto',
         background: '#000',
-        objectFit: 'cover',
+        borderRadius: 12,
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
-    />
+    >
+      <video
+        ref={ref}
+        poster={poster}
+        muted={autoplay}
+        autoPlay={autoplay}
+        loop
+        playsInline
+        controls
+        onLoadedMetadata={onLoadedMetadata}
+        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+      />
+    </div>
   );
 }

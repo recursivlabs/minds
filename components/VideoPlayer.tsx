@@ -34,7 +34,7 @@ export function VideoPlayer({ uri, autoplay = true, height = 260 }: VideoPlayerP
       <VideoView
         player={player}
         style={styles.video}
-        contentFit="cover"
+        contentFit="contain"
         nativeControls={false}
       />
       <View style={styles.badge}>
