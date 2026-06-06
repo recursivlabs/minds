@@ -279,6 +279,7 @@ export default function CreateScreen() {
           organization_id: ORG_ID || undefined,
           community_id: selectedCommunity?.id || undefined,
           media_urls: mediaUrls,
+          is_nsfw: isNsfw || undefined,
         } as any);
         // Reset the composer — it's a persistent tab, so without this the old
         // text/media would still be sitting there next time you open it.
@@ -286,6 +287,7 @@ export default function CreateScreen() {
         setMediaUri(null);
         setMediaIsVideo(false);
         setVideoPct(null);
+        setIsNsfw(false);
         if (draftRef.current) deleteDraft(draftRef.current);
         // Land on the Following feed so you see your just-posted content as
         // immediate proof it worked (your own posts now show there).
