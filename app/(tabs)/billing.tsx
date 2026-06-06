@@ -99,6 +99,19 @@ export default function BillingScreen() {
       <ScreenHeader title="Billing" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl }}>
+        <Pressable onPress={() => router.push('/upgrade' as any)}>
+          <Card style={{ borderColor: colors.accent, borderWidth: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <Ionicons name="sparkles" size={22} color={colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyMedium">Upgrade to Plus or Pro</Text>
+                <Text variant="caption" color={colors.textMuted}>Video uploads, more agent, premium connections.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </View>
+          </Card>
+        </Pressable>
+
         <Card>
           <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>Current Plan</Text>
           <Text variant="h2" color={colors.accent}>{planName}</Text>
