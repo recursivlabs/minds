@@ -264,7 +264,12 @@ export default function CreateScreen() {
           } catch (err: any) {
             setVideoPct(null);
             setSubmitting(false);
-            showError(err?.message || 'Video could not be uploaded.');
+            // Not entitled → send them to the upgrade flow instead of a dead-end error.
+            if (err instanceof VideoNotEntitledError) {
+              router.push('/upgrade' as any);
+            } else {
+              showError(err?.message || 'Video could not be uploaded.');
+            }
             return;
           }
           setVideoPct(null);
