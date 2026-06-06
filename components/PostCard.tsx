@@ -161,7 +161,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const rawMedia = displayPost.media;
   const media = (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia) || displayPost.image || displayPost.thumbnail || null;
   const replyCount = displayPost.replyCount || displayPost.reply_count || displayPost.comments_count || 0;
-  const isNsfw = (displayPost.tags || []).some((t: any) =>
+  const isNsfw = displayPost.is_nsfw === true || (displayPost.tags || []).some((t: any) =>
     typeof t === 'string' ? t.toLowerCase() === 'nsfw' : t?.name?.toLowerCase() === 'nsfw'
   );
   const createdAt = displayPost.createdAt || displayPost.created_at || new Date().toISOString();
