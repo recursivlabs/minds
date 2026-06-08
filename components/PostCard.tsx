@@ -14,6 +14,7 @@ import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
 import { logSignal } from '../lib/signals';
 import { isMuted, toggleMute } from '../lib/muted';
+import { blockUser } from '../lib/moderation';
 import { getCached } from '../lib/cache';
 import { LinkPreview } from './LinkPreview';
 import { MediaViewer } from './MediaViewer';
@@ -778,6 +779,23 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                     style={{ padding: spacing.md }}
                   >
                     <Text variant="body">{isMuted(author.id) ? 'Unmute' : 'Mute'}</Text>
+                  </Pressable>
+                )}
+                {!isOwnPost && (
+                  <Pressable
+                    onPress={async () => {
+                      setShowMenu(false);
+                      if (!author.id) return;
+                      try {
+                        await blockUser(author.id);
+                        toast.show(`Blocked ${authorName}`);
+                      } catch {
+                        toast.show('Could not block', 'error');
+                      }
+                    }}
+                    style={{ padding: spacing.md }}
+                  >
+                    <Text variant="body" color={colors.error}>Block {authorName}</Text>
                   </Pressable>
                 )}
                 <Pressable onPress={() => { setShowMenu(false); setShowReport(true); }} style={{ padding: spacing.md }}>

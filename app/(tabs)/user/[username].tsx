@@ -10,6 +10,7 @@ import { TabBar } from '../../../components/TabBar';
 import { useAuth } from '../../../lib/auth';
 import { useProfile, useMyProfile, useCommunities } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
+import { getFollowRelationship } from '../../../lib/moderation';
 import { getBookmarks } from '../../../lib/bookmarks';
 import { getCached } from '../../../lib/cache';
 import { spacing, radius, typography } from '../../../constants/theme';
@@ -84,6 +85,7 @@ export default function UserProfileScreen() {
   const [profileTab, setProfileTab] = React.useState<ProfileTab>(validInitialTab);
 
   const [followLoading, setFollowLoading] = React.useState(false);
+  const [followsYou, setFollowsYou] = React.useState(false);
   const [userPosts, setUserPosts] = React.useState<any[]>([]);
   const [postsLoading, setPostsLoading] = React.useState(true);
   const [followersList, setFollowersList] = React.useState<any[] | null>(null);
@@ -141,6 +143,14 @@ export default function UserProfileScreen() {
     })();
     return () => { cancelled = true; };
   }, [profileTab, profile?.id, sdk, followersList, followingList]);
+
+  // Does this user follow you back? (for the "Follows you" badge)
+  React.useEffect(() => {
+    if (!profile?.id || isOwnProfile) { setFollowsYou(false); return; }
+    let alive = true;
+    getFollowRelationship(profile.id).then((r) => { if (alive) setFollowsYou(r.follows_you); });
+    return () => { alive = false; };
+  }, [profile?.id, isOwnProfile]);
 
   // User's posts (for posts / replies / blogs tabs)
   React.useEffect(() => {
@@ -384,9 +394,16 @@ export default function UserProfileScreen() {
               </View>
             )}
           </View>
-          <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-            @{profile.username || username}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+            <Text variant="body" color={colors.textMuted}>
+              @{profile.username || username}
+            </Text>
+            {followsYou && (
+              <View style={{ backgroundColor: colors.surfaceRaised, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 }}>
+                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>Follows you</Text>
+              </View>
+            )}
+          </View>
           {(profile.createdAt || profile.created_at) && (
             <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
               Joined {new Date(profile.createdAt || profile.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}

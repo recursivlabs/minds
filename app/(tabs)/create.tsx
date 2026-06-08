@@ -39,6 +39,8 @@ const MODES: { key: Mode; label: string }[] = [
   { key: 'post', label: 'Post' },
 ];
 
+const MAX_IMAGES = 10; // matches the server media_urls cap
+
 export default function CreateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string; mode?: string }>();
@@ -72,8 +74,9 @@ export default function CreateScreen() {
   const [showTags, setShowTags] = React.useState(false);
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState('');
-  const [mediaUri, setMediaUri] = React.useState<string | null>(null);
+  const [mediaUris, setMediaUris] = React.useState<string[]>([]);
   const [mediaIsVideo, setMediaIsVideo] = React.useState(false);
+  const mediaUri = mediaUris[0] ?? null; // first item — used for video + blog cover
   const [videoPct, setVideoPct] = React.useState<number | null>(null);
   const { mentionQuery, showMentions, insertMention } = useMentions(content, setContent);
   const [selectedCommunity, setSelectedCommunity] = React.useState<any>(
@@ -187,26 +190,42 @@ export default function CreateScreen() {
 
   const handlePickImage = async () => {
     try {
+      // Posts allow multiple images (or one video); the blog cover is single.
+      const allowMulti = mode === 'post';
       const picker = getImagePicker();
       if (picker) {
         const result = await picker.launchImageLibraryAsync({
           mediaTypes: picker.MediaTypeOptions.All, // image OR video
+          allowsMultipleSelection: allowMulti,
+          selectionLimit: allowMulti ? MAX_IMAGES : 1,
           quality: 0.8,
         });
-        if (!result.canceled && result.assets[0]) {
-          const asset = result.assets[0];
-          setMediaUri(asset.uri);
-          setMediaIsVideo(asset.type === 'video');
+        if (!result.canceled && result.assets?.length) {
+          const assets = result.assets;
+          const vid = assets.find((a: any) => a.type === 'video');
+          if (vid) {
+            setMediaUris([vid.uri]);
+            setMediaIsVideo(true);
+          } else {
+            setMediaUris(assets.map((a: any) => a.uri).slice(0, allowMulti ? MAX_IMAGES : 1));
+            setMediaIsVideo(false);
+          }
         }
       } else if (Platform.OS === 'web') {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*,video/*';
+        if (allowMulti) input.multiple = true;
         input.onchange = (e: any) => {
-          const file = e.target?.files?.[0];
-          if (file) {
-            setMediaUri(URL.createObjectURL(file));
-            setMediaIsVideo((file.type || '').startsWith('video/'));
+          const files: File[] = Array.from(e.target?.files || []);
+          if (!files.length) return;
+          const vid = files.find((f) => (f.type || '').startsWith('video/'));
+          if (vid) {
+            setMediaUris([URL.createObjectURL(vid)]);
+            setMediaIsVideo(true);
+          } else {
+            setMediaUris(files.slice(0, MAX_IMAGES).map((f) => URL.createObjectURL(f)));
+            setMediaIsVideo(false);
           }
         };
         input.click();
@@ -228,29 +247,33 @@ export default function CreateScreen() {
           return;
         }
         let mediaUrls: string[] | undefined;
-        if (mediaUri && !mediaIsVideo) {
-          try {
-            const response = await fetch(mediaUri);
-            const blob = await response.blob();
-            const contentType = blob.type || 'image/jpeg';
-            const uploadRes = await sdk.uploads.getMediaUploadUrl({
-              content_type: contentType,
-              content_length: blob.size,
-            });
-            const uploadUrl = uploadRes.data?.upload_url || (uploadRes.data as any)?.url;
-            if (uploadUrl) {
-              const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
-              if (!putRes.ok) {
-                console.error('Media upload PUT failed:', putRes.status, putRes.statusText);
-                showError(`Image upload failed (${putRes.status}).`);
-              } else {
-                mediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
+        if (!mediaIsVideo && mediaUris.length > 0) {
+          const urls: string[] = [];
+          for (const uri of mediaUris) {
+            try {
+              const response = await fetch(uri);
+              const blob = await response.blob();
+              const contentType = blob.type || 'image/jpeg';
+              const uploadRes = await sdk.uploads.getMediaUploadUrl({
+                content_type: contentType,
+                content_length: blob.size,
+              });
+              const uploadUrl = uploadRes.data?.upload_url || (uploadRes.data as any)?.url;
+              if (uploadUrl) {
+                const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
+                if (!putRes.ok) {
+                  console.error('Media upload PUT failed:', putRes.status, putRes.statusText);
+                  showError(`An image upload failed (${putRes.status}).`);
+                } else {
+                  urls.push(uploadRes.data?.public_url || uploadUrl.split('?')[0]);
+                }
               }
+            } catch (err: any) {
+              console.error('Media upload error:', err);
+              showError(err?.message || 'An image could not be uploaded.');
             }
-          } catch (err: any) {
-            console.error('Media upload error:', err);
-            showError(err?.message || 'Image could not be uploaded. Post will be created without media.');
           }
+          if (urls.length) mediaUrls = urls;
         }
         if (mediaUri && mediaIsVideo) {
           try {
@@ -284,7 +307,7 @@ export default function CreateScreen() {
         // Reset the composer — it's a persistent tab, so without this the old
         // text/media would still be sitting there next time you open it.
         setContent('');
-        setMediaUri(null);
+        setMediaUris([]);
         setMediaIsVideo(false);
         setVideoPct(null);
         setIsNsfw(false);
@@ -653,23 +676,47 @@ export default function CreateScreen() {
             </View>
           </View>
 
-          {mediaUri && (
-            <View style={{ marginTop: spacing.lg, position: 'relative' }}>
+          {mediaUris.length > 0 && (
+            <View style={{ marginTop: spacing.lg }}>
               {mediaIsVideo ? (
-                <VideoPlayer uri={mediaUri} autoplay={false} height={400} />
+                <View style={{ position: 'relative' }}>
+                  <VideoPlayer uri={mediaUris[0]} autoplay={false} height={400} />
+                  <Pressable
+                    onPress={() => { setMediaUris([]); setMediaIsVideo(false); }}
+                    style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: spacing.sm }}
+                  >
+                    <Ionicons name="close" size={18} color="#ffffff" />
+                  </Pressable>
+                </View>
+              ) : mediaUris.length === 1 ? (
+                <View style={{ position: 'relative' }}>
+                  <Image
+                    source={{ uri: mediaUris[0] }}
+                    style={{ width: '100%', aspectRatio: 16 / 9, maxHeight: 300, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
+                    resizeMode="contain"
+                  />
+                  <Pressable
+                    onPress={() => setMediaUris([])}
+                    style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: spacing.sm }}
+                  >
+                    <Ionicons name="close" size={18} color="#ffffff" />
+                  </Pressable>
+                </View>
               ) : (
-                <Image
-                  source={{ uri: mediaUri }}
-                  style={{ width: '100%', aspectRatio: 16 / 9, maxHeight: 300, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
-                  resizeMode="contain"
-                />
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {mediaUris.map((uri, i) => (
+                    <View key={`${uri}-${i}`} style={{ width: '31.5%', aspectRatio: 1, position: 'relative' }}>
+                      <Image source={{ uri }} style={{ width: '100%', height: '100%', borderRadius: radius.md, backgroundColor: colors.surfaceHover }} resizeMode="cover" />
+                      <Pressable
+                        onPress={() => setMediaUris((prev) => prev.filter((_, idx) => idx !== i))}
+                        style={{ position: 'absolute', top: 4, right: 4, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: 4 }}
+                      >
+                        <Ionicons name="close" size={14} color="#ffffff" />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
               )}
-              <Pressable
-                onPress={() => { setMediaUri(null); setMediaIsVideo(false); }}
-                style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: spacing.sm }}
-              >
-                <Ionicons name="close" size={18} color="#ffffff" />
-              </Pressable>
             </View>
           )}
 
