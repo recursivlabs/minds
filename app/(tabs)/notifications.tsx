@@ -42,8 +42,8 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
-  React.useEffect(() => {
-    (async () => {
+  const loadNotifications = React.useCallback(async () => {
+    {
       if (!sdk) { setLoading(false); return; }
       try {
         const res = await sdk.notifications.list({ limit: 30, organization_id: ORG_ID || undefined });
@@ -82,8 +82,29 @@ export default function NotificationsScreen() {
         setNotifications(items);
       } catch {}
       finally { setLoading(false); }
-    })();
+    }
   }, [sdk]);
+
+  // Initial load.
+  React.useEffect(() => { loadNotifications(); }, [loadNotifications]);
+
+  // Live updates: refetch the moment a notification lands over the socket, so
+  // a new reply/follow/vote shows up here without a manual refresh (X parity).
+  React.useEffect(() => {
+    if (!sdk) return;
+    let cleanup: (() => void) | undefined;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        const sock = (sdk as any).realtime?.socket;
+        if (!sock) return;
+        const onNotif = () => loadNotifications();
+        sock.on('notification', onNotif);
+        cleanup = () => sock.off?.('notification', onNotif);
+      } catch {}
+    })();
+    return () => { cleanup?.(); };
+  }, [sdk, loadNotifications]);
 
   // Group similar notifications targeting the same post / user within
   // the last 24h so the list reads "Sarah and 2 others reacted" instead
