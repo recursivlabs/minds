@@ -13,7 +13,7 @@ import { registerShortcut } from '../../lib/keyboard';
 import { getItem, setItem } from '../../lib/storage';
 import { loadPreferences, isAgentCtaDismissed, markAgentCtaDismissed, isAgentSetUp } from '../../lib/onboarding';
 import { MINDS_PERSONAL_AGENT_SYSTEM_PROMPT } from '../../lib/curator/prompts';
-import { spacing } from '../../constants/theme';
+import { spacing, radius } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
 const PROFILE_NUDGE_DISMISSED_KEY = 'minds:profileNudge:dismissed';
@@ -246,6 +246,34 @@ export default function FeedScreen() {
   }, [activeTab]);
 
 
+  // Live "new posts" pill (X/Bluesky parity). The server fans out a
+  // 'feed_update' event to org members whenever someone posts; we count them
+  // and surface a tap-to-load banner instead of making the user pull-to-refresh
+  // to discover there's new content.
+  const [newPostsAvailable, setNewPostsAvailable] = React.useState(0);
+  React.useEffect(() => {
+    if (!sdk) return;
+    let cleanup: (() => void) | undefined;
+    (async () => {
+      try {
+        await sdk.realtime.connect();
+        const sock = (sdk as any).realtime?.socket;
+        if (!sock) return;
+        const onFeedUpdate = () => setNewPostsAvailable(n => Math.min(n + 1, 99));
+        sock.on('feed_update', onFeedUpdate);
+        cleanup = () => sock.off?.('feed_update', onFeedUpdate);
+      } catch {}
+    })();
+    return () => { cleanup?.(); };
+  }, [sdk]);
+  // Reset the counter when switching tabs (each tab is its own stream).
+  React.useEffect(() => { setNewPostsAvailable(0); }, [activeTab]);
+  const loadNewPosts = React.useCallback(() => {
+    setNewPostsAvailable(0);
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    refresh();
+  }, [refresh]);
+
   // Keyboard shortcuts
   React.useEffect(() => {
     const unsubs = [
@@ -270,6 +298,31 @@ export default function FeedScreen() {
 
   const feedContent = (
     <>
+      {newPostsAvailable > 0 && (
+        <Pressable
+          onPress={loadNewPosts}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            top: spacing.md,
+            alignSelf: 'center',
+            zIndex: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xs,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm,
+            borderRadius: radius.full,
+            backgroundColor: colors.accent,
+            opacity: pressed ? 0.9 : 1,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.22)' } as any : {}),
+          })}
+        >
+          <Ionicons name="arrow-up" size={15} color={colors.textOnAccent} />
+          <Text variant="caption" color={colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>
+            {newPostsAvailable >= 99 ? '99+' : newPostsAvailable} new post{newPostsAvailable === 1 ? '' : 's'}
+          </Text>
+        </Pressable>
+      )}
       {postsLoading && posts.length === 0 ? (
         <FeedSkeletons count={5} />
       ) : (
