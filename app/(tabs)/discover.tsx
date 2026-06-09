@@ -12,6 +12,7 @@ import { logSignal } from '../../lib/signals';
 import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
+import { profileFollowerCount } from '../../lib/models';
 
 function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
   const colors = useColors();
@@ -289,7 +290,7 @@ function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; on
   const username = person.username;
   const bio = person.bio || person.description || '';
   const avatar = person.image || person.avatar;
-  const followerCount = person.followerCount || person.follower_count || 0;
+  const followerCount = profileFollowerCount(person);
 
   return (
     <Pressable
