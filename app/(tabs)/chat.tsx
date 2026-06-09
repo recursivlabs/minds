@@ -425,32 +425,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   // a "jump to latest" affordance instead (Claude / iMessage behaviour).
   const atBottomRef = React.useRef(true);
   const [showJump, setShowJump] = React.useState(false);
-  // Pin the viewport to the bottom WITHOUT the jolt. On web we set the scroll
-  // node's scrollTop = scrollHeight directly: it's deterministic (no FlatList
-  // virtualization overshoot) and, fired from onContentSizeChange as the
-  // streaming text grows, the scroll keeps lockstep with the content so the
-  // text appears to push up smoothly instead of the viewport snapping a frame
-  // behind. This is how Claude streams. Native falls back to scrollToEnd.
-  const pinToBottom = React.useCallback(() => {
-    if (!atBottomRef.current) return;
-    const fl = flatListRef.current as any;
-    if (Platform.OS === 'web') {
-      const node = fl?.getScrollableNode?.();
-      if (node) { node.scrollTop = node.scrollHeight; return; }
-    }
-    fl?.scrollToEnd?.({ animated: false });
-  }, []);
   const stickToBottom = React.useCallback((animated = false) => {
     atBottomRef.current = true;
     setShowJump(false);
-    requestAnimationFrame(() => {
-      const fl = flatListRef.current as any;
-      if (Platform.OS === 'web' && !animated) {
-        const node = fl?.getScrollableNode?.();
-        if (node) { node.scrollTop = node.scrollHeight; return; }
-      }
-      fl?.scrollToEnd?.({ animated });
-    });
+    requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated }));
   }, []);
   const handleScroll = React.useCallback((e: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -467,9 +445,6 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
     || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent'
   );
-  // When a streaming bubble exists it shows its own in-place typing indicator,
-  // so the separate footer pill would be a duplicate — hide it then.
-  const streamingActive = React.useMemo(() => messages.some((m: any) => m.streaming), [messages]);
 
   // Load conversation info + messages in PARALLEL (not sequential)
   React.useEffect(() => {
@@ -715,26 +690,6 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       pending: true,
     }]);
 
-    const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
-    const otherName = partnerInfo?.name || partnerInfo?.user?.name || 'Agent';
-    const isAgent = partnerInfo?.isAi || partnerInfo?.is_ai
-      || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
-      || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
-    const streamingId = 'streaming-' + Date.now();
-
-    // For agents, drop the response placeholder in the SAME tick as the user's
-    // message so its typing indicator shows instantly (in parallel with the
-    // send round-trip), exactly like Claude — not after the server responds.
-    if (isAgent && otherId) {
-      setMessages(prev => [...prev, {
-        id: streamingId,
-        content: '',
-        sender: { id: otherId, name: otherName, is_ai: true },
-        createdAt: new Date().toISOString(),
-        streaming: true,
-      }]);
-    }
-
     try {
       const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText });
       const serverMsgId = sendRes?.data?.id;
@@ -750,11 +705,31 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         setMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false } : m));
       }
 
+      const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
+      const otherName = partnerInfo?.name || partnerInfo?.user?.name || 'Agent';
+      const isAgent = partnerInfo?.isAi || partnerInfo?.is_ai
+        || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
+        || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
+
       // Agent reply path. The server's POST /chat/messages does NOT
-      // auto-trigger an agent response — the client kicks off the stream.
-      // The placeholder bubble is already in place (above); we now fill it
-      // with text_delta chunks, batched to the animation frame.
+      // auto-trigger an agent response — the client is responsible
+      // for kicking off /agents/:id/chat/stream when the recipient
+      // is an agent.
+      //
+      // Streaming render: insert a placeholder bubble immediately
+      // ('streaming: true') and append text_delta chunks to it as
+      // they arrive. The bubble shows a blinking caret while
+      // streaming. Net effect: Claude-style typed-out reply instead
+      // of a long pause followed by a paste.
       if (isAgent && otherId) {
+        const streamingId = 'streaming-' + Date.now();
+        setMessages(prev => [...prev, {
+          id: streamingId,
+          content: '',
+          sender: { id: otherId, name: otherName, is_ai: true },
+          createdAt: new Date().toISOString(),
+          streaming: true,
+        }]);
         let acc = '';
         let streamedAny = false;
         try {
@@ -766,29 +741,21 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             message: messageText,
             ...(conversationId ? { conversation_id: conversationId } : {}),
           });
-          // Coalesce token deltas to one render per animation frame (~60fps).
-          // Models can emit dozens of tiny deltas per second; rendering every
-          // one is what made streaming feel jumpy. Batching to the frame
-          // cadence matches how Claude/OpenAI paint streamed text.
-          let pendingFlush: number | null = null;
-          const flushContent = () => {
-            pendingFlush = null;
-            setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, content: acc } : m));
-          };
           for await (const chunk of stream) {
             if (chunk?.type === 'text_delta' && typeof chunk.delta === 'string') {
               acc += chunk.delta;
               streamedAny = true;
-              if (pendingFlush == null) pendingFlush = requestAnimationFrame(flushContent);
+              setMessages(prev => prev.map(m => m.id === streamingId
+                ? { ...m, content: acc }
+                : m));
             }
           }
-          if (pendingFlush != null) cancelAnimationFrame(pendingFlush);
-          // Final flush + mark complete in a single update. WS broadcast of the
-          // final stored message may arrive after this; the dedup in the
-          // onMessage handler (content + sender match for agent-*/streaming-*
-          // ids) drops it.
+          // Mark complete. WS broadcast of the final stored message
+          // may arrive after this; the dedup in the onMessage handler
+          // (content + sender match for agent-* / streaming-* ids)
+          // drops it.
           setMessages(prev => prev.map(m => m.id === streamingId
-            ? { ...m, content: acc, streaming: false }
+            ? { ...m, streaming: false }
             : m));
         } catch (streamErr) {
           console.warn('[chat] agent stream failed, falling back to chatStreamText', streamErr);
@@ -831,17 +798,13 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         setAgentTyping(false);
       }
     } catch (err) {
-      // Send failed — mark the temp row as failed and drop the agent's
-      // placeholder so its typing indicator doesn't spin forever.
-      setMessages(prev => prev
-        .filter(m => m.id !== streamingId)
-        .map(m => m.id === tempId ? { ...m, pending: false, failed: true } : m));
+      // Send failed — mark the temp row as failed so the user knows.
+      setMessages(prev => prev.map(m => m.id === tempId
+        ? { ...m, pending: false, failed: true }
+        : m));
       console.warn('[chat] send failed', err);
     } finally {
       setSending(false);
-      // Guard: if the agent placeholder never received any content (all paths
-      // failed), remove the empty bubble instead of leaving a blank reply.
-      setMessages(prev => prev.filter(m => !(m.id === streamingId && !m.content?.trim())));
     }
   };
 
@@ -892,11 +855,11 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           scrollEventThrottle={100}
           // Only follow new content when the user is already at the bottom, so
           // streaming tokens / incoming messages never interrupt scroll-back.
-          onContentSizeChange={pinToBottom}
+          onContentSizeChange={() => { if (atBottomRef.current) flatListRef.current?.scrollToEnd({ animated: false }); }}
           ListFooterComponent={
             <>
               <ThinkingPill
-                visible={agentTyping && !streamingActive}
+                visible={agentTyping}
                 status={agentStatus}
                 agentName={partnerInfo?.name || partnerInfo?.user?.name || 'Agent'}
               />
