@@ -11,6 +11,7 @@ import { getPreference, setPreference } from '../../lib/preferences';
 import { spacing, radius } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
 import { useColors } from '../../lib/theme';
+import { openSupportConversation } from '../../lib/support';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const colors = useColors();
@@ -511,7 +512,19 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Help & feedback">
-          <SettingRow first label="Feedback & feature requests" sublabel="Suggest ideas, report problems, and upvote what matters" onPress={() => router.push('/(tabs)/feedback' as any)} />
+          <SettingRow
+            first
+            label="Message Minds Support"
+            sublabel="Get help from our support assistant, any time"
+            onPress={async () => {
+              if (!sdk) return;
+              showMsg('Opening support…');
+              const id = await openSupportConversation(sdk);
+              if (id) router.push({ pathname: '/(tabs)/chat', params: { id } } as any);
+              else showMsg('Support is unavailable right now', true);
+            }}
+          />
+          <SettingRow label="Feedback & feature requests" sublabel="Suggest ideas, report problems, and upvote what matters" onPress={() => router.push('/(tabs)/feedback' as any)} />
         </Section>
 
         <Section title="Legal">
