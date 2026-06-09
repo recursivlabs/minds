@@ -354,49 +354,9 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             </Pressable>
           </View>
 
-          {/* Search trigger — opens the global Cmd+K command palette.
-             Lives above the main nav so it's the first thing the eye
-             hits in the sidebar. Native users tap the per-screen search
-             bar instead. */}
-          {!collapsed && Platform.OS === 'web' && (
-            <Pressable
-              onPress={() => {
-                // Dispatch a synthetic Cmd+K keystroke so the palette
-                // toggles via its existing keyboard handler. Same UX
-                // as the keyboard shortcut.
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
-                }
-              }}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: spacing.sm,
-                paddingVertical: spacing.sm,
-                paddingHorizontal: spacing.md,
-                marginHorizontal: spacing.lg,
-                marginBottom: spacing.md,
-                borderRadius: radius.full,
-                backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.borderSubtle,
-              })}
-            >
-              <Ionicons name="search" size={14} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted} style={{ flex: 1 }}>Search anywhere</Text>
-              <View
-                style={{
-                  paddingHorizontal: 6,
-                  paddingVertical: 1,
-                  borderRadius: 4,
-                  borderWidth: 0.5,
-                  borderColor: colors.borderSubtle,
-                }}
-              >
-                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>⌘K</Text>
-              </View>
-            </Pressable>
-          )}
+          {/* Search lives at the top of the right rail (FeedSidebar) now,
+             matching X — keeps the left nav clean and pins discovery to
+             the trends column. */}
 
           {/* Main nav — filter admin tab to platform admins only */}
           <View style={{ gap: spacing.xs }}>
