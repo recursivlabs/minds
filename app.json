@@ -47,7 +47,6 @@
           "color": "#1b6ef3"
         }
       ],
-      "@sentry/react-native",
       "expo-font",
       "expo-video"
     ],
