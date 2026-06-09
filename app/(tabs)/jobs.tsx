@@ -10,7 +10,9 @@ import { useColors } from '../../lib/theme';
 
 type Job = { id: string; name: string; cron: string; status?: string; handler_code?: string };
 
-export default function JobsScreen() {
+import { withAdminGuard } from '../../lib/guards';
+
+function JobsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
   const colors = useColors();
@@ -117,3 +119,5 @@ export default function JobsScreen() {
     </Container>
   );
 }
+
+export default withAdminGuard(JobsScreen);

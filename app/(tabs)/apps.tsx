@@ -17,7 +17,9 @@ function StatusDot({ status }: { status?: string }) {
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c }} />;
 }
 
-export default function AppsScreen() {
+import { withAdminGuard } from '../../lib/guards';
+
+function AppsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
   const colors = useColors();
@@ -170,3 +172,5 @@ export default function AppsScreen() {
     </Container>
   );
 }
+
+export default withAdminGuard(AppsScreen);
