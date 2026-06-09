@@ -10,7 +10,9 @@ import { useColors } from '../../lib/theme';
 
 type Protocol = { id: string; name: string; enabled: boolean; type?: string };
 
-export default function ProtocolsScreen() {
+import { withAdminGuard } from '../../lib/guards';
+
+function ProtocolsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
   const colors = useColors();
@@ -160,3 +162,5 @@ export default function ProtocolsScreen() {
     </Container>
   );
 }
+
+export default withAdminGuard(ProtocolsScreen);

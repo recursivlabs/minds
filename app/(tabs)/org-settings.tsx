@@ -9,7 +9,9 @@ import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
-export default function OrgSettingsScreen() {
+import { withAdminGuard } from '../../lib/guards';
+
+function OrgSettingsScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
   const colors = useColors();
@@ -156,3 +158,5 @@ export default function OrgSettingsScreen() {
     </Container>
   );
 }
+
+export default withAdminGuard(OrgSettingsScreen);

@@ -10,7 +10,9 @@ import { useColors } from '../../lib/theme';
 
 type Webhook = { id: string; url: string; event_types?: string[]; events?: string[]; active?: boolean };
 
-export default function WebhooksScreen() {
+import { withAdminGuard } from '../../lib/guards';
+
+function WebhooksScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
   const colors = useColors();
@@ -118,3 +120,5 @@ export default function WebhooksScreen() {
     </Container>
   );
 }
+
+export default withAdminGuard(WebhooksScreen);

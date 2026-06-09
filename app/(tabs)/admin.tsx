@@ -647,7 +647,9 @@ function NetworkTab({ sdk }: { sdk: any }) {
 }
 
 /* --- Main --- */
-export default function AdminScreen() {
+import { withAdminGuard } from '../../lib/guards';
+
+function AdminScreen() {
   const colors = useColors();
   const router = useRouter();
   const { sdk } = useAuth();
@@ -685,3 +687,5 @@ export default function AdminScreen() {
     </Container>
   );
 }
+
+export default withAdminGuard(AdminScreen);

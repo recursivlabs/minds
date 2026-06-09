@@ -27,7 +27,9 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function EmailScreen() {
+import { withAdminGuard } from '../../lib/guards';
+
+function EmailScreen() {
   const router = useRouter();
   const { sdk } = useAuth();
   const colors = useColors();
@@ -182,3 +184,5 @@ export default function EmailScreen() {
     </Container>
   );
 }
+
+export default withAdminGuard(EmailScreen);
