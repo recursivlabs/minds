@@ -16,7 +16,6 @@ import { colors as defaultColors, spacing, radius } from '../constants/theme';
 
 const COLLAPSED_WIDTH = 68;
 const EXPANDED_WIDTH = 264;
-const COLLAPSE_KEY = 'minds:sidebar:collapsed';
 const AUTO_COLLAPSE_WIDTH = 1024;
 
 type NavItem = { name: string; label: string; icon: string; activeIcon: string };
@@ -34,38 +33,10 @@ const BOTTOM_ITEMS: NavItem[] = [];
 
 export function useSidebarState() {
   const { width: windowWidth } = useWindowDimensions();
-  const [manualCollapsed, setManualCollapsed] = React.useState<boolean | null>(null);
-
-  React.useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem(COLLAPSE_KEY);
-      if (saved !== null) setManualCollapsed(saved === 'true');
-    }
-  }, []);
-
-  // Auto-collapse below breakpoint, but respect manual override
-  const autoCollapsed = windowWidth < AUTO_COLLAPSE_WIDTH;
-  const collapsed = manualCollapsed !== null ? manualCollapsed : autoCollapsed;
-
-  const toggle = React.useCallback(() => {
-    setManualCollapsed(prev => {
-      const current = prev !== null ? prev : windowWidth < AUTO_COLLAPSE_WIDTH;
-      const next = !current;
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.localStorage.setItem(COLLAPSE_KEY, String(next));
-      }
-      return next;
-    });
-  }, [windowWidth]);
-
-  // Reset manual override when crossing the breakpoint
-  React.useEffect(() => {
-    setManualCollapsed(null);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.localStorage.removeItem(COLLAPSE_KEY);
-    }
-  }, [autoCollapsed]);
-
+  // Auto-collapse below the breakpoint only. No manual toggle — collapsing a
+  // full-size desktop nav by hand looked odd, so it's width-driven.
+  const collapsed = windowWidth < AUTO_COLLAPSE_WIDTH;
+  const toggle = React.useCallback(() => {}, []);
   return { collapsed, toggle, width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH };
 }
 
@@ -78,7 +49,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, sdk } = useAuth();
-  const { mode, toggle: toggleTheme, colors } = useTheme();
+  const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
   const { communities } = useCommunities(5);
   const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
@@ -361,64 +332,26 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       >
         {/* Top section */}
         <View>
-          {/* Logo + collapse toggle */}
+          {/* Logo (auto-collapses with the nav — no manual toggle, no theme
+              switch; theme lives in Settings now) */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: collapsed ? 'center' : 'space-between',
+              justifyContent: collapsed ? 'center' : 'flex-start',
               paddingHorizontal: collapsed ? 0 : spacing.lg,
               marginBottom: spacing['2xl'],
             }}
           >
-            {collapsed ? (
-              <Pressable onPress={onToggle} hitSlop={12}>
-                <Text
-                  variant="h2"
-                  color={colors.accent}
-                  style={{ fontSize: 18, letterSpacing: 2, fontWeight: '300' }}
-                >
-                  m
-                </Text>
-              </Pressable>
-            ) : (
-              <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Pressable onPress={() => router.push('/(tabs)')}>
-                    <Text
-                      variant="h2"
-                      color={colors.accent}
-                      style={{ fontSize: 20, letterSpacing: 0.5 }}
-                    >
-                      minds
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={toggleTheme}
-                    hitSlop={8}
-                    style={({ pressed }) => ({
-                      opacity: pressed ? 0.5 : 0.7,
-                      padding: 4,
-                      borderRadius: 4,
-                    })}
-                  >
-                    <Ionicons name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={14} color={colors.textMuted} />
-                  </Pressable>
-                </View>
-                <Pressable
-                  onPress={onToggle}
-                  hitSlop={8}
-                  style={({ pressed }) => ({
-                    opacity: pressed ? 0.5 : 0.7,
-                    padding: 6,
-                    borderRadius: 6,
-                    backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-                  })}
-                >
-                  <Ionicons name="chevron-back" size={16} color={colors.textMuted} />
-                </Pressable>
-              </>
-            )}
+            <Pressable onPress={() => router.push('/(tabs)')} hitSlop={8}>
+              <Text
+                variant="h2"
+                color={colors.accent}
+                style={{ fontSize: 20, letterSpacing: collapsed ? 1 : 0.5 }}
+              >
+                {collapsed ? 'm' : 'minds'}
+              </Text>
+            </Pressable>
           </View>
 
           {/* Search trigger — opens the global Cmd+K command palette.

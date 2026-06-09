@@ -295,13 +295,6 @@ export default function FeedScreen() {
                   <Text variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
                     Your agent curated this {formatRelativeTime(lastCurateAt)}
                   </Text>
-                  <Pressable onPress={recurate} disabled={refreshing} hitSlop={8}>
-                    <Ionicons
-                      name={refreshing ? 'sync' : 'refresh-outline'}
-                      size={16}
-                      color={refreshing ? colors.textMuted : colors.accent}
-                    />
-                  </Pressable>
                 </View>
               )}
               {profileIncomplete && !nudgeDismissed && (
@@ -421,19 +414,20 @@ export default function FeedScreen() {
           hitSlop={8}
           style={({ pressed }) => ({
             paddingHorizontal: spacing.xl,
+            minWidth: 56,
             alignItems: 'center',
             justifyContent: 'center',
             borderBottomWidth: 1,
             borderBottomColor: colors.borderSubtle,
-            opacity: refreshing ? 0.5 : pressed ? 0.7 : 1,
+            opacity: pressed ? 0.7 : 1,
           })}
-          accessibilityLabel="Refresh feed"
+          accessibilityLabel="Curate fresh posts"
         >
-          <Ionicons
-            name={refreshing ? 'sync' : 'refresh-outline'}
-            size={18}
-            color={colors.textMuted}
-          />
+          {refreshing ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Ionicons name="refresh-outline" size={18} color={colors.textMuted} />
+          )}
         </Pressable>
       )}
     </View>

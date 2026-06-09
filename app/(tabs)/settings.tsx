@@ -8,13 +8,21 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { getPreference, setPreference } from '../../lib/preferences';
-import { colors, spacing, radius } from '../../constants/theme';
+import { spacing, radius } from '../../constants/theme';
 import { useTheme } from '../../lib/theme';
+import { useColors } from '../../lib/theme';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const colors = useColors();
   return (
-    <View style={{ gap: spacing.md }}>
-      <Text variant="h3">{title}</Text>
+    <View style={{ gap: spacing.sm }}>
+      <Text
+        variant="label"
+        color={colors.textMuted}
+        style={{ fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', marginLeft: spacing.xs }}
+      >
+        {title}
+      </Text>
       <Card>{children}</Card>
     </View>
   );
@@ -22,6 +30,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function TwoFactorSetup() {
   const { sdk } = useAuth();
+  const colors = useColors();
   const [enabled, setEnabled] = React.useState(false);
   const [setupUri, setSetupUri] = React.useState<string | null>(null);
   const [verifyCode, setVerifyCode] = React.useState('');
@@ -120,7 +129,7 @@ function TwoFactorSetup() {
 export default function SettingsScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
-  const { mode: themeMode, setMode: setThemeMode, colors: themedColors } = useTheme();
+  const { mode: themeMode, setMode: setThemeMode, colors } = useTheme();
 
   const [loading, setLoading] = React.useState(true);
   const [sessions, setSessions] = React.useState<any[]>([]);
@@ -302,16 +311,16 @@ export default function SettingsScreen() {
         <Section title="Appearance">
           <View style={{ paddingVertical: spacing.xs, gap: spacing.sm }}>
             <Text variant="body">Theme</Text>
-            <View style={{ flexDirection: 'row', backgroundColor: themedColors.glass, borderRadius: radius.md, padding: 2, borderWidth: 0.5, borderColor: themedColors.borderSubtle }}>
+            <View style={{ flexDirection: 'row', backgroundColor: colors.glass, borderRadius: radius.md, padding: 2, borderWidth: 0.5, borderColor: colors.borderSubtle }}>
               {(['system', 'light', 'dark'] as const).map(opt => {
                 const active = themeMode === opt;
                 return (
                   <Pressable
                     key={opt}
                     onPress={() => setThemeMode(opt)}
-                    style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: active ? themedColors.surfaceRaised : 'transparent', alignItems: 'center' }}
+                    style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: active ? colors.surfaceRaised : 'transparent', alignItems: 'center' }}
                   >
-                    <Text variant="bodyMedium" color={active ? themedColors.text : themedColors.textMuted} style={{ textTransform: 'capitalize' }}>{opt}</Text>
+                    <Text variant="bodyMedium" color={active ? colors.text : colors.textMuted} style={{ textTransform: 'capitalize' }}>{opt}</Text>
                   </Pressable>
                 );
               })}
@@ -319,14 +328,14 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
             <Text variant="body">Language</Text>
-            <Text variant="body" color={themedColors.textMuted}>English</Text>
+            <Text variant="body" color={colors.textMuted}>English</Text>
           </View>
         </Section>
 
         <Section title="Feed">
           <View style={{ paddingVertical: spacing.xs }}>
             <Text variant="body" style={{ marginBottom: spacing.sm }}>Default feed</Text>
-            <Text variant="caption" color={themedColors.textMuted} style={{ marginBottom: spacing.md, lineHeight: 18 }}>
+            <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.md, lineHeight: 18 }}>
               Which feed opens when you launch the app. You can always switch tabs once you're in.
             </Text>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
