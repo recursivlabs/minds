@@ -28,6 +28,61 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+// One consistent row shape for the whole settings surface: label (+ optional
+// sublabel) on the left, and on the right either a control (Switch/Toggle), a
+// value string, and/or a chevron when the row navigates. Rows stack inside a
+// Card with hairline separators, so everything scans the same way (iOS-style).
+function SettingRow({
+  label, sublabel, right, value, onPress, first, destructive,
+}: {
+  label: string;
+  sublabel?: string;
+  right?: React.ReactNode;
+  value?: string;
+  onPress?: () => void;
+  first?: boolean;
+  destructive?: boolean;
+}) {
+  const colors = useColors();
+  const body = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        paddingVertical: spacing.md,
+        borderTopWidth: first ? 0 : 0.5,
+        borderTopColor: colors.borderSubtle,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <Text variant="body" color={destructive ? colors.error : colors.text}>{label}</Text>
+        {sublabel ? (
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, lineHeight: 17 }}>{sublabel}</Text>
+        ) : null}
+      </View>
+      {right ?? (value ? <Text variant="body" color={colors.textMuted}>{value}</Text> : null)}
+      {onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={{ marginLeft: -spacing.xs }} /> : null}
+    </View>
+  );
+  if (onPress) {
+    return <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>{body}</Pressable>;
+  }
+  return body;
+}
+
+function Toggle({ value, onValueChange }: { value: boolean; onValueChange: (v: boolean) => void }) {
+  const colors = useColors();
+  return (
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      trackColor={{ true: colors.accent, false: colors.glass }}
+      thumbColor={colors.text}
+    />
+  );
+}
+
 function TwoFactorSetup() {
   const { sdk } = useAuth();
   const colors = useColors();
@@ -135,10 +190,19 @@ export default function SettingsScreen() {
   const [sessions, setSessions] = React.useState<any[]>([]);
   const [loginHistory, setLoginHistory] = React.useState<any[]>([]);
   const [privacy, setPrivacy] = React.useState({ profilePublic: true, showEmail: false });
+  // Notification toggles. Local UI state for now (was hardcoded-on with no
+  // handler); wire to a server notification-preferences API when it lands.
+  const [notifPrefs, setNotifPrefs] = React.useState({ replies: true, follows: true, votes: true, community: true });
+  const toggleNotif = (key: 'replies' | 'follows' | 'votes' | 'community', v: boolean) =>
+    setNotifPrefs(p => ({ ...p, [key]: v }));
   const [pw, setPw] = React.useState({ current: '', next: '' });
   const [newEmail, setNewEmail] = React.useState('');
   const [emailPw, setEmailPw] = React.useState('');
   const [saving, setSaving] = React.useState('');
+  // Collapse the credential-change forms by default so Account isn't a wall of
+  // inputs; they expand only when the user taps the row.
+  const [showPwForm, setShowPwForm] = React.useState(false);
+  const [showEmailForm, setShowEmailForm] = React.useState(false);
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
   const [deletePw, setDeletePw] = React.useState('');
   // Forces re-read of getPreference() values when the user toggles a
@@ -256,18 +320,23 @@ export default function SettingsScreen() {
           </View>
         )}
         <Section title="Account">
-          <View style={{ paddingVertical: spacing.sm, marginBottom: spacing.md }}>
-            <Text variant="caption" color={colors.textMuted}>Email</Text>
-            <Text variant="body" style={{ marginTop: spacing.xs }}>{user?.email || 'Not set'}</Text>
-          </View>
-          <Divider marginVertical={spacing.sm} />
-          <Input label="Current password" secureTextEntry value={pw.current} onChangeText={t => setPw(p => ({ ...p, current: t }))} placeholder="Current password" />
-          <Input label="New password" secureTextEntry value={pw.next} onChangeText={t => setPw(p => ({ ...p, next: t }))} placeholder="New password" />
-          <Button onPress={changePassword} loading={saving === 'pw'} size="sm" disabled={!pw.current || !pw.next}>Change Password</Button>
-          <Divider marginVertical={spacing.lg} />
-          <Input label="New email" value={newEmail} onChangeText={setNewEmail} placeholder="new@email.com" keyboardType="email-address" autoCapitalize="none" />
-          <Input label="Confirm with password" secureTextEntry value={emailPw} onChangeText={setEmailPw} placeholder="Your password" />
-          <Button onPress={changeEmail} loading={saving === 'email'} size="sm" disabled={!newEmail || !emailPw}>Change Email</Button>
+          <SettingRow first label="Email" value={user?.email || 'Not set'} />
+          <SettingRow label="Change password" onPress={() => setShowPwForm(s => !s)} />
+          {showPwForm && (
+            <View style={{ gap: spacing.sm, paddingBottom: spacing.md }}>
+              <Input secureTextEntry value={pw.current} onChangeText={t => setPw(p => ({ ...p, current: t }))} placeholder="Current password" />
+              <Input secureTextEntry value={pw.next} onChangeText={t => setPw(p => ({ ...p, next: t }))} placeholder="New password" />
+              <Button onPress={changePassword} loading={saving === 'pw'} size="sm" disabled={!pw.current || !pw.next}>Change Password</Button>
+            </View>
+          )}
+          <SettingRow label="Change email" onPress={() => setShowEmailForm(s => !s)} />
+          {showEmailForm && (
+            <View style={{ gap: spacing.sm, paddingBottom: spacing.md }}>
+              <Input value={newEmail} onChangeText={setNewEmail} placeholder="new@email.com" keyboardType="email-address" autoCapitalize="none" />
+              <Input secureTextEntry value={emailPw} onChangeText={setEmailPw} placeholder="Confirm with your password" />
+              <Button onPress={changeEmail} loading={saving === 'email'} size="sm" disabled={!newEmail || !emailPw}>Change Email</Button>
+            </View>
+          )}
         </Section>
 
         <Section title="Security">
@@ -298,14 +367,8 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Privacy">
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Public profile</Text>
-            <Switch value={privacy.profilePublic} onValueChange={v => togglePrivacy('profilePublic', v)} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Show email on profile</Text>
-            <Switch value={privacy.showEmail} onValueChange={v => togglePrivacy('showEmail', v)} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
-          </View>
+          <SettingRow first label="Public profile" right={<Toggle value={privacy.profilePublic} onValueChange={v => togglePrivacy('profilePublic', v)} />} />
+          <SettingRow label="Show email on profile" right={<Toggle value={privacy.showEmail} onValueChange={v => togglePrivacy('showEmail', v)} />} />
         </Section>
 
         <Section title="Appearance">
@@ -326,10 +389,7 @@ export default function SettingsScreen() {
               })}
             </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Language</Text>
-            <Text variant="body" color={colors.textMuted}>English</Text>
-          </View>
+          <SettingRow label="Language" value="English" />
         </Section>
 
         <Section title="Feed">
@@ -367,82 +427,38 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Content">
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Show NSFW content</Text>
-            <Switch
-              value={getPreference('showNsfw')}
-              onValueChange={v => { setPreference('showNsfw', v); setSettingsTick(t => t + 1); }}
-              trackColor={{ true: colors.accent, false: colors.glass }}
-              thumbColor={colors.text}
-            />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Autoplay videos</Text>
-            <Switch
-              value={getPreference('autoplayVideo')}
-              onValueChange={v => { setPreference('autoplayVideo', v); setSettingsTick(t => t + 1); }}
-              trackColor={{ true: colors.accent, false: colors.glass }}
-              thumbColor={colors.text}
-            />
-          </View>
+          <SettingRow
+            first
+            label="Show NSFW content"
+            right={<Toggle value={getPreference('showNsfw')} onValueChange={v => { setPreference('showNsfw', v); setSettingsTick(t => t + 1); }} />}
+          />
+          <SettingRow
+            label="Autoplay videos"
+            right={<Toggle value={getPreference('autoplayVideo')} onValueChange={v => { setPreference('autoplayVideo', v); setSettingsTick(t => t + 1); }} />}
+          />
         </Section>
 
         <Section title="AI">
-          {/* Entry point back to the agent setup/edit screen. Lives here
-             so users who dismissed the For You CTA can still find the
-             setup flow (or edit their existing agent's name, model,
-             system prompt, etc.). */}
-          <Pressable
+          {/* Entry point back to the agent setup/edit screen so users who
+             dismissed the For You CTA can still find the setup flow. */}
+          <SettingRow
+            first
+            label="Set up your personal AI agent"
+            sublabel="Name, model, system prompt, secure context, and curation preferences. Change anything anytime."
             onPress={() => router.push('/agent' as any)}
-            style={({ pressed }) => ({
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              paddingVertical: spacing.md,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <View style={{ flex: 1, paddingRight: spacing.lg }}>
-              <Text variant="body">Set up your personal AI agent</Text>
-              <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, lineHeight: 18 }}>
-                Name, model, system prompt, secure context, and curation preferences. You can change anything anytime.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </Pressable>
-          <View style={{ paddingVertical: spacing.xs, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1, paddingRight: spacing.lg }}>
-                <Text variant="body">Use my personal AI agent</Text>
-                <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, lineHeight: 18 }}>
-                  Off: clean Minds with no AI mediation. For You falls back to chronological. Agent hidden from chat. You can still post, follow, comment, and DM.
-                </Text>
-              </View>
-              <Switch
-                value={getPreference('aiEnabled')}
-                onValueChange={v => { setPreference('aiEnabled', v); }}
-                trackColor={{ true: colors.accent, false: colors.glass }}
-                thumbColor={colors.text}
-              />
-            </View>
-          </View>
+          />
+          <SettingRow
+            label="Use my personal AI agent"
+            sublabel="Off: clean Minds with no AI mediation. For You falls back to chronological; agent hidden from chat. You can still post, follow, comment, and DM."
+            right={<Toggle value={getPreference('aiEnabled')} onValueChange={v => { setPreference('aiEnabled', v); }} />}
+          />
         </Section>
 
         <Section title="Notifications">
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Replies to my posts</Text>
-            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">New followers</Text>
-            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Upvotes on my posts</Text>
-            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-            <Text variant="body">Community activity</Text>
-            <Switch value={true} trackColor={{ true: colors.accent, false: colors.glass }} thumbColor={colors.text} />
-          </View>
+          <SettingRow first label="Replies to my posts" right={<Toggle value={notifPrefs.replies} onValueChange={v => toggleNotif('replies', v)} />} />
+          <SettingRow label="New followers" right={<Toggle value={notifPrefs.follows} onValueChange={v => toggleNotif('follows', v)} />} />
+          <SettingRow label="Upvotes on my posts" right={<Toggle value={notifPrefs.votes} onValueChange={v => toggleNotif('votes', v)} />} />
+          <SettingRow label="Community activity" right={<Toggle value={notifPrefs.community} onValueChange={v => toggleNotif('community', v)} />} />
         </Section>
 
         <Section title="Data">
@@ -492,15 +508,9 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Legal">
-          <Pressable onPress={() => Linking.openURL('https://minds.com/p/terms')} style={{ paddingVertical: spacing.sm }}>
-            <Text variant="body" color={colors.accent}>Terms of Service</Text>
-          </Pressable>
-          <Pressable onPress={() => Linking.openURL('https://minds.com/p/privacy')} style={{ paddingVertical: spacing.sm }}>
-            <Text variant="body" color={colors.accent}>Privacy Policy</Text>
-          </Pressable>
-          <Pressable onPress={() => Linking.openURL('https://minds.com/p/community-guidelines')} style={{ paddingVertical: spacing.sm }}>
-            <Text variant="body" color={colors.accent}>Community Guidelines</Text>
-          </Pressable>
+          <SettingRow first label="Terms of Service" onPress={() => Linking.openURL('https://minds.com/p/terms')} />
+          <SettingRow label="Privacy Policy" onPress={() => Linking.openURL('https://minds.com/p/privacy')} />
+          <SettingRow label="Community Guidelines" onPress={() => Linking.openURL('https://minds.com/p/community-guidelines')} />
         </Section>
 
         <Section title="Danger Zone">
