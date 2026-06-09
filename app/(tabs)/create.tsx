@@ -430,7 +430,7 @@ export default function CreateScreen() {
     : 'Create Community';
 
   return (
-    <Container safeTop padded={false} maxWidth={600}>
+    <Container safeTop padded={false}>
       {/* Header */}
       <View
         style={{

@@ -231,9 +231,14 @@ export function usePost(postId: string) {
     setError(null);
   }, [postId]);
 
+  // Always revalidate on mount (stale-while-revalidate). Replies change far
+  // more often than the 30s cache window, so a fresh cache used to be served
+  // WITHOUT a refetch — meaning a new reply (yours or someone else's) wouldn't
+  // show until the cache expired. We still render the cached copy instantly
+  // (no flash), but we always fetch the canonical post + replies in the
+  // background and reconcile.
   React.useEffect(() => {
     if (!postId) return;
-    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -244,7 +249,7 @@ export function usePost(postId: string) {
           setCache(cacheKey, res.data);
         }
       } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Failed to load post');
+        if (!cancelled && !cached) setError(err.message || 'Failed to load post');
       } finally {
         if (!cancelled) setLoading(false);
       }
