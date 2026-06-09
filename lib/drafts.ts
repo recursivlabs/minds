@@ -1,6 +1,11 @@
 import { getItemSync, getItem, setItem } from './storage';
 
-const DRAFTS_KEY = 'minds:drafts';
+// v2: the old key accumulated orphaned drafts (posted text that kept
+// repopulating the composer because autosave re-stamped restored drafts). The
+// bump abandons those orphans for a clean slate; the new lifecycle (single
+// slot, cleared on post, staleness guard, no re-stamp of untouched restores)
+// keeps it correct going forward.
+const DRAFTS_KEY = 'minds:drafts:v2';
 
 interface Draft {
   id: string;

@@ -310,10 +310,13 @@ export default function SettingsScreen() {
   }
 
   return (
-    <Container safeTop padded={false} maxWidth={720}>
+    <Container safeTop padded={false}>
+      {/* Header spans full width so the back button lines up with every other
+         page; the settings content stays centered at a readable width. */}
       <ScreenHeader title="Settings" />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: spacing['5xl'] }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: spacing['5xl'] }}>
+        <View style={{ width: '100%', maxWidth: 720, padding: spacing.xl, gap: spacing.xl }}>
         {statusMsg && (
           <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' }}>
             <Text variant="body" color={colors.success}>{statusMsg}</Text>
@@ -537,6 +540,7 @@ export default function SettingsScreen() {
             Version 2.0.0
           </Text>
         </Section>
+        </View>
       </ScrollView>
     </Container>
   );
