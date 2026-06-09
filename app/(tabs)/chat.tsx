@@ -15,6 +15,7 @@ import { getCached, setCache, invalidate } from '../../lib/cache';
 import { useSetActiveConvoId } from '../../lib/activeConvo';
 import { ThinkingPill } from '../../components/ThinkingPill';
 import { ensureIntroDM } from '../../lib/agentIntro';
+import { captureException } from '../../lib/sentry';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -802,7 +803,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       setMessages(prev => prev.map(m => m.id === tempId
         ? { ...m, pending: false, failed: true }
         : m));
-      console.warn('[chat] send failed', err);
+      captureException(err, { action: 'chat_send', conversationId });
     } finally {
       setSending(false);
     }

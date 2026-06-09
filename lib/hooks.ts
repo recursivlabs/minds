@@ -6,6 +6,7 @@ import { filterMuted } from './muted';
 import { loadPreferences, markCuratedNow } from './onboarding';
 import { buildCuratorRequest } from './curator';
 import { getPreference } from './preferences';
+import { captureException } from './sentry';
 
 /**
  * Fetch posts from the feed.
@@ -115,6 +116,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       setHasMore(res.meta?.has_more ?? data.length >= limit);
       offsetRef.current = (refresh ? 0 : offsetRef.current) + data.length;
     } catch (err: any) {
+      captureException(err, { hook: 'usePosts', sort });
       setError(err.message || 'Failed to load posts');
     } finally {
       setLoading(false);
@@ -249,7 +251,7 @@ export function usePost(postId: string) {
           setCache(cacheKey, res.data);
         }
       } catch (err: any) {
-        if (!cancelled && !cached) setError(err.message || 'Failed to load post');
+        if (!cancelled) { captureException(err, { hook: 'usePost', postId }); if (!cached) setError(err.message || 'Failed to load post'); }
       } finally {
         if (!cancelled) setLoading(false);
       }
