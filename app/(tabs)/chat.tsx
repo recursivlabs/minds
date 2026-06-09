@@ -47,10 +47,14 @@ export default function ChatScreen() {
       try {
         await sdk.realtime.connect();
         if (cancelled) return;
+        let lastRefresh = 0;
         unsub = sdk.realtime.onMessage(() => {
-          // Cheap path: re-fetch the conversations list so previews +
-          // unread counts reflect the latest message. The list query is
-          // cached so this is fast.
+          // Re-fetch the conversations list so previews + unread counts move.
+          // Throttle to once / 1.5s: a busy thread fires many messages, and we
+          // don't want one refetch per message hammering the list endpoint.
+          const now = Date.now();
+          if (now - lastRefresh < 1500) return;
+          lastRefresh = now;
           refresh();
         });
       } catch {
@@ -636,7 +640,12 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     const startTimer = setTimeout(() => {
       if (wsConnectedRef.current) return; // WS connected, no need to poll
 
+      let pollInFlight = false;
       pollRef.current = setInterval(async () => {
+        // Skip if the previous poll hasn't returned — under load a slow
+        // response must not let 5s-spaced requests pile up and stampede.
+        if (pollInFlight) return;
+        pollInFlight = true;
         try {
           const msgRes = await sdk.chat.messages(conversationId, { limit: 20 });
           const rawMessages = msgRes.data || [];
@@ -649,7 +658,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           })).filter((m: any) => m.content); // Skip blank messages
 
           setMessages(allServerMsgs);
-        } catch {}
+        } catch {} finally { pollInFlight = false; }
       }, 5000);
 
     }, 2000); // Wait 2s for WS to connect before falling back to polling

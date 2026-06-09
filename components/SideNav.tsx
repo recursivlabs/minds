@@ -185,6 +185,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     (async () => {
       try {
         await sdk.realtime.connect();
+        let lastConvoRefresh = 0;
         unsub = sdk.realtime.onMessage((msg: any) => {
           const convoId = msg.conversationId || msg.conversation_id;
           if (!convoId) return;
@@ -197,7 +198,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             setUnreadConvos(prev => new Set(prev).add(convoId));
           }
           setLastMessageConvoId(convoId);
-          refreshConvos();
+          // Throttle: a busy thread shouldn't refetch the conversation list
+          // once per message.
+          const now = Date.now();
+          if (now - lastConvoRefresh >= 1500) { lastConvoRefresh = now; refreshConvos(); }
         });
       } catch {}
     })();
