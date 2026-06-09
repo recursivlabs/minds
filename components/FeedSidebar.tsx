@@ -48,15 +48,17 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={({ pressed, hovered }: any) => ({
         flexDirection: 'row', alignItems: 'center', gap: spacing.md,
         paddingVertical: spacing.sm,
+        marginHorizontal: -spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.sm,
+        backgroundColor: hovered ? colors.glass : 'transparent',
         opacity: pressed ? 0.7 : 1,
-        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
       })}
     >
       <Avatar uri={avatar} name={name} size="sm" />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Text variant="body" numberOfLines={1} style={{ fontSize: 13, flex: 1 }}>{name}</Text>
           {badge && (
@@ -66,7 +68,7 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
           )}
         </View>
         {subtitle && <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{subtitle}</Text>}
-        {description && <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ fontSize: 11, marginTop: 1, lineHeight: 15 }}>{description}</Text>}
+        {description && <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ fontSize: 11, marginTop: 1, lineHeight: 15 }}>{description}</Text>}
       </View>
     </Pressable>
   );
@@ -111,10 +113,12 @@ export function FeedSidebar() {
             <Pressable
               key={post.id}
               onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
-              style={({ pressed }) => ({
+              style={({ pressed, hovered }: any) => ({
                 paddingVertical: spacing.sm,
+                marginHorizontal: -spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.sm,
+                backgroundColor: hovered ? colors.glass : 'transparent',
                 opacity: pressed ? 0.7 : 1,
-                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
               })}
             >
               <Text variant="body" numberOfLines={2} style={{ fontSize: 13 }}>

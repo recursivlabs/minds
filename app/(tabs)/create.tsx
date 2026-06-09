@@ -429,7 +429,7 @@ export default function CreateScreen() {
     : 'Create Community';
 
   return (
-    <Container safeTop padded={false}>
+    <Container safeTop padded={false} maxWidth={600}>
       {/* Header */}
       <View
         style={{
@@ -606,7 +606,7 @@ export default function CreateScreen() {
                 onChangeText={setBlogTitle}
                 style={{
                   color: colors.text,
-                  fontFamily: 'Geist-SemiBold',
+                  fontFamily: 'Roboto-Medium',
                   fontSize: 22,
                   lineHeight: 28,
                   padding: 0,

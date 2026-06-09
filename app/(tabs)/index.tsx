@@ -409,47 +409,59 @@ export default function FeedScreen() {
     </>
   );
 
+  const feedTabsRow = (
+    <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+      <View style={{ flex: 1 }}>
+        <FeedTabs active={activeTab} onChange={setActiveTab} unread={freshCounts} />
+      </View>
+      {activeTab === 'foryou' && (
+        <Pressable
+          onPress={recurate}
+          disabled={refreshing}
+          hitSlop={8}
+          style={({ pressed }) => ({
+            paddingHorizontal: spacing.xl,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderSubtle,
+            opacity: refreshing ? 0.5 : pressed ? 0.7 : 1,
+          })}
+          accessibilityLabel="Refresh feed"
+        >
+          <Ionicons
+            name={refreshing ? 'sync' : 'refresh-outline'}
+            size={18}
+            color={colors.textMuted}
+          />
+        </Pressable>
+      )}
+    </View>
+  );
+
   return (
     <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>
       <Header />
-      <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
-        <View style={{ flex: 1 }}>
-          <FeedTabs active={activeTab} onChange={setActiveTab} unread={freshCounts} />
-        </View>
-        {activeTab === 'foryou' && (
-          <Pressable
-            onPress={recurate}
-            disabled={refreshing}
-            hitSlop={8}
-            style={({ pressed }) => ({
-              paddingHorizontal: spacing.xl,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderBottomWidth: 1,
-              borderBottomColor: colors.borderSubtle,
-              opacity: refreshing ? 0.5 : pressed ? 0.7 : 1,
-            })}
-            accessibilityLabel="Refresh feed"
-          >
-            <Ionicons
-              name={refreshing ? 'sync' : 'refresh-outline'}
-              size={18}
-              color={colors.textMuted}
-            />
-          </Pressable>
-        )}
-      </View>
-
       {isDesktopWeb ? (
-        <View style={{ flex: 1, flexDirection: 'row', paddingHorizontal: spacing.xl }}>
-          <View style={{ flex: 1 }}>{feedContent}</View>
-          <View style={{ width: spacing.xl }} />
-          <View style={{ width: 340 }}><FeedSidebar /></View>
+        // X/Bluesky desktop: a centered [timeline (≤600) | rail (340)] group.
+        // The tabs sit directly above the timeline; the SideNav stays pinned left.
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <View style={{ width: '100%', maxWidth: 960, flex: 1, flexDirection: 'row', paddingHorizontal: spacing.xl }}>
+            <View style={{ flex: 1, maxWidth: 600, minWidth: 0 }}>
+              {feedTabsRow}
+              <View style={{ flex: 1 }}>{feedContent}</View>
+            </View>
+            <View style={{ width: spacing.xl }} />
+            <View style={{ width: 340 }}><FeedSidebar /></View>
+          </View>
         </View>
       ) : (
-        <GestureDetector gesture={swipeGesture}>
-          <View style={{ flex: 1 }}>{feedContent}</View>
-        </GestureDetector>
+        <>
+          {feedTabsRow}
+          <GestureDetector gesture={swipeGesture}>
+            <View style={{ flex: 1 }}>{feedContent}</View>
+          </GestureDetector>
+        </>
       )}
 
       <Pressable

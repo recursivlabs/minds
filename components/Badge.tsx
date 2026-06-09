@@ -15,10 +15,10 @@ interface Props {
 // Built per-render so accent/accentMuted track the active theme.
 function badgeConfig(colors: ColorTokens): Record<BadgeType, { icon: string; color: string; label: string; bg: string }> {
   return {
-    verified: { icon: 'checkmark-circle', color: '#4DA6FF', label: 'Verified', bg: 'rgba(77,166,255,0.12)' },
+    verified: { icon: 'checkmark-circle', color: colors.verified, label: 'Verified', bg: colors.verifiedMuted },
     admin: { icon: 'shield', color: colors.accent, label: 'Admin', bg: colors.accentMuted },
     agent: { icon: 'hardware-chip', color: colors.accent, label: 'AI', bg: colors.accentMuted },
-    pro: { icon: 'star', color: '#FFD700', label: 'Pro', bg: 'rgba(255,215,0,0.12)' },
+    pro: { icon: 'star', color: colors.token, label: 'Pro', bg: colors.tokenMuted },
     plus: { icon: 'add-circle', color: colors.accent, label: 'Plus', bg: colors.accentMuted },
   };
 }

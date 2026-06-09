@@ -39,7 +39,7 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
         .replace(/color:#a0a0a8/g, `color:${isOwn ? '#ffffffaa' : '#a0a0a8'}`);
       return (
         <div
-          style={{ color: textColor, fontSize: 15, lineHeight: '22px', fontFamily: 'Geist-Regular', wordBreak: 'break-word' as any }}
+          style={{ color: textColor, fontSize: 15, lineHeight: '22px', fontFamily: 'Roboto-Regular', wordBreak: 'break-word' as any }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -52,7 +52,7 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
         {segments.map((seg, i) => {
           if (seg.type === 'bold') return <Text key={i} variant="bodyMedium" color={textColor}>{seg.text}</Text>;
           if (seg.type === 'italic') return <Text key={i} variant="body" color={textColor} style={{ fontStyle: 'italic' }}>{seg.text}</Text>;
-          if (seg.type === 'code') return <Text key={i} variant="mono" color={colors.textSecondary} style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 4, borderRadius: 3 }}>{seg.text}</Text>;
+          if (seg.type === 'code') return <Text key={i} variant="mono" color={colors.textSecondary} style={{ backgroundColor: colors.surfaceRaised, paddingHorizontal: 4, borderRadius: radius.sm }}>{seg.text}</Text>;
           if (seg.type === 'break') return <Text key={i}>{'\n'}</Text>;
           return <Text key={i}>{seg.text}</Text>;
         })}
