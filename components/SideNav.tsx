@@ -124,6 +124,25 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     return () => { cleanups.forEach(fn => fn()); };
   }, [sdk, refreshNotifs, refreshConvos]);
 
+  // Seed unread dots from the server's unread counts on every conversation
+  // refresh. The live WS listener below only catches messages that land while
+  // the SideNav is mounted + subscribed — so a message delivered earlier (e.g.
+  // the personal agent's first DM, or anything that arrived before this tab
+  // opened) would show no unread dot. This back-fills from server truth. Items
+  // are cleared from the set when the user opens the conversation.
+  React.useEffect(() => {
+    const serverUnread = (conversations || [])
+      .filter((c: any) => (c.unreadCount ?? c.unread_count ?? 0) > 0)
+      .map((c: any) => c.id as string);
+    if (serverUnread.length === 0) return;
+    setUnreadConvos(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of serverUnread) if (!next.has(id)) { next.add(id); changed = true; }
+      return changed ? next : prev;
+    });
+  }, [conversations]);
+
   // Personal-agent intro back-fill. Runs once per app load. If the
   // user has a personal agent and that thread has no agent-authored
   // message yet, post the intro DM. Covers accounts whose original

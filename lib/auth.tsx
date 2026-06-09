@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Platform } from 'react-native';
 import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
@@ -270,6 +271,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setAuthedSdk(null);
     setProjectId(null);
+    // On web, force a hard navigation to the logged-out homepage. A soft
+    // router.replace can leave the authed shell mounted (stale context/SDK)
+    // until the user manually refreshes — a full reload guarantees a clean
+    // signed-out state.
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.replace('/');
+    }
   }, []);
 
   const value = React.useMemo(

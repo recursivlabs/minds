@@ -238,7 +238,7 @@ export default function UserProfileScreen() {
 
   if (loading) {
     return (
-      <Container safeTop padded={false} maxWidth={600}>
+      <Container safeTop padded={false}>
         <ScreenHeader title="" />
         <View style={{ padding: spacing['3xl'], gap: spacing.lg }}>
           <Skeleton width={80} height={80} borderRadius={40} />
@@ -251,7 +251,7 @@ export default function UserProfileScreen() {
 
   if (error || !profile) {
     return (
-      <Container safeTop padded={false} maxWidth={600}>
+      <Container safeTop padded={false}>
         <ScreenHeader title="User" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Text variant="body" color={colors.textMuted}>{error || 'User not found'}</Text>

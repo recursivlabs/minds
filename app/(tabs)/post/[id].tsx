@@ -52,6 +52,9 @@ export default function PostDetailScreen() {
       });
       if (res.data) {
         const newReply = {
+          tags: [],
+          reactions_count: 0,
+          reply_count: 0,
           ...res.data,
           author: { id: user?.id, name: user?.name, username: user?.username, image: user?.image },
         };
