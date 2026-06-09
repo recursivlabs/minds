@@ -7,7 +7,7 @@ import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTheme } from '../lib/theme';
-import { useConversations } from '../lib/hooks';
+import { useConversations, useCommunities } from '../lib/hooks';
 import { ensureIntroDM } from '../lib/agentIntro';
 import { invalidate } from '../lib/cache';
 import { getPreference } from '../lib/preferences';
@@ -51,6 +51,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { user, sdk } = useAuth();
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
+  const { communities } = useCommunities(5);
   const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
   const [lastMessageConvoId, setLastMessageConvoId] = React.useState<string | null>(null);
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
@@ -260,12 +261,21 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     })
     .filter(Boolean)
     .slice(0, 4) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string }>;
-  // The Recent inbox is for conversations (DMs + community group chats the user
-  // is actually in — those arrive via the conversations list above). We do NOT
-  // surface community *memberships* here: that cluttered the inbox with
-  // communities the user never messaged in (and, when membership got
-  // auto-created by other actions, ones they didn't knowingly join).
-  const inboxItems = recentDMs;
+  // Communities the user is a member of. Strict is_member check (only true).
+  // NOTE: this reflects real communityMember rows — if a community the user
+  // never joined appears here, the fix is at the source (an auto-join path
+  // creating the membership), not this filter.
+  const recentCommunities = (communities || [])
+    .filter((c: any) => c.is_member === true || c.isMember === true)
+    .slice(0, 3)
+    .map((c: any) => ({
+      id: c.id,
+      type: 'community' as const,
+      name: c.name || 'Community',
+      avatar: c.image || c.avatar || null,
+      preview: `${c.memberCount || c.member_count || 0} members`,
+    }));
+  const inboxItems = [...recentDMs, ...recentCommunities];
 
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.name);
