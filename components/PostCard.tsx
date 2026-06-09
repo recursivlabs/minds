@@ -8,6 +8,7 @@ import { VoteButtons } from './VoteButtons';
 import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { useAuth } from '../lib/auth';
+import { postScore, postUserVote, postRepostCount } from '../lib/models';
 import { BASE_ORIGIN, ORG_ID } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
@@ -47,10 +48,8 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const { sdk, user } = useAuth();
   const toast = useToast();
   const colors = useColors();
-  const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(
-    post.userReaction || post.user_reaction || post.userVote || post.user_vote || null
-  );
-  const [score, setScore] = React.useState(post.score ?? post.vote_count ?? post.voteCount ?? 0);
+  const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(postUserVote(post));
+  const [score, setScore] = React.useState(postScore(post));
   const [showMenu, setShowMenu] = React.useState(false);
   const [menuPos, setMenuPos] = React.useState<{ x: number; y: number } | null>(null);
   const [showReport, setShowReport] = React.useState(false);
@@ -72,9 +71,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   // Repost count (X/Bluesky parity). Sourced from the original post's
   // reposts_count and adjusted optimistically as the viewer reposts/undoes.
   const _repostSource = post.reposted_from || post.repostedFrom || post;
-  const [repostCount, setRepostCount] = React.useState<number>(
-    _repostSource?.reposts_count ?? _repostSource?.repostsCount ?? 0
-  );
+  const [repostCount, setRepostCount] = React.useState<number>(postRepostCount(_repostSource));
 
   // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {

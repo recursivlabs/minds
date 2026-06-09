@@ -15,6 +15,7 @@ import { getBookmarks } from '../../../lib/bookmarks';
 import { getCached } from '../../../lib/cache';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
+import { profileFollowerCount, profileFollowingCount } from '../../../lib/models';
 
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 
@@ -173,10 +174,10 @@ export default function UserProfileScreen() {
     return () => { cancelled = true; };
   }, [profile?.id, sdk, username]);
 
-  // SDK returns followers_count / following_count (plural). Older code only
-  // read the singular forms, so the base count was always 0 and never moved.
-  const baseFollowerCount = profile?.followersCount ?? profile?.followers_count ?? profile?.followerCount ?? profile?.follower_count ?? 0;
-  const followingCount = profile?.followingCount ?? profile?.following_count ?? 0;
+  // Counts via the centralized, unit-tested accessors (handles the
+  // followers_count vs follower_count drift that caused a real bug).
+  const baseFollowerCount = profileFollowerCount(profile);
+  const followingCount = profileFollowingCount(profile);
   const [followerOffset, setFollowerOffset] = React.useState(0);
   const followerCount = baseFollowerCount + followerOffset;
 
