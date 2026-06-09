@@ -20,6 +20,7 @@ import { TabBar } from '../../components/TabBar';
 import { MentionPicker, useMentions } from '../../components/MentionPicker';
 import { LinkPreview } from '../../components/LinkPreview';
 import { getLatestDraft, saveDraft, deleteDraft, clearDraft } from '../../lib/drafts';
+import { captureException } from '../../lib/sentry';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
@@ -417,6 +418,7 @@ export default function CreateScreen() {
         router.back();
       }
     } catch (err: any) {
+      captureException(err, { action: 'create', mode });
       const errMsg = err?.message || 'Something went wrong';
       setSuccessMsg(null);
       showError(errMsg);

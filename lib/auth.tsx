@@ -4,6 +4,7 @@ import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
 import { registerPushToken, registerTokenWithServer } from './notifications';
+import { captureException } from './sentry';
 import { clearAll as clearCacheAll } from './cache';
 
 function registerPushTokenBackground(sdk: Recursiv) {
@@ -112,7 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProjectId(storedProjectId);
           registerPushTokenBackground(sdk);
         }
-      } catch {
+      } catch (err) {
+        // An unexpected error during boot logs the user out — make it visible
+        // so we can tell a real failure from an expected token expiry.
+        captureException(err, { phase: 'auth_boot' });
         await clearStorage();
       } finally {
         setIsLoading(false);
