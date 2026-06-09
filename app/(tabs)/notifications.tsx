@@ -10,8 +10,21 @@ import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { loadLastCuratedAt } from '../../lib/onboarding';
 import { getPreference } from '../../lib/preferences';
+import { getItemSync, setItem } from '../../lib/storage';
 import { spacing } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
+
+// The "Your agent updated your feed" alert is client-synthesised, so there's
+// no server record to mark read. We persist the curate timestamp the user
+// last acknowledged; any agent alert at or before it renders as read. This
+// makes the read state survive a refresh instead of perpetually re-appearing.
+const AGENT_NOTIF_READ_KEY = 'minds:agentNotifReadAt';
+function getAgentNotifReadAt(): number {
+  return Number(getItemSync(AGENT_NOTIF_READ_KEY) || 0);
+}
+function setAgentNotifReadAt(ts: number) {
+  setItem(AGENT_NOTIF_READ_KEY, String(ts));
+}
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -49,6 +62,7 @@ export default function NotificationsScreen() {
               ({
                 id: `agent-curated-${lastCurated}`,
                 _agentSourced: true,
+                _curatedAt: lastCurated,
                 title: 'Your agent updated your feed',
                 body: 'Pull to refresh your For You for the latest takes.',
                 targetType: 'agent',
@@ -57,7 +71,8 @@ export default function NotificationsScreen() {
                 action_url: '/(tabs)',
                 createdAt: new Date(lastCurated).toISOString(),
                 created_at: new Date(lastCurated).toISOString(),
-                status: 'unread',
+                // Read state is persisted client-side so it survives refresh.
+                status: lastCurated <= getAgentNotifReadAt() ? 'read' : 'unread',
               } as any),
               ...items,
             ];
@@ -108,7 +123,11 @@ export default function NotificationsScreen() {
 
   const handlePress = (notif: any) => {
     // Mark as read
-    if (notif.id && notif.status === 'unread' && sdk) {
+    if (notif._agentSourced) {
+      // Persist so it stays read across refreshes (no server record to PATCH).
+      if (notif._curatedAt) setAgentNotifReadAt(notif._curatedAt);
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
+    } else if (notif.id && notif.status === 'unread' && sdk) {
       sdk.notifications.markAsRead(notif.id).catch(() => {});
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
     }
@@ -135,10 +154,14 @@ export default function NotificationsScreen() {
   };
 
   const markAllRead = async () => {
+    // Acknowledge the client-synthesised agent alert too, so it doesn't
+    // bounce back to unread on the next fetch.
+    const agentTs = notifications.find(n => n._agentSourced)?._curatedAt;
+    if (agentTs) setAgentNotifReadAt(agentTs);
+    setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
     if (!sdk) return;
     try {
       await sdk.notifications.markAllAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
     } catch {}
   };
 
@@ -219,7 +242,9 @@ export default function NotificationsScreen() {
             );
             const handleDismiss = () => {
               setNotifications(prev => prev.filter(n => n.id !== item.id));
-              if (sdk && item.id && item.status === 'unread' && !item._agentSourced) {
+              if (item._agentSourced) {
+                if (item._curatedAt) setAgentNotifReadAt(item._curatedAt);
+              } else if (sdk && item.id && item.status === 'unread') {
                 sdk.notifications.markAsRead(item.id).catch(() => {});
               }
             };

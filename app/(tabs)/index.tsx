@@ -29,6 +29,18 @@ function formatRelativeTime(ts: number): string {
   return `${d}d ago`;
 }
 
+// Animated "…" that cycles while the agent is thinking, so curation reads as
+// active work rather than a frozen UI.
+function useThinkingDots(active: boolean): string {
+  const [n, setN] = React.useState(0);
+  React.useEffect(() => {
+    if (!active) { setN(0); return; }
+    const id = setInterval(() => setN(x => (x + 1) % 4), 400);
+    return () => clearInterval(id);
+  }, [active]);
+  return '.'.repeat(n);
+}
+
 type FeedTab = 'foryou' | 'following';
 
 export default function FeedScreen() {
@@ -113,6 +125,23 @@ export default function FeedScreen() {
     following: 'following',
   } as const;
   const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
+
+  // Curating wrapper: drives the live "your agent is curating…" banner and
+  // refreshes the timestamp the moment it finishes, so the banner flips to
+  // "just now" without needing a manual reload.
+  const [curating, setCurating] = React.useState(false);
+  const curatingDots = useThinkingDots(curating);
+  const handleCurate = React.useCallback(async () => {
+    setCurating(true);
+    try {
+      await recurate();
+    } finally {
+      setCurating(false);
+      const now = Date.now();
+      setLastCurateAt(now);
+      void setItem(LAST_CURATE_AT_KEY, String(now));
+    }
+  }, [recurate]);
 
   // Horizontal-swipe nav between feed filters. Pan past 60px without
   // significant vertical drift cycles to the next/previous tab. Vertical
@@ -284,16 +313,22 @@ export default function FeedScreen() {
                   </View>
                 </Pressable>
               )}
-              {activeTab === 'foryou' && agentCtaState === 'hidden' && lastCurateAt && posts.length > 0 && (
+              {activeTab === 'foryou' && agentCtaState === 'hidden' && (curating || (lastCurateAt && posts.length > 0)) && (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
                   paddingHorizontal: spacing.xl, paddingVertical: spacing.md,
                   borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
                   backgroundColor: colors.surface,
                 }}>
-                  <Ionicons name="sparkles" size={14} color={colors.accent} />
-                  <Text variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                    Your agent curated this {formatRelativeTime(lastCurateAt)}
+                  {curating ? (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  ) : (
+                    <Ionicons name="sparkles" size={14} color={colors.accent} />
+                  )}
+                  <Text variant="caption" color={curating ? colors.accent : colors.textSecondary} style={{ flex: 1 }}>
+                    {curating
+                      ? `Your agent is curating your feed${curatingDots}`
+                      : `Your agent curated this ${formatRelativeTime(lastCurateAt as number)}`}
                   </Text>
                 </View>
               )}
@@ -338,7 +373,7 @@ export default function FeedScreen() {
               </Pressable>
             </>
           }
-          onRefresh={recurate}
+          onRefresh={handleCurate}
           refreshing={refreshing}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
@@ -384,7 +419,7 @@ export default function FeedScreen() {
                 </Text>
                 <View style={{ alignSelf: 'center' }}>
                   {activeTab === 'foryou' ? (
-                    <Button onPress={recurate} disabled={refreshing} size="sm">
+                    <Button onPress={handleCurate} disabled={refreshing} size="sm">
                       {refreshing ? 'Curating…' : 'Curate now'}
                     </Button>
                   ) : (
@@ -409,7 +444,7 @@ export default function FeedScreen() {
       </View>
       {activeTab === 'foryou' && (
         <Pressable
-          onPress={recurate}
+          onPress={handleCurate}
           disabled={refreshing}
           hitSlop={8}
           style={({ pressed }) => ({

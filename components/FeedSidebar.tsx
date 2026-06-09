@@ -99,6 +99,36 @@ export function FeedSidebar() {
       }}
       showsVerticalScrollIndicator={false}
     >
+      {/* Search — opens the global Cmd+K command palette. Sits at the top of
+         the right rail like X, so discovery lives with the trends column. */}
+      {Platform.OS === 'web' && (
+        <Pressable
+          onPress={() => {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
+            }
+          }}
+          style={({ pressed, hovered }: any) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            paddingVertical: spacing.sm + 2,
+            paddingHorizontal: spacing.md,
+            borderRadius: radius.full,
+            backgroundColor: pressed || hovered ? colors.surfaceHover : colors.surface,
+            borderWidth: 0.5,
+            borderColor: colors.borderSubtle,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
+          })}
+        >
+          <Ionicons name="search" size={15} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted} style={{ flex: 1 }}>Search anywhere</Text>
+          <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: radius.xs, borderWidth: 0.5, borderColor: colors.borderSubtle }}>
+            <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>⌘K</Text>
+          </View>
+        </Pressable>
+      )}
+
       {/* Trending Posts */}
       <SidebarSection
         title="Trending Posts"

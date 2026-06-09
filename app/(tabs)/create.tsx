@@ -19,7 +19,7 @@ import { Container } from '../../components/Container';
 import { TabBar } from '../../components/TabBar';
 import { MentionPicker, useMentions } from '../../components/MentionPicker';
 import { LinkPreview } from '../../components/LinkPreview';
-import { getLatestDraft, saveDraft, deleteDraft } from '../../lib/drafts';
+import { getLatestDraft, saveDraft, deleteDraft, clearDraft } from '../../lib/drafts';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
@@ -311,7 +311,8 @@ export default function CreateScreen() {
         setMediaIsVideo(false);
         setVideoPct(null);
         setIsNsfw(false);
-        if (draftRef.current) deleteDraft(draftRef.current);
+        clearDraft();
+        draftRef.current = null;
         // Land on the Following feed so you see your just-posted content as
         // immediate proof it worked (your own posts now show there).
         router.replace({ pathname: '/(tabs)', params: { tab: 'following' } });
