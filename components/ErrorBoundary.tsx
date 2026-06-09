@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { View, Pressable } from 'react-native';
 import { Text } from './Text';
-import { captureException } from '../lib/sentry';
+import { captureException } from '../lib/monitoring';
 import { colors, spacing } from '../constants/theme';
 
 interface Props {

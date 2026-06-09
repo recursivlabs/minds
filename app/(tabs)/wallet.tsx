@@ -7,7 +7,7 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
-import { captureException } from '../../lib/sentry';
+import { captureException } from '../../lib/monitoring';
 
 export default function WalletScreen() {
   const { sdk } = useAuth();

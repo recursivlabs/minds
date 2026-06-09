@@ -15,7 +15,7 @@ import { getCached, setCache, invalidate } from '../../lib/cache';
 import { useSetActiveConvoId } from '../../lib/activeConvo';
 import { ThinkingPill } from '../../components/ThinkingPill';
 import { ensureIntroDM } from '../../lib/agentIntro';
-import { captureException } from '../../lib/sentry';
+import { captureException } from '../../lib/monitoring';
 import { conversationUnreadCount, isAiActor } from '../../lib/models';
 
 export default function ChatScreen() {

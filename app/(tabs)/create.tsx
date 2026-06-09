@@ -20,7 +20,7 @@ import { TabBar } from '../../components/TabBar';
 import { MentionPicker, useMentions } from '../../components/MentionPicker';
 import { LinkPreview } from '../../components/LinkPreview';
 import { getLatestDraft, saveDraft, deleteDraft, clearDraft } from '../../lib/drafts';
-import { captureException } from '../../lib/sentry';
+import { captureException } from '../../lib/monitoring';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
