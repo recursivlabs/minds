@@ -65,6 +65,9 @@ try {
 
   // cleanup
   for (const fn of [()=>B.profiles.unfollow(meA.id),()=>B.posts.delete(reply.id),()=>B.posts.delete(repost.id),()=>A.posts.delete(post.id),()=>A.chat.deleteConversation(dm.id)]) { try{await fn();}catch{} }
+
+  // Non-zero exit on any failed check, so CI / synthetic monitoring alerts.
+  if (fails > 0) process.exit(1);
 } catch (err) {
   console.error('PARITY ERROR:', err?.message||err, err?.status||'', JSON.stringify(err?.body||''));
   process.exit(1);
