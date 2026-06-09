@@ -6,7 +6,7 @@ import { filterMuted } from './muted';
 import { loadPreferences, markCuratedNow } from './onboarding';
 import { buildCuratorRequest } from './curator';
 import { getPreference } from './preferences';
-import { captureException } from './sentry';
+import { captureException } from './monitoring';
 
 /**
  * Fetch posts from the feed.

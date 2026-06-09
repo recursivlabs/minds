@@ -21,12 +21,12 @@ import { ToastProvider } from '../components/Toast';
 import { NetworkBanner } from '../components/NetworkBanner';
 import { CommandPalette } from '../components/CommandPalette';
 import { ActiveConvoProvider } from '../lib/activeConvo';
-import { initSentry } from '../lib/sentry';
+import { initMonitoring } from '../lib/monitoring';
 import { injectWebStyles } from '../lib/webStyles';
 import { initKeyboardShortcuts } from '../lib/keyboard';
 import { setupNotificationListeners } from '../lib/notifications';
 
-initSentry();
+initMonitoring();
 injectWebStyles();
 initKeyboardShortcuts();
 

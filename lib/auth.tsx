@@ -4,7 +4,7 @@ import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
 import { registerPushToken, registerTokenWithServer } from './notifications';
-import { captureException } from './sentry';
+import { captureException } from './monitoring';
 import { clearAll as clearCacheAll } from './cache';
 
 function registerPushTokenBackground(sdk: Recursiv) {
