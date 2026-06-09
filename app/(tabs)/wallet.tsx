@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, TextInput, Alert, Platform } from 'react-native';
+import { View, TextInput, Alert, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Card, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
@@ -7,26 +7,35 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
+import { captureException } from '../../lib/sentry';
 
 export default function WalletScreen() {
   const { sdk } = useAuth();
   const colors = useColors();
   const [wallet, setWallet] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState(false);
   const [sendTo, setSendTo] = React.useState('');
   const [sendAmount, setSendAmount] = React.useState('');
   const [sending, setSending] = React.useState(false);
 
-  React.useEffect(() => {
+  const loadWallet = React.useCallback(async () => {
     if (!sdk) return;
-    (async () => {
-      try {
-        const res = await sdk.wallet.getMyWallet();
-        setWallet(res.data);
-      } catch {}
+    setLoadError(false);
+    setLoading(true);
+    try {
+      const res = await sdk.wallet.getMyWallet();
+      setWallet(res.data);
+    } catch (err) {
+      // Don't let a fetch failure masquerade as "no wallet yet".
+      captureException(err, { screen: 'wallet' });
+      setLoadError(true);
+    } finally {
       setLoading(false);
-    })();
+    }
   }, [sdk]);
+
+  React.useEffect(() => { loadWallet(); }, [loadWallet]);
 
   const handleSend = async () => {
     if (!sdk || !sendTo.trim() || !sendAmount.trim()) return;
@@ -53,6 +62,17 @@ export default function WalletScreen() {
         <View style={{ padding: spacing.xl, gap: spacing.xl }}>
           <Skeleton height={120} />
           <Skeleton height={80} />
+        </View>
+      ) : loadError ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+          <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
+          <Text variant="body" color={colors.textSecondary} align="center">Couldn't load your wallet.</Text>
+          <Pressable
+            onPress={loadWallet}
+            style={({ pressed }) => ({ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full, backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 })}
+          >
+            <Text variant="bodyMedium" color={colors.textOnAccent}>Retry</Text>
+          </Pressable>
         </View>
       ) : !wallet?.configured ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
