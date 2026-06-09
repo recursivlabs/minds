@@ -92,7 +92,7 @@ function ToastItem({ toast }: { toast: Toast }) {
         borderRadius: radius.full,
         marginBottom: spacing.sm,
         borderWidth: 0.5,
-        borderColor: textColor + '30',
+        borderColor: `${textColor}30`,
         ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } as any : {}),
       }}
     >

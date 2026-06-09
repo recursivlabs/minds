@@ -219,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyOtp = React.useCallback(async (email: string, otp: string) => {
     const result = await anonSdk.auth.verifyOtpAndCreateKey(
       { email, otp },
-      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
+      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
     );
 
     await persistSession(result.apiKey, {
@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = React.useCallback(async (name: string, email: string, password: string) => {
     const result = await anonSdk.auth.signUpAndCreateKey(
       { name, email, password },
-      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
+      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
     );
 
     await persistSession(result.apiKey, {
@@ -251,7 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = React.useCallback(async (email: string, password: string) => {
     const result = await anonSdk.auth.signInAndCreateKey(
       { email, password },
-      { name: 'minds-' + Date.now(), scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
+      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
     );
 
     await persistSession(result.apiKey, {

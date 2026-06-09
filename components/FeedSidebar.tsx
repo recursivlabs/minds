@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import { View, Pressable, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

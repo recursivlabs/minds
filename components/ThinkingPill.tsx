@@ -91,7 +91,7 @@ function PulsingOrb({ color, active }: { color: string; active: boolean }) {
   if (Platform.OS === 'web') {
     return (
       <>
-        <style>{`@keyframes mindsThinkingPulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.4); opacity: 1; } }`}</style>
+        <style>{"@keyframes mindsThinkingPulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.4); opacity: 1; } }"}</style>
         <span
           style={{
             display: 'inline-block',

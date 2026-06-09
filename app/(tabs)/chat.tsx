@@ -692,7 +692,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     // Optimistic insert FIRST so the message appears the instant the
     // user hits send — no waiting on the server round-trip. Reconciled
     // with the real server id when the response lands. iMessage feel.
-    const tempId = 'temp-' + Date.now();
+    const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, {
       id: tempId,
       content: messageText,
@@ -733,7 +733,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       // streaming. Net effect: Claude-style typed-out reply instead
       // of a long pause followed by a paste.
       if (isAgent && otherId) {
-        const streamingId = 'streaming-' + Date.now();
+        const streamingId = `streaming-${Date.now()}`;
         setMessages(prev => [...prev, {
           id: streamingId,
           content: '',

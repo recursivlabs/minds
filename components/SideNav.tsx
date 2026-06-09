@@ -102,7 +102,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // SDK doesn't expose typed helpers yet — use the underlying socket.
   React.useEffect(() => {
     if (!sdk) return;
-    let cleanups: Array<() => void> = [];
+    const cleanups: Array<() => void> = [];
     (async () => {
       try {
         await sdk.realtime.connect();

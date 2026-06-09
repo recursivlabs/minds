@@ -95,8 +95,7 @@ export default function ProtocolsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: spacing['5xl'] }}>
         {tab === 'protocols' && (
-          <>
-            {protocols.length === 0 ? (
+          protocols.length === 0 ? (
               <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
                 <Ionicons name="globe-outline" size={40} color={colors.textMuted} />
                 <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>No protocols configured</Text>
@@ -113,8 +112,7 @@ export default function ProtocolsScreen() {
                   </View>
                 </View>
               </Card>
-            ))}
-          </>
+            ))
         )}
 
         {tab === 'search' && (

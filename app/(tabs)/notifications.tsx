@@ -43,7 +43,6 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = React.useState(true);
 
   const loadNotifications = React.useCallback(async () => {
-    {
       if (!sdk) { setLoading(false); return; }
       try {
         const res = await sdk.notifications.list({ limit: 30, organization_id: ORG_ID || undefined });
@@ -82,7 +81,6 @@ export default function NotificationsScreen() {
         setNotifications(items);
       } catch {}
       finally { setLoading(false); }
-    }
   }, [sdk]);
 
   // Initial load.

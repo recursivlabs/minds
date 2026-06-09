@@ -1,4 +1,4 @@
-import { Pressable, ActivityIndicator, ViewStyle, Platform } from 'react-native';
+import { Pressable, ActivityIndicator, type ViewStyle, Platform } from 'react-native';
 import { Text } from './Text';
 import { radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
