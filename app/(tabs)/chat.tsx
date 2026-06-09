@@ -419,6 +419,33 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const messageIdsRef = React.useRef<Set<string>>(new Set(cachedSorted.map((m: any) => m.id)));
 
+  // Scroll-position handling. We only auto-stick to the bottom when the user
+  // is already there — so an incoming message or a streaming reply never yanks
+  // them away from history they're reading. When they're scrolled up we surface
+  // a "jump to latest" affordance instead (Claude / iMessage behaviour).
+  const atBottomRef = React.useRef(true);
+  const [showJump, setShowJump] = React.useState(false);
+  const stickToBottom = React.useCallback((animated = false) => {
+    atBottomRef.current = true;
+    setShowJump(false);
+    requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated }));
+  }, []);
+  const handleScroll = React.useCallback((e: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    const near = distanceFromBottom < 120;
+    atBottomRef.current = near;
+    setShowJump(prev => (prev === !near ? prev : !near));
+  }, []);
+
+  // Agent conversations render Claude-style (full-width assistant text);
+  // human DMs keep iMessage bubbles on both sides.
+  const isAgentChat = !!(
+    partnerInfo?.isAi || partnerInfo?.is_ai
+    || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
+    || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent'
+  );
+
   // Load conversation info + messages in PARALLEL (not sequential)
   React.useEffect(() => {
     if (!sdk) return;
@@ -647,6 +674,9 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     const messageText = text.trim();
     setText('');
     setSending(true);
+    // Sending always pins you to the bottom — you want to see your own
+    // message and the reply that follows.
+    stickToBottom(true);
 
     // Optimistic insert FIRST so the message appears the instant the
     // user hits send — no waiting on the server round-trip. Reconciled
@@ -814,14 +844,18 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
             const senderId = item.sender?.id || item.senderId || item.sender_id;
-            return <ChatBubble message={item} isOwn={senderId === user?.id} />;
+            return <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} />;
           }}
           contentContainerStyle={{
             padding: spacing.xl,
             flexGrow: 1,
             justifyContent: messages.length === 0 ? 'center' : 'flex-end',
           }}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onScroll={handleScroll}
+          scrollEventThrottle={100}
+          // Only follow new content when the user is already at the bottom, so
+          // streaming tokens / incoming messages never interrupt scroll-back.
+          onContentSizeChange={() => { if (atBottomRef.current) flatListRef.current?.scrollToEnd({ animated: false }); }}
           ListFooterComponent={
             <>
               <ThinkingPill
@@ -845,6 +879,33 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           }
           showsVerticalScrollIndicator={false}
         />
+      )}
+
+      {/* Jump to latest — appears only when scrolled up, so streaming/incoming
+          messages never force the viewport down while you're reading back. */}
+      {showJump && !loading && (
+        <Pressable
+          onPress={() => stickToBottom(true)}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            alignSelf: 'center',
+            bottom: 84,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xs,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+            borderRadius: radius.full,
+            backgroundColor: colors.surfaceRaised,
+            borderWidth: 0.5,
+            borderColor: colors.borderSubtle,
+            opacity: pressed ? 0.85 : 1,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' } as any : {}),
+          })}
+        >
+          <Ionicons name="arrow-down" size={15} color={colors.text} />
+          <Text variant="caption" color={colors.text}>Latest</Text>
+        </Pressable>
       )}
 
       {/* Slash-command suggestions — only shown in agent conversations

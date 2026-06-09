@@ -8,9 +8,13 @@ import { useColors } from '../lib/theme';
 interface Props {
   message: any;
   isOwn: boolean;
+  // When true and this is the agent's message, render Claude-style: full-width
+  // plain text, no bubble. User messages stay in a bubble. For human DMs leave
+  // this false and both sides render as iMessage bubbles.
+  agentChat?: boolean;
 }
 
-export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Props) {
+export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agentChat }: Props) {
   const colors = useColors();
   const content = message.content || message.text || message.body || '';
   const timestamp = message.createdAt || message.created_at || '';
@@ -19,13 +23,15 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
   // bubble doesn't bounce-resize as new chunks land. Once `streaming`
   // goes false the timestamp + final layout render normally.
   const isStreaming = message.streaming === true;
+  // Claude-style document layout for the agent's side of an agent chat.
+  const isDocument = agentChat === true && !isOwn;
 
   const formattedTime = timestamp
     ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
 
-  const textColor = isOwn ? colors.textOnAccent : colors.text;
-  const linkColor = isOwn ? colors.textOnAccent : colors.accent;
+  const textColor = isDocument ? colors.text : isOwn ? colors.textOnAccent : colors.text;
+  const linkColor = isDocument ? colors.accent : isOwn ? colors.textOnAccent : colors.accent;
 
   const renderContent = () => {
     if (!hasMarkdown) {
@@ -59,6 +65,19 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn }: Pro
       </Text>
     );
   };
+
+  // Claude-style: the agent's reply is full-width plain text (no bubble), with
+  // a blinking caret while streaming. Reads like a document, not a chat bubble.
+  if (isDocument) {
+    return (
+      <View style={{ alignSelf: 'stretch', width: '100%', marginBottom: spacing.lg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <View style={{ flexShrink: 1 }}>{renderContent()}</View>
+          {isStreaming ? <StreamingCaret color={textColor} /> : null}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View
