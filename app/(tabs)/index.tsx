@@ -12,6 +12,7 @@ import { getPreference } from '../../lib/preferences';
 import { registerShortcut } from '../../lib/keyboard';
 import { getItem, setItem } from '../../lib/storage';
 import { loadPreferences, isAgentCtaDismissed, markAgentCtaDismissed, isAgentSetUp } from '../../lib/onboarding';
+import { MINDS_PERSONAL_AGENT_SYSTEM_PROMPT } from '../../lib/curator/prompts';
 import { spacing } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
@@ -101,12 +102,29 @@ export default function FeedScreen() {
         sdk.agents.list({ limit: 50 }).catch(() => ({ data: [] as any[] })),
       ]);
       if (!active) return;
-      const hasPersonal = ((agentsList as any).data || []).some(
+      const personal = ((agentsList as any).data || []).find(
         (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
       );
-      setAgentCtaState(dismissed || setUp || hasPersonal ? 'hidden' : 'show');
+      setAgentCtaState(dismissed || setUp || personal ? 'hidden' : 'show');
       const parsed = lastTs ? Number(lastTs) : NaN;
       setLastCurateAt(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+
+      // One-time persona heal: some personal agents were provisioned with the
+      // generic org (sales/SDR) system prompt, so they mis-describe their role
+      // ("I'm your SDR…"). If the current prompt is empty or sales-flavoured,
+      // stamp the Minds curator persona once. Guarded by a storage flag and a
+      // marker test so we never clobber a user's deliberately customised voice.
+      if (personal) {
+        const curPrompt = String(personal.ai_system_prompt || personal.aiSystemPrompt || '');
+        const looksWrong = !curPrompt.trim() || /\b(SDR|Apollo|outbound|lead[-\s]?gen|sales pipeline|CRM)\b/i.test(curPrompt);
+        const alreadyHealed = await getItem('minds:agentPersonaHealed');
+        if (looksWrong && alreadyHealed !== '1' && active) {
+          try {
+            await (sdk as any).agents.ensurePersonal({ overrides: { system_prompt: MINDS_PERSONAL_AGENT_SYSTEM_PROMPT } });
+            await setItem('minds:agentPersonaHealed', '1');
+          } catch {}
+        }
+      }
     })();
     return () => { active = false; };
   }, [user?.id, sdk]);
