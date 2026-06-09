@@ -14,8 +14,8 @@ import { getPreference } from '../lib/preferences';
 import { useActiveConvoId } from '../lib/activeConvo';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
 
-const COLLAPSED_WIDTH = 60;
-const EXPANDED_WIDTH = 240;
+const COLLAPSED_WIDTH = 68;
+const EXPANDED_WIDTH = 264;
 const COLLAPSE_KEY = 'minds:sidebar:collapsed';
 const AUTO_COLLAPSE_WIDTH = 1024;
 
@@ -295,7 +295,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           gap: spacing.md,
           paddingVertical: spacing.sm + 2,
           paddingHorizontal: collapsed ? 0 : spacing.md,
-          marginHorizontal: collapsed ? 0 : spacing.sm,
+          marginHorizontal: collapsed ? 0 : spacing.md,
+          marginRight: collapsed ? 0 : spacing.lg,
           borderRadius: radius.md,
           backgroundColor: active ? colors.accentSubtle : 'transparent',
           opacity: pressed ? 0.7 : 1,
@@ -580,7 +581,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               gap: spacing.md,
               paddingVertical: spacing.sm + 2,
               paddingHorizontal: collapsed ? 0 : spacing.md,
-              marginHorizontal: collapsed ? 0 : spacing.sm,
+              marginHorizontal: collapsed ? 0 : spacing.md,
+              marginRight: collapsed ? 0 : spacing.lg,
               borderRadius: radius.md,
               backgroundColor: (isActive('profile') || (user?.username && pathname?.includes(`/user/${user.username}`))) ? colors.accentSubtle : 'transparent',
               opacity: pressed ? 0.7 : 1,

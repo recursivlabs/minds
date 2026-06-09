@@ -445,7 +445,7 @@ export default function FeedScreen() {
       {isDesktopWeb ? (
         // X/Bluesky desktop: [timeline (≤600) | rail (340)] filling the content
         // column. The whole nav + content group is centered by the app shell.
-        <View style={{ flex: 1, flexDirection: 'row', paddingHorizontal: spacing.lg }}>
+        <View style={{ flex: 1, flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
           <View style={{ flex: 1, maxWidth: 600, minWidth: 0 }}>
             {feedTabsRow}
             <View style={{ flex: 1 }}>{feedContent}</View>
