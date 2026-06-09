@@ -69,20 +69,12 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
   // Claude-style: the agent's reply is full-width plain text (no bubble), with
   // a blinking caret while streaming. Reads like a document, not a chat bubble.
   if (isDocument) {
-    const awaitingFirstToken = isStreaming && !content.trim();
     return (
       <View style={{ alignSelf: 'stretch', width: '100%', marginBottom: spacing.lg }}>
-        {awaitingFirstToken ? (
-          // Before the first token lands, the response slot shows a typing
-          // indicator in place — which then becomes the streamed text. One
-          // indicator, in the right spot, exactly like Claude/OpenAI.
-          <TypingDots color={colors.textMuted} />
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <View style={{ flexShrink: 1 }}>{renderContent()}</View>
-            {isStreaming ? <StreamingCaret color={textColor} /> : null}
-          </View>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <View style={{ flexShrink: 1 }}>{renderContent()}</View>
+          {isStreaming ? <StreamingCaret color={textColor} /> : null}
+        </View>
       </View>
     );
   }
@@ -126,62 +118,6 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
     </View>
   );
 });
-
-// Three-dot typing indicator shown in the response slot before the first
-// token. Staggered pulse on web; a single shared Animated loop on native.
-function TypingDots({ color }: { color: string }) {
-  if (Platform.OS === 'web') {
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: spacing.xs }}>
-        <style>{`@keyframes mindsTypingBounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.35; } 40% { transform: translateY(-3px); opacity: 1; } }`}</style>
-        {[0, 1, 2].map(i => (
-          <span
-            key={i}
-            style={{
-              display: 'inline-block',
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: color,
-              animationName: 'mindsTypingBounce',
-              animationDuration: '1100ms',
-              animationIterationCount: 'infinite',
-              animationDelay: `${i * 160}ms`,
-            } as any}
-          />
-        ))}
-      </View>
-    );
-  }
-  return <NativeTypingDots color={color} />;
-}
-
-function NativeTypingDots({ color }: { color: string }) {
-  const { Animated } = require('react-native');
-  const dots = [React.useRef(new Animated.Value(0.35)).current, React.useRef(new Animated.Value(0.35)).current, React.useRef(new Animated.Value(0.35)).current];
-  React.useEffect(() => {
-    const loops = dots.map((v, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 160),
-          Animated.timing(v, { toValue: 1, duration: 350, useNativeDriver: true }),
-          Animated.timing(v, { toValue: 0.35, duration: 350, useNativeDriver: true }),
-          Animated.delay((2 - i) * 160),
-        ]),
-      ),
-    );
-    loops.forEach(l => l.start());
-    return () => loops.forEach(l => l.stop());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: spacing.xs }}>
-      {dots.map((v, i) => (
-        <Animated.View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, opacity: v }} />
-      ))}
-    </View>
-  );
-}
 
 // Blinking block caret rendered at the end of a streaming bubble.
 // Plain CSS @keyframes on web; alpha fade via Animated on native.

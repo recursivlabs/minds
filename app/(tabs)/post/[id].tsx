@@ -25,18 +25,26 @@ export default function PostDetailScreen() {
   const [replyText, setReplyText] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
-  // Seed replies from the post detail response only when we first land on
-  // a post (or when we navigate to a different post id). Using [post] as
-  // the dep caused any post state update — including our own reply-count
-  // increment after posting a reply — to clobber the optimistic reply
-  // append with the stale server list. Depend on post?.id instead so this
-  // runs exactly once per post.
+  // Keep replies in sync with the post detail response WHENEVER it changes —
+  // not just on first land. Previously this was keyed on post?.id and ran once
+  // per post, so replies fetched by the background revalidate (yours or other
+  // people's) never appeared until a full refresh. We merge by id and preserve
+  // any local optimistic replies the server hasn't returned yet, so a freshly
+  // posted reply is never clobbered by a lagging server list.
   React.useEffect(() => {
     if (!post) return;
-    setReplies(post.replies || []);
+    const serverReplies = post.replies || [];
+    setReplies(prev => {
+      const byId = new Map<string, any>();
+      for (const r of serverReplies) if (r?.id) byId.set(r.id, r);
+      for (const r of prev) if (r?.id && !byId.has(r.id)) byId.set(r.id, r);
+      return Array.from(byId.values()).sort((a, b) =>
+        new Date(a.createdAt || a.created_at || 0).getTime() - new Date(b.createdAt || b.created_at || 0).getTime()
+      );
+    });
     setRepliesLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?.id]);
+  }, [post?.replies]);
 
   const handleReply = async () => {
     if (!replyText.trim() || !sdk || !id) return;
