@@ -306,7 +306,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         <View style={{ position: 'relative' }}>
           <Ionicons
             name={(active ? item.activeIcon : item.icon) as any}
-            size={20}
+            size={22}
             color={active ? colors.accent : colors.textMuted}
           />
           {/* Gold dot badge for unread notifications */}
@@ -328,7 +328,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           <Text
             variant="body"
             color={active ? colors.accent : colors.textSecondary}
-            style={{ fontSize: 14, fontWeight: active ? '500' : '300' }}
+            style={{ fontSize: 15, fontFamily: active ? 'Roboto-Medium' : 'Roboto-Regular' }}
             numberOfLines={1}
           >
             {item.label}
@@ -387,7 +387,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                     <Text
                       variant="h2"
                       color={colors.accent}
-                      style={{ fontSize: 18, letterSpacing: 4, fontWeight: '300' }}
+                      style={{ fontSize: 20, letterSpacing: 0.5 }}
                     >
                       minds
                     </Text>

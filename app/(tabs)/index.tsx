@@ -443,10 +443,11 @@ export default function FeedScreen() {
     <Container safeTop padded={false} maxWidth={isDesktopWeb ? undefined : 600}>
       <Header />
       {isDesktopWeb ? (
-        // X/Bluesky desktop: a centered [timeline (≤600) | rail (340)] group.
-        // The tabs sit directly above the timeline; the SideNav stays pinned left.
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <View style={{ width: '100%', maxWidth: 960, flex: 1, flexDirection: 'row', paddingHorizontal: spacing.xl }}>
+        // X/Bluesky desktop: [timeline (≤600) | rail (340)] anchored right after
+        // the pinned SideNav (a left-anchored cluster, not floating mid-screen)
+        // with a comfortable gutter. The tabs sit directly above the timeline.
+        <View style={{ flex: 1, alignItems: 'flex-start' }}>
+          <View style={{ width: '100%', maxWidth: 988, flex: 1, flexDirection: 'row', paddingLeft: spacing['3xl'], paddingRight: spacing.xl }}>
             <View style={{ flex: 1, maxWidth: 600, minWidth: 0 }}>
               {feedTabsRow}
               <View style={{ flex: 1 }}>{feedContent}</View>
