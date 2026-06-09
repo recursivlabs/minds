@@ -20,6 +20,9 @@ export function Header({ showBack, title }: Props) {
   const isDesktop = Platform.OS === 'web' && width > 768;
 
   if (isDesktop) {
+    // No back button and no title → nothing to show. Don't render an empty bar
+    // (it was leaving a blank strip above the feed's For You/Following tabs).
+    if (!showBack && !title) return null;
     // Minimal desktop header — just page context, no logo/bell/avatar (all in sidebar)
     return (
       <View

@@ -66,7 +66,10 @@ export default function TabLayout() {
 
   if (isDesktop) {
     return (
-      <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.bg }}>
+      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', backgroundColor: colors.bg }}>
+        {/* Center the whole nav + content + rail group like X (equal empty
+            gutters on both sides), capped so it doesn't sprawl on wide screens. */}
+        <View style={{ flex: 1, flexDirection: 'row', maxWidth: 1280 }}>
         <SideNav collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
         <View style={{ flex: 1 }}>
           <Tabs
@@ -98,6 +101,7 @@ export default function TabLayout() {
             <Tabs.Screen name="user/[username]" options={{ href: null }} />
             <Tabs.Screen name="community/[id]" options={{ href: null }} />
           </Tabs>
+        </View>
         </View>
       </View>
     );
