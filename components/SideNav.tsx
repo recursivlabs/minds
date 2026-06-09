@@ -7,6 +7,7 @@ import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTheme } from '../lib/theme';
+import { conversationUnreadCount } from '../lib/models';
 import { useConversations, useCommunities } from '../lib/hooks';
 import { ensureIntroDM } from '../lib/agentIntro';
 import { invalidate } from '../lib/cache';
@@ -142,7 +143,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         const id = c.id as string;
         // The conversation you're reading is never unread.
         if (id === activeConvoIdFromPath) { next.delete(id); continue; }
-        const unread = (c.unreadCount ?? c.unread_count ?? 0) > 0;
+        const unread = conversationUnreadCount(c) > 0;
         if (unread) next.add(id);
         else next.delete(id); // server says read elsewhere → clear the dot
       }

@@ -16,6 +16,7 @@ import { useSetActiveConvoId } from '../../lib/activeConvo';
 import { ThinkingPill } from '../../components/ThinkingPill';
 import { ensureIntroDM } from '../../lib/agentIntro';
 import { captureException } from '../../lib/sentry';
+import { conversationUnreadCount, isAiActor } from '../../lib/models';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -251,11 +252,11 @@ export default function ChatScreen() {
             const other = item.participants?.find((p: any) => p.id !== user?.id) || item.participants?.[0];
             const name = item.name || other?.name || 'Conversation';
             const avatar = other?.image || null;
-            const isAgentConvo = other?.isAi || other?.is_ai || other?.type === 'agent';
+            const isAgentConvo = isAiActor(other);
             const lastMsg = item.lastMessage || item.last_message;
             const lastText = lastMsg?.content || lastMsg?.text || '';
             const time = lastMsg?.createdAt || lastMsg?.created_at || item.updatedAt || '';
-            const unread = item.unreadCount || item.unread_count || 0;
+            const unread = conversationUnreadCount(item);
 
             return (
               <Pressable
