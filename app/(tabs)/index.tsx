@@ -142,7 +142,7 @@ export default function FeedScreen() {
     foryou: aiEnabled ? 'personal' : 'latest',
     following: 'following',
   } as const;
-  const { posts, setPosts, loading: postsLoading, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
+  const { posts, setPosts, loading: postsLoading, error: feedError, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
   // Curating wrapper: drives the live "your agent is curating…" banner and
   // refreshes the timestamp the moment it finishes, so the banner flips to
@@ -325,6 +325,20 @@ export default function FeedScreen() {
       )}
       {postsLoading && posts.length === 0 ? (
         <FeedSkeletons count={5} />
+      ) : feedError && posts.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['2xl'], gap: spacing.lg }}>
+          <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
+          <Text variant="body" color={colors.textSecondary} align="center">Couldn't load your feed.</Text>
+          <Pressable
+            onPress={() => refresh()}
+            style={({ pressed }) => ({
+              paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full,
+              backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1,
+            })}
+          >
+            <Text variant="bodyMedium" color={colors.textOnAccent}>Retry</Text>
+          </Pressable>
+        </View>
       ) : (
         <FlatList
           ref={listRef}
