@@ -69,6 +69,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   // a reload, the server-side `viewer_reposted_id` flag (TBD) will
   // restore this. For now the toggle works within the session.
   const [myRepostId, setMyRepostId] = React.useState<string | null>(null);
+  // Repost count (X/Bluesky parity). Sourced from the original post's
+  // reposts_count and adjusted optimistically as the viewer reposts/undoes.
+  const _repostSource = post.reposted_from || post.repostedFrom || post;
+  const [repostCount, setRepostCount] = React.useState<number>(
+    _repostSource?.reposts_count ?? _repostSource?.repostsCount ?? 0
+  );
 
   // Sync ALL state when post prop changes (prevents content mixing between posts)
   React.useEffect(() => {
@@ -624,14 +630,17 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             if (myRepostId) {
               const idToDelete = myRepostId;
               setMyRepostId(null);
+              setRepostCount(c => Math.max(0, c - 1));
               sdk.posts.delete(idToDelete)
                 .then(() => toast.show('Repost removed', 'success'))
                 .catch(() => {
                   setMyRepostId(idToDelete);
+                  setRepostCount(c => c + 1);
                   toast.show('Could not undo repost', 'error');
                 });
               return;
             }
+            setRepostCount(c => c + 1);
             sdk.posts.create({
               content: '',
               reposted_from_id: actionPostId,
@@ -642,7 +651,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                 if (newId) setMyRepostId(newId);
                 toast.show('Reposted', 'success');
               })
-              .catch(() => toast.show('Repost failed', 'error'));
+              .catch(() => {
+                setRepostCount(c => Math.max(0, c - 1));
+                toast.show('Repost failed', 'error');
+              });
           }}
           hitSlop={8}
           style={({ hovered }: any) => ({
@@ -657,6 +669,9 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             size={16}
             color={myRepostId ? colors.accent : colors.textMuted}
           />
+          {repostCount > 0 && (
+            <Text variant="caption" color={myRepostId ? colors.accent : colors.textMuted}>{repostCount}</Text>
+          )}
         </Pressable>
 
         <Pressable
