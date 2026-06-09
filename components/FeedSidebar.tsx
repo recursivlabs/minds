@@ -95,7 +95,6 @@ export function FeedSidebar() {
       }}
       contentContainerStyle={{
         gap: spacing.lg,
-        paddingTop: spacing.lg,
         paddingBottom: spacing['4xl'],
       }}
       showsVerticalScrollIndicator={false}
