@@ -106,7 +106,7 @@ export default function FeedScreen() {
         (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
       );
       setAgentCtaState(dismissed || setUp || personal ? 'hidden' : 'show');
-      const parsed = lastTs ? Number(lastTs) : NaN;
+      const parsed = lastTs ? Number(lastTs) : Number.NaN;
       setLastCurateAt(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
 
       // One-time persona heal: some personal agents were provisioned with the

@@ -92,7 +92,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       } else if (sort === 'following' && followingIdsRef.current) {
         data = data.filter((p: any) => {
           const authorId = p.author?.id || p.userId || p.user_id;
-          return followingIdsRef.current!.has(authorId);
+          return followingIdsRef.current?.has(authorId);
         });
       }
 

@@ -99,7 +99,7 @@ function postAITake(post: any): string {
   if (!body) return '';
   if (/^https?:\/\//.test(body)) return '';
   const firstSentence = body.split(/(?<=[.!?])\s+/)[0] || body;
-  return firstSentence.length > 140 ? firstSentence.slice(0, 137) + '…' : firstSentence;
+  return firstSentence.length > 140 ? `${firstSentence.slice(0, 137)}…` : firstSentence;
 }
 
 function DiscoverHero({ post, onPress }: { post: any; onPress: () => void }) {
@@ -121,9 +121,8 @@ function DiscoverHero({ post, onPress }: { post: any; onPress: () => void }) {
     >
       {image ? (
         <View style={{ width: '100%', aspectRatio: 1.91, backgroundColor: colors.surfaceRaised, marginBottom: spacing.lg }}>
-          {/* eslint-disable-next-line jsx-a11y/alt-text */}
           {Platform.OS === 'web'
-            ? <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' } as any} />
+            ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' } as any} />
             : null}
         </View>
       ) : null}

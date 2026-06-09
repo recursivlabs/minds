@@ -133,7 +133,7 @@ export function TipModal({ visible, onClose, recipientName, recipientAvatar, onS
               <Button
                 onPress={handleSend}
                 loading={sending}
-                disabled={!amount || parseFloat(amount) <= 0}
+                disabled={!amount || Number.parseFloat(amount) <= 0}
                 fullWidth
               >
                 Send Tip

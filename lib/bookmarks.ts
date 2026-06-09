@@ -26,11 +26,10 @@ export function toggleBookmark(postId: string): boolean {
     bookmarks.delete(postId);
     persist();
     return false;
-  } else {
+  }
     bookmarks.add(postId);
     persist();
     return true;
-  }
 }
 
 export function getBookmarks(): string[] {

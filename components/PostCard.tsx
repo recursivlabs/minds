@@ -311,6 +311,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       const WebDiv = 'div' as any;
       return (
         <WebDiv
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML comes from renderMarkdownToHtml, which escapes all user input before formatting.
           dangerouslySetInnerHTML={{ __html: html }}
           style={{
             color: colors.text,

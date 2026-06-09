@@ -35,7 +35,7 @@ function getInitials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function hashColor(name?: string, fallback: string = '#a07e24'): string {
+function hashColor(name?: string, fallback = '#a07e24'): string {
   if (!name) return fallback;
   let hash = 0;
   for (let i = 0; i < name.length; i++) {

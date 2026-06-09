@@ -46,6 +46,7 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
       return (
         <div
           style={{ color: textColor, fontSize: 15, lineHeight: '22px', fontFamily: 'Roboto-Regular', wordBreak: 'break-word' as any }}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML comes from renderMarkdownToHtml, which escapes all user input before formatting.
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -125,7 +126,7 @@ function StreamingCaret({ color }: { color: string }) {
   if (Platform.OS === 'web') {
     return (
       <>
-        <style>{`@keyframes mindsCaretBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }`}</style>
+        <style>{"@keyframes mindsCaretBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }"}</style>
         <span
           style={{
             display: 'inline-block',

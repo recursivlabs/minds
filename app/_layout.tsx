@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

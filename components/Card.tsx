@@ -1,4 +1,4 @@
-import { View, ViewProps, Platform } from 'react-native';
+import { View, type ViewProps, Platform } from 'react-native';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 

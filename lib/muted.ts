@@ -26,11 +26,10 @@ export function toggleMute(userId: string): boolean {
     mutedUsers.delete(userId);
     persist();
     return false;
-  } else {
+  }
     mutedUsers.add(userId);
     persist();
     return true;
-  }
 }
 
 export function getMutedUsers(): string[] {

@@ -2,7 +2,7 @@
  * Shared type helpers for the Minds app.
  * Eliminates `as any` casts throughout the codebase.
  */
-import { ViewStyle, TextStyle } from 'react-native';
+import { type ViewStyle, TextStyle } from 'react-native';
 
 /**
  * Web-only CSS properties that React Native's ViewStyle doesn't include.

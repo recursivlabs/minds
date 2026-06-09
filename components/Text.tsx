@@ -1,4 +1,4 @@
-import { Text as RNText, TextProps, TextStyle } from 'react-native';
+import { Text as RNText, type TextProps, type TextStyle } from 'react-native';
 import { typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
 

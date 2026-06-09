@@ -1,4 +1,4 @@
-import { View, ViewProps, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, type ViewProps, Platform, KeyboardAvoidingView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../lib/theme';
 import { spacing } from '../constants/theme';

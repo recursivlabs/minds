@@ -357,7 +357,7 @@ export default function CreateScreen() {
         router.back();
       } else if (mode === 'agent') {
         if (!agentName.trim()) { setSubmitting(false); return; }
-        const username = agentName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).slice(2, 6);
+        const username = `${agentName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Math.random().toString(36).slice(2, 6)}`;
         await sdk.agents.create({
           name: agentName.trim(),
           username,
@@ -398,7 +398,7 @@ export default function CreateScreen() {
         router.back();
       } else if (mode === 'community') {
         if (!communityName.trim()) { setSubmitting(false); return; }
-        const slug = communityName.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-') + '-' + Math.random().toString(36).slice(2, 6);
+        const slug = `${communityName.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}-${Math.random().toString(36).slice(2, 6)}`;
         await sdk.communities.create({
           name: communityName.trim(),
           slug,
@@ -526,7 +526,7 @@ export default function CreateScreen() {
                 paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
                 backgroundColor: selectedCommunity ? colors.accentSubtle : colors.surface,
                 borderRadius: radius.full, alignSelf: 'flex-start',
-                borderWidth: 0.5, borderColor: selectedCommunity ? colors.accent + '40' : colors.glassBorder,
+                borderWidth: 0.5, borderColor: selectedCommunity ? `${colors.accent}40` : colors.glassBorder,
               }}
             >
               <Ionicons name={selectedCommunity ? 'people' : 'globe-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />

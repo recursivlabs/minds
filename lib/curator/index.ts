@@ -8,8 +8,8 @@
  * interest map) lives here, not in the Recursiv repo.
  */
 
-import { MINDS_PERSONA_INSTRUCTIONS, MindsPersona } from './prompts';
-import { getSourcesForInterests, MindsRssSource } from './sources';
+import { MINDS_PERSONA_INSTRUCTIONS, type MindsPersona } from './prompts';
+import { getSourcesForInterests, type MindsRssSource } from './sources';
 
 export type { MindsPersona } from './prompts';
 export { MINDS_PERSONA_INSTRUCTIONS, MINDS_PERSONAL_AGENT_SYSTEM_PROMPT } from './prompts';

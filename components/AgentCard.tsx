@@ -69,7 +69,7 @@ export function AgentCard({ agent, onChat }: Props) {
           >
             <View
               style={{
-                backgroundColor: colors.accentHover + '20',
+                backgroundColor: `${colors.accentHover}20`,
                 paddingHorizontal: spacing.sm,
                 paddingVertical: 2,
                 borderRadius: radius.full,

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Animated, ViewStyle } from 'react-native';
+import { Animated, type ViewStyle } from 'react-native';
 import { radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
