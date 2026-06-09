@@ -51,10 +51,16 @@ export default function CreateScreen() {
 
   // Restore draft on mount
   const draftRef = React.useRef<string | null>(null);
+  // The exact content we restored. Autosave compares against this and skips
+  // while the field is untouched — otherwise restoring a draft would re-stamp
+  // it with a fresh timestamp on every open, making it immortal (the old
+  // "posted text keeps coming back" bug).
+  const restoredContentRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     const draft = getLatestDraft();
     if (draft && !params.communityId) {
       setContent(draft.content);
+      restoredContentRef.current = draft.content;
       if (draft.communityId) setSelectedCommunity({ id: draft.communityId, name: draft.communityName });
       draftRef.current = draft.id;
     }
@@ -94,6 +100,8 @@ export default function CreateScreen() {
   // their work is preserved even if they navigate away accidentally.
   React.useEffect(() => {
     if (!content.trim()) return;
+    // Don't re-save a draft we just restored and the user hasn't touched.
+    if (content === restoredContentRef.current) return;
     const timer = setTimeout(() => {
       try {
         const id = saveDraft(content, selectedCommunity?.id, selectedCommunity?.name);

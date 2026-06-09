@@ -173,8 +173,10 @@ export default function UserProfileScreen() {
     return () => { cancelled = true; };
   }, [profile?.id, sdk, username]);
 
-  const baseFollowerCount = profile?.followerCount || profile?.follower_count || 0;
-  const followingCount = profile?.followingCount || profile?.following_count || 0;
+  // SDK returns followers_count / following_count (plural). Older code only
+  // read the singular forms, so the base count was always 0 and never moved.
+  const baseFollowerCount = profile?.followersCount ?? profile?.followers_count ?? profile?.followerCount ?? profile?.follower_count ?? 0;
+  const followingCount = profile?.followingCount ?? profile?.following_count ?? 0;
   const [followerOffset, setFollowerOffset] = React.useState(0);
   const followerCount = baseFollowerCount + followerOffset;
 
@@ -261,7 +263,7 @@ export default function UserProfileScreen() {
   }
 
   return (
-    <Container safeTop padded={false} maxWidth={600}>
+    <Container safeTop padded={false}>
       <ScreenHeader title={`@${profile.username || username}`} />
 
       <ScrollView showsVerticalScrollIndicator={false}>

@@ -365,7 +365,11 @@ export function useProfile(username: string) {
 
   React.useEffect(() => {
     if (!username) return;
-    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    // Always revalidate on mount (stale-while-revalidate). The cached profile
+    // renders instantly, but we MUST re-fetch — a fresh cache used to early-
+    // return here, which skipped the isFollowing fetch below, so after a page
+    // refresh the follow button wrongly showed "Follow" for someone you already
+    // follow (then "already following" if you clicked it).
     let cancelled = false;
     (async () => {
       try {
@@ -418,6 +422,14 @@ export function useProfile(username: string) {
       if (res?.data) {
         setProfile(res.data);
         setCache(cacheKey, res.data);
+        // Re-sync follow state too, so it survives a refresh and reflects the
+        // server after a follow/unfollow.
+        if (!(res.data as any).isAgent) {
+          try {
+            const followRes = await s.profiles.isFollowing(res.data.id);
+            setIsFollowing(followRes.data?.is_following ?? false);
+          } catch {}
+        }
       }
     } catch {}
   }, [username, sdk, cacheKey]);

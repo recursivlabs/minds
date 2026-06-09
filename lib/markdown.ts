@@ -18,20 +18,18 @@ export function renderMarkdownToHtml(text: string): string {
     return `\u0000${idx}\u0000`;
   };
 
-  let html = text
-    // Escape HTML entities first
+  // 1. Escape entities, then stash multi-line code blocks as single tokens so
+  //    the line-by-line block pass below never splits them.
+  const escaped = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    // Code blocks (triple backtick) — must come before inline code
-    .replace(/```([\s\S]*?)```/g, (_m, code) => stash(`<pre style="background:#1a1a1e;padding:8px 12px;border-radius:6px;overflow-x:auto;font-family:monospace;font-size:13px;color:#a0a0a8;margin:8px 0"><code>${code}</code></pre>`))
-    // Inline code
+    .replace(/```([\s\S]*?)```/g, (_m, code) => stash(`<pre style="background:#1a1a1e;padding:8px 12px;border-radius:6px;overflow-x:auto;font-family:monospace;font-size:13px;color:#a0a0a8;margin:8px 0"><code>${code}</code></pre>`));
+
+  // 2. Inline formatting applied to a single line's content.
+  const inline = (line: string): string => line
     .replace(/`([^`]+)`/g, (_m, code) => stash(`<code style="background:#1a1a1e;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:#a0a0a8">${code}</code>`))
-    // Markdown links [text](url) — stash so bare-URL pass doesn't re-match them
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, url) => stash(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#d4a844;text-decoration:underline">${label}</a>`))
-    // Bare URLs (http/https). Must come BEFORE bold/italic so e.g. `**https://x.com**`
-    // still linkifies correctly. Strip common trailing punctuation so sentences
-    // render cleanly (. , ; : ! ? ) ]).
     .replace(/\bhttps?:\/\/[^\s<>()\[\]"']+/g, (m) => {
       let url = m;
       let trailing = '';
@@ -42,18 +40,51 @@ export function renderMarkdownToHtml(text: string): string {
       }
       return `${stash(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#d4a844;text-decoration:underline">${url}</a>`)}${trailing}`;
     })
-    // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Headings (### h3, ## h2, # h1)
-    .replace(/^### (.+)$/gm, '<h3 style="font-size:18px;font-weight:600;margin:12px 0 4px">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 style="font-size:22px;font-weight:600;margin:12px 0 4px">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 style="font-size:28px;font-weight:700;margin:12px 0 4px">$1</h1>')
-    // Hashtags — color only, no underline (prevents browser default <a> underline)
-    .replace(/(^|\s)#([a-zA-Z0-9_]+)/g, (_m, lead, tag) => `${lead}${stash(`<a href="/(tabs)/discover?tab=posts&q=%23${tag}" style="color:#d4a844;text-decoration:none">#${tag}</a>`)}`)
-    // Line breaks
-    .replace(/\n/g, '<br />');
+    .replace(/(^|\s)#([a-zA-Z0-9_]+)/g, (_m, lead, tag) => `${lead}${stash(`<a href="/(tabs)/discover?tab=posts&q=%23${tag}" style="color:#d4a844;text-decoration:none">#${tag}</a>`)}`);
+
+  // 3. Block pass: walk lines so bullet/numbered lists and headings render as
+  //    real <ul>/<ol>/<h*> instead of leaking raw "-", "*", "#" markers.
+  const lines = escaped.split('\n');
+  const out: string[] = [];
+  let listType: 'ul' | 'ol' | null = null;
+  const closeList = () => { if (listType) { out.push(`</${listType}>`); listType = null; } };
+  const openList = (t: 'ul' | 'ol') => {
+    if (listType !== t) {
+      closeList();
+      out.push(t === 'ul' ? '<ul style="margin:6px 0;padding-left:22px">' : '<ol style="margin:6px 0;padding-left:22px">');
+      listType = t;
+    }
+  };
+
+  for (const line of lines) {
+    const ul = line.match(/^\s*[-*•]\s+(.*)$/);
+    const ol = line.match(/^\s*\d+\.\s+(.*)$/);
+    const h3 = line.match(/^###\s+(.*)$/);
+    const h2 = line.match(/^##\s+(.*)$/);
+    const h1 = line.match(/^#\s+(.*)$/);
+    if (ul) {
+      openList('ul');
+      out.push(`<li style="margin:2px 0">${inline(ul[1])}</li>`);
+    } else if (ol) {
+      openList('ol');
+      out.push(`<li style="margin:2px 0">${inline(ol[1])}</li>`);
+    } else if (h3) {
+      closeList(); out.push(`<h3 style="font-size:18px;font-weight:600;margin:12px 0 4px">${inline(h3[1])}</h3>`);
+    } else if (h2) {
+      closeList(); out.push(`<h2 style="font-size:22px;font-weight:600;margin:12px 0 4px">${inline(h2[1])}</h2>`);
+    } else if (h1) {
+      closeList(); out.push(`<h1 style="font-size:28px;font-weight:700;margin:12px 0 4px">${inline(h1[1])}</h1>`);
+    } else if (line.trim() === '') {
+      closeList(); out.push('<br />');
+    } else {
+      closeList(); out.push(`${inline(line)}<br />`);
+    }
+  }
+  closeList();
+
+  let html = out.join('');
 
   // Restore stashed tokens
   html = html.replace(/\u0000(\d+)\u0000/g, (_m, idx) => placeholders[Number(idx)] || '');
@@ -76,6 +107,9 @@ export type MarkdownSegment =
 
 export function parseMarkdownSegments(text: string): MarkdownSegment[] {
   if (!text) return [];
+  // Render line-start bullet markers as real bullets on native (the inline
+  // tokenizer below has no block/list concept). "- item" / "* item" → "• item".
+  text = text.replace(/^[ \t]*[-*]\s+/gm, '• ');
   const segments: MarkdownSegment[] = [];
   // Simple regex-based tokenizer.
   // Order matters: markdown link `[text](url)` is matched before the bare URL
