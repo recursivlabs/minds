@@ -7,7 +7,7 @@ import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTheme } from '../lib/theme';
-import { useConversations, useCommunities } from '../lib/hooks';
+import { useConversations } from '../lib/hooks';
 import { ensureIntroDM } from '../lib/agentIntro';
 import { invalidate } from '../lib/cache';
 import { getPreference } from '../lib/preferences';
@@ -51,7 +51,6 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { user, sdk } = useAuth();
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
-  const { communities } = useCommunities(5);
   const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
   const [lastMessageConvoId, setLastMessageConvoId] = React.useState<string | null>(null);
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
@@ -124,6 +123,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     return () => { cleanups.forEach(fn => fn()); };
   }, [sdk, refreshNotifs, refreshConvos]);
 
+  // Active conversation id — set by ConversationView on mount via the shared
+  // ActiveConvoProvider context. One source of truth, web + native.
+  const activeConvoIdFromPath = useActiveConvoId();
+
   // Seed unread dots from the server's unread counts on every conversation
   // refresh. The live WS listener below only catches messages that land while
   // the SideNav is mounted + subscribed — so a message delivered earlier (e.g.
@@ -131,17 +134,20 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // opened) would show no unread dot. This back-fills from server truth. Items
   // are cleared from the set when the user opens the conversation.
   React.useEffect(() => {
-    const serverUnread = (conversations || [])
-      .filter((c: any) => (c.unreadCount ?? c.unread_count ?? 0) > 0)
-      .map((c: any) => c.id as string);
-    if (serverUnread.length === 0) return;
+    if (!conversations) return;
     setUnreadConvos(prev => {
-      let changed = false;
       const next = new Set(prev);
-      for (const id of serverUnread) if (!next.has(id)) { next.add(id); changed = true; }
-      return changed ? next : prev;
+      for (const c of conversations as any[]) {
+        const id = c.id as string;
+        // The conversation you're reading is never unread.
+        if (id === activeConvoIdFromPath) { next.delete(id); continue; }
+        const unread = (c.unreadCount ?? c.unread_count ?? 0) > 0;
+        if (unread) next.add(id);
+        else next.delete(id); // server says read elsewhere → clear the dot
+      }
+      return next;
     });
-  }, [conversations]);
+  }, [conversations, activeConvoIdFromPath]);
 
   // Personal-agent intro back-fill. Runs once per app load. If the
   // user has a personal agent and that thread has no agent-authored
@@ -170,11 +176,6 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     })();
   }, [sdk, user?.id, user?.name, refreshConvos]);
 
-  // Active conversation id — set by ConversationView on mount via
-  // the shared ActiveConvoProvider context. Replaces the earlier
-  // window.location parse which only worked on web. One source of
-  // truth, works the same on web + native.
-  const activeConvoIdFromPath = useActiveConvoId();
 
   // Real-time unread tracking + conversation reordering
   React.useEffect(() => {
@@ -259,17 +260,12 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     })
     .filter(Boolean)
     .slice(0, 4) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string }>;
-  const recentCommunities = (communities || [])
-    .filter((c: any) => c.is_member === true || c.isMember === true)
-    .slice(0, 3)
-    .map((c: any) => ({
-      id: c.id,
-      type: 'community' as const,
-      name: c.name || 'Community',
-      avatar: c.image || c.avatar || null,
-      preview: `${c.memberCount || c.member_count || 0} members`,
-    }));
-  const inboxItems = [...recentDMs, ...recentCommunities];
+  // The Recent inbox is for conversations (DMs + community group chats the user
+  // is actually in — those arrive via the conversations list above). We do NOT
+  // surface community *memberships* here: that cluttered the inbox with
+  // communities the user never messaged in (and, when membership got
+  // auto-created by other actions, ones they didn't knowingly join).
+  const inboxItems = recentDMs;
 
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.name);
