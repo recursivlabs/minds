@@ -69,6 +69,8 @@ export interface ColorTokens {
   boostMuted: string;
   token: string;
   tokenMuted: string;
+  verified: string;
+  verifiedMuted: string;
 
   // Shadow base color (always darkens, not lightens)
   shadow: string;
@@ -116,6 +118,8 @@ export const darkColors: ColorTokens = {
   boostMuted: 'rgba(230,188,84,0.12)',
   token: '#f0d060',
   tokenMuted: 'rgba(240,208,96,0.10)',
+  verified: '#4da6ff',
+  verifiedMuted: 'rgba(77,166,255,0.12)',
 
   shadow: '#000000',
 };
@@ -167,6 +171,8 @@ export const lightColors: ColorTokens = {
   boostMuted: 'rgba(160,126,36,0.12)',
   token: '#a07e24',
   tokenMuted: 'rgba(160,126,36,0.10)',
+  verified: '#1d8fe6',
+  verifiedMuted: 'rgba(29,143,230,0.12)',
 
   shadow: '#000000',
 };
@@ -192,6 +198,7 @@ export const spacing = {
 } as const;
 
 export const radius = {
+  xs: 4,
   sm: 6,
   md: 8,
   lg: 12,
@@ -199,59 +206,72 @@ export const radius = {
   full: 9999,
 } as const;
 
+// Standard border widths. hairline = default border/divider; thin = emphasized
+// boxes (edit box, community card); thick = active tab underline.
+export const borders = {
+  hairline: 0.5,
+  thin: 1,
+  thick: 2,
+} as const;
+
+// Roboto type scale, tuned for X/Bluesky-grade feed readability. Roboto reads
+// slightly larger than Geist, so display sizes are shaved 1-2px; body keeps 15px
+// (X parity) with a tighter 22 line-height and neutral letter-spacing (Roboto is
+// already optimally spaced — positive tracking hurt scan speed). Roboto has no
+// SemiBold(600) in our set, so all emphasis/headings use Medium(500).
 export const typography = {
   hero: {
-    fontSize: 36,
-    lineHeight: 44,
-    fontFamily: 'Geist-Regular',
-    letterSpacing: -0.8,
-  },
-  h1: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontFamily: 'Geist-SemiBold',
+    fontSize: 34,
+    lineHeight: 40,
+    fontFamily: 'Roboto-Medium',
     letterSpacing: -0.5,
   },
+  h1: {
+    fontSize: 27,
+    lineHeight: 32,
+    fontFamily: 'Roboto-Medium',
+    letterSpacing: -0.4,
+  },
   h2: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontFamily: 'Geist-SemiBold',
-    letterSpacing: -0.3,
+    fontSize: 21,
+    lineHeight: 27,
+    fontFamily: 'Roboto-Medium',
+    letterSpacing: -0.2,
   },
   h3: {
     fontSize: 17,
     lineHeight: 22,
-    fontFamily: 'Geist-SemiBold',
-    letterSpacing: -0.2,
+    fontFamily: 'Roboto-Medium',
+    letterSpacing: -0.1,
   },
   body: {
     fontSize: 15,
-    lineHeight: 24,
-    fontFamily: 'Geist-Regular',
-    letterSpacing: 0.1,
+    lineHeight: 22,
+    fontFamily: 'Roboto-Regular',
+    letterSpacing: 0,
   },
   bodyMedium: {
     fontSize: 15,
-    lineHeight: 24,
-    fontFamily: 'Geist-SemiBold',
-    letterSpacing: 0.1,
+    lineHeight: 22,
+    fontFamily: 'Roboto-Medium',
+    letterSpacing: 0,
   },
   caption: {
     fontSize: 13,
     lineHeight: 18,
-    fontFamily: 'Geist-Regular',
+    fontFamily: 'Roboto-Regular',
     letterSpacing: 0,
   },
   label: {
     fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'Geist-SemiBold',
+    lineHeight: 17,
+    fontFamily: 'Roboto-Medium',
     letterSpacing: 0,
   },
   mono: {
     fontSize: 14,
     lineHeight: 20,
-    fontFamily: 'Geist-Regular',
+    fontFamily: 'Roboto-Regular',
     letterSpacing: 0,
   },
 } as const;

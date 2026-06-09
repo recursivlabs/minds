@@ -6,6 +6,12 @@ import { Slot, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
+import {
+  Roboto_300Light,
+  Roboto_400Regular,
+  Roboto_500Medium,
+  Roboto_700Bold,
+} from '@expo-google-fonts/roboto';
 import * as SplashScreen from 'expo-splash-screen';
 import { ProjectProvider } from '../lib/project';
 import { AuthProvider, useAuth } from '../lib/auth';
@@ -69,12 +75,14 @@ function NotificationWiring() {
 }
 
 export default function RootLayout() {
+  // Roboto (matches legacy Minds + reads cleanly on web). Custom keys keep the
+  // theme's typography references stable. Roboto has no SemiBold in our scale —
+  // headings/labels use Medium (the X/Bluesky-correct UI weight).
   const [fontsLoaded] = useFonts({
-    'Geist-Light': require('../assets/fonts/Geist-Light.ttf'),
-    'Geist-Regular': require('../assets/fonts/Geist-Regular.ttf'),
-    'Geist-Medium': require('../assets/fonts/Geist-Medium.ttf'),
-    'Geist-SemiBold': require('../assets/fonts/Geist-SemiBold.ttf'),
-    'Geist-Bold': require('../assets/fonts/Geist-Bold.ttf'),
+    'Roboto-Light': Roboto_300Light,
+    'Roboto-Regular': Roboto_400Regular,
+    'Roboto-Medium': Roboto_500Medium,
+    'Roboto-Bold': Roboto_700Bold,
   });
 
   const onLayoutRootView = useCallback(async () => {

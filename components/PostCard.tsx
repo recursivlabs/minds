@@ -19,7 +19,7 @@ import { getCached } from '../lib/cache';
 import { LinkPreview } from './LinkPreview';
 import { MediaViewer } from './MediaViewer';
 import { Badge, getBadges } from './Badge';
-import { spacing, radius, typography } from '../constants/theme';
+import { spacing, radius, borders, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
 import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
 
@@ -396,11 +396,11 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       delayLongPress={300}
       style={({ pressed, hovered }: any) => ({
         backgroundColor: pressed && !isEditing && !showMenu ? colors.surfaceHover : (hovered && !isEditing && !showMenu) ? colors.glass : 'transparent',
-        borderBottomWidth: 1,
+        borderBottomWidth: borders.thin,
         borderBottomColor: colors.borderSubtle,
         paddingHorizontal: spacing.xl,
-        paddingTop: spacing.lg,
-        paddingBottom: spacing.xl,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.md,
         ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease', cursor: isEditing ? 'default' : 'pointer' } as any : {}),
       })}
     >
@@ -439,12 +439,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             style={{
               width: 32,
               height: 32,
-              borderRadius: 8,
+              borderRadius: radius.md,
               backgroundColor: colors.surface,
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
-              borderWidth: 0.5,
+              borderWidth: borders.hairline,
               borderColor: colors.borderSubtle,
             }}
           >
@@ -458,7 +458,9 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       {/* Content column */}
       <View style={{ flex: 1 }}>
       {/* Source/author byline + time + via-agent attribution */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, flexWrap: 'wrap' }}>
+      {/* X-style one-line byline: bold name · @handle · time · in Community / via Agent.
+          Name truncates first under width pressure; identity trio stays legible. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm, minWidth: 0 }}>
         <Pressable
           onPress={() => {
             if (isAgentCurated && externalUrlForByline) {
@@ -467,28 +469,29 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             }
             router.push(`/(tabs)/user/${authorUsername}` as any);
           }}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1, minWidth: 0 }}
         >
-          <Text variant="label">{bylineName}</Text>
+          <Text variant="bodyMedium" numberOfLines={1}>{bylineName}</Text>
           {!isAgentCurated && getBadges(author).map(b => <Badge key={b} type={b} size="sm" />)}
         </Pressable>
-        {communityName && (
-          <>
-            <Text variant="caption" color={colors.textMuted}>in</Text>
-            <Pressable onPress={() => router.push(`/(tabs)/community/${communityId}` as any)}>
-              <Text variant="label" color={colors.accent}>{communityName}</Text>
-            </Pressable>
-          </>
+        {!isAgentCurated && authorUsername && (
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flexShrink: 0 }}>@{authorUsername}</Text>
         )}
-        <Text variant="caption" color={colors.textMuted}>{timeAgo(createdAt)}</Text>
+        <Text variant="caption" color={colors.textMuted} style={{ flexShrink: 0 }}>· {timeAgo(createdAt)}</Text>
+        {communityName && (
+          <Pressable onPress={() => router.push(`/(tabs)/community/${communityId}` as any)} style={{ flexShrink: 1, minWidth: 0 }}>
+            <Text variant="caption" color={colors.accent} numberOfLines={1}>in {communityName}</Text>
+          </Pressable>
+        )}
         {isAgentCurated && (
           <Pressable
             onPress={(e: any) => {
               e?.stopPropagation?.();
               router.push(`/(tabs)/user/${authorUsername}` as any);
             }}
+            style={{ flexShrink: 1, minWidth: 0 }}
           >
-            <Text variant="caption" color={colors.textMuted}>via {authorName}</Text>
+            <Text variant="caption" color={colors.textMuted} numberOfLines={1}>via {authorName}</Text>
           </Pressable>
         )}
       </View>
@@ -580,13 +583,14 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         </View>
       )}
 
-      {/* Action bar: vote, comment, more */}
+      {/* Action bar: votes (Minds signature, kept prominent) left, then a tight
+          left-grouped cluster of reply/repost/bookmark/more — X-style rhythm. */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: spacing.lg,
+          gap: spacing.xl,
+          marginTop: spacing.md,
         }}
       >
         <VoteButtons
@@ -599,7 +603,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
         <Pressable
           onPress={() => router.push(`/(tabs)/post/${actionPostId}` as any)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
+          style={({ hovered }: any) => ({
+            flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+            borderRadius: radius.full, paddingHorizontal: spacing.xs, paddingVertical: 3,
+            backgroundColor: hovered ? colors.glass : 'transparent',
+            ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease' } as any : {}),
+          })}
           hitSlop={8}
         >
           <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
@@ -636,7 +645,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               .catch(() => toast.show('Repost failed', 'error'));
           }}
           hitSlop={8}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: 2 }}
+          style={({ hovered }: any) => ({
+            flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+            borderRadius: radius.full, padding: spacing.xs,
+            backgroundColor: hovered ? colors.glass : 'transparent',
+            ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease' } as any : {}),
+          })}
         >
           <Ionicons
             name={myRepostId ? 'repeat' : 'repeat-outline'}
@@ -653,7 +667,11 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             logSignal(nowSaved ? 'save' : 'hide', { postId: actionPostId, metadata: { source: 'postcard_bookmark' } });
           }}
           hitSlop={8}
-          style={{ padding: 2 }}
+          style={({ hovered }: any) => ({
+            borderRadius: radius.full, padding: spacing.xs,
+            backgroundColor: hovered ? colors.glass : 'transparent',
+            ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease' } as any : {}),
+          })}
         >
           <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={saved ? colors.accent : colors.textMuted} />
         </Pressable>
@@ -671,7 +689,11 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             setShowMenu(true);
           }}
           hitSlop={8}
-          style={{ padding: 2 }}
+          style={({ hovered }: any) => ({
+            borderRadius: radius.full, padding: spacing.xs,
+            backgroundColor: hovered ? colors.glass : 'transparent',
+            ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease' } as any : {}),
+          })}
         >
           <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
         </Pressable>
