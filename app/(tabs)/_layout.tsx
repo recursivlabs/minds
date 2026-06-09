@@ -96,6 +96,7 @@ export default function TabLayout() {
             <Tabs.Screen name="apps" options={{ href: null }} />
             <Tabs.Screen name="org-settings" options={{ href: null }} />
             <Tabs.Screen name="webhooks" options={{ href: null }} />
+            <Tabs.Screen name="feedback" options={{ href: null }} />
             <Tabs.Screen name="jobs" options={{ href: null }} />
             <Tabs.Screen name="post/[id]" options={{ href: null }} />
             <Tabs.Screen name="user/[username]" options={{ href: null }} />
@@ -191,6 +192,7 @@ export default function TabLayout() {
       <Tabs.Screen name="apps" options={{ href: null }} />
       <Tabs.Screen name="org-settings" options={{ href: null }} />
       <Tabs.Screen name="webhooks" options={{ href: null }} />
+      <Tabs.Screen name="feedback" options={{ href: null }} />
       <Tabs.Screen name="jobs" options={{ href: null }} />
       <Tabs.Screen name="post/[id]" options={{ href: null }} />
       <Tabs.Screen name="user/[username]" options={{ href: null }} />

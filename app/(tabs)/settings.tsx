@@ -510,6 +510,10 @@ export default function SettingsScreen() {
           </Button>
         </Section>
 
+        <Section title="Help & feedback">
+          <SettingRow first label="Feedback & feature requests" sublabel="Suggest ideas, report problems, and upvote what matters" onPress={() => router.push('/(tabs)/feedback' as any)} />
+        </Section>
+
         <Section title="Legal">
           <SettingRow first label="Terms of Service" onPress={() => Linking.openURL('https://minds.com/p/terms')} />
           <SettingRow label="Privacy Policy" onPress={() => Linking.openURL('https://minds.com/p/privacy')} />
