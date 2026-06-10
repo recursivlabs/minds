@@ -8,6 +8,9 @@ import { buildCuratorRequest } from './curator';
 import { getPreference } from './preferences';
 import { captureException } from './monitoring';
 
+// Once-per-session guard for the personal-agent config upsert (see recurate).
+let ensuredPersonalThisSession = false;
+
 /**
  * Fetch posts from the feed.
  * All calls scoped to the Minds org.
@@ -229,7 +232,10 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
         agent_name: undefined,
         paste_sources: {},
       };
-      if (typeof ensurePersonal === 'function') {
+      // The agent upsert is idempotent config-sync, not per-gesture work —
+      // doing it on EVERY pull-to-refresh made the most-used gesture in the
+      // app cost an extra write per pull, for everyone, all day.
+      if (typeof ensurePersonal === 'function' && !ensuredPersonalThisSession) {
         await ensurePersonal.call((s as any).agents, {
           preferences: {
             interests: prefs.interests,
@@ -239,6 +245,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
           },
           overrides: prefs.agent_name ? { name: prefs.agent_name } : undefined,
         });
+        ensuredPersonalThisSession = true;
       }
       const request = buildCuratorRequest({
         agentName: prefs.agent_name || undefined,
