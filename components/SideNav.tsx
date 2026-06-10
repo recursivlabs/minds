@@ -61,6 +61,12 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // it doesn't flicker back on from a stale refresh that still shows it unread.
   const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
   const readLocallyRef = React.useRef<Set<string>>(new Set());
+  // Optimistic inbox preview overlay, keyed by conversation id. Set the instant
+  // a live message arrives so the preview text, the reorder, the unread dot and
+  // the row highlight all update TOGETHER — instead of the dot firing instantly
+  // (from the WS event) while the preview waits ~600ms for the list refetch.
+  // The refetch then reconciles with server truth (same message, no conflict).
+  const [livePreviews, setLivePreviews] = React.useState<Map<string, { content: string; createdAt: string }>>(new Map());
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
 
   // Fetch unread notification count + subscribe to live updates.
@@ -224,9 +230,17 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           const convoId = msg.conversationId || msg.conversation_id;
           if (!convoId) return;
           const senderId = msg.senderId || msg.sender?.id;
-          if (senderId && senderId === user?.id) return; // never light up for own sends
-          // Instant mark — unless it's the thread you're actively reading.
-          if (convoId !== activeConvoRef.current) {
+          const content = (msg.text || msg.content || '').trim();
+          // Optimistically update the inbox preview + reorder the instant the
+          // message lands (own or incoming), so the row updates atomically with
+          // the dot below.
+          if (content) {
+            const createdAt = msg.createdAt || msg.created_at || new Date().toISOString();
+            setLivePreviews(prev => { const n = new Map(prev); n.set(convoId, { content, createdAt }); return n; });
+          }
+          // The dot only lights for INCOMING messages on a thread you're not
+          // actively reading.
+          if (senderId && senderId !== user?.id && convoId !== activeConvoRef.current) {
             readLocallyRef.current.delete(convoId); // a new message makes it unread again
             setUnreadConvos(prev => (prev.has(convoId) ? prev : new Set(prev).add(convoId)));
           }
@@ -276,11 +290,18 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // Sort by latest activity before mapping so the freshest DMs surface
   // in the top-4 slice. Server now also orders by this, but this
   // belt-and-suspenders keeps things sane on older API versions.
+  // Latest activity time for a conversation = newer of (server last message,
+  // optimistic live overlay). Used for both sort order and which preview to show.
+  const serverMs = (c: any) => {
+    const s = c.lastMessage?.createdAt || c.last_message?.created_at || c.updatedAt || c.createdAt || 0;
+    return s ? new Date(s).getTime() : 0;
+  };
   const recentDMs = [...(conversations || [])]
     .sort((a: any, b: any) => {
-      const aT = a.lastMessage?.createdAt || a.last_message?.created_at || a.updatedAt || a.createdAt || 0;
-      const bT = b.lastMessage?.createdAt || b.last_message?.created_at || b.updatedAt || b.createdAt || 0;
-      return new Date(bT).getTime() - new Date(aT).getTime();
+      const aL = livePreviews.get(a.id); const bL = livePreviews.get(b.id);
+      const aT = Math.max(serverMs(a), aL ? new Date(aL.createdAt).getTime() : 0);
+      const bT = Math.max(serverMs(b), bL ? new Date(bL.createdAt).getTime() : 0);
+      return bT - aT;
     })
     .map((c: any) => {
       const participants: any[] = c.participants || c.members || [];
@@ -291,12 +312,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       // One-on-one with no resolvable other is the orphan case.
       if (type === 'one_on_one' && !other) return null;
       if (!name) return null;
+      const live = livePreviews.get(c.id);
+      const useLive = live && new Date(live.createdAt).getTime() >= serverMs(c);
       return {
         id: c.id,
         type: 'dm' as const,
         name,
         avatar: other?.image || null,
-        preview: c.lastMessage?.content || c.last_message?.content || '',
+        preview: useLive ? live.content : (c.lastMessage?.content || c.last_message?.content || ''),
       };
     })
     .filter(Boolean)
