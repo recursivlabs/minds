@@ -4,6 +4,8 @@
     "slug": "minds",
     "version": "2.0.0",
     "scheme": "minds",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
     "web": {
       "bundler": "metro",
       "output": "single",
@@ -18,6 +20,10 @@
     },
     "android": {
       "package": "com.minds.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#08080a"
+      },
       "intentFilters": [
         {
           "action": "VIEW",
@@ -48,7 +54,22 @@
         }
       ],
       "expo-font",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "backgroundColor": "#08080a"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Minds uses your photo library so you can attach photos and videos to posts and set your avatar.",
+          "cameraPermission": "Minds uses your camera so you can take photos and videos for posts."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
