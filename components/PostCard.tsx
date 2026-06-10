@@ -22,7 +22,7 @@ import { MediaViewer } from './MediaViewer';
 import { Badge, getBadges } from './Badge';
 import { spacing, radius, borders, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
-import { renderMarkdownToHtml, parseMarkdownSegments } from '../lib/markdown';
+import { renderMarkdownToHtml, parseMarkdownSegments, isSafeUrl } from '../lib/markdown';
 
 interface Props {
   post: any;
@@ -111,7 +111,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   // single post in the feed reads "M · M · M". The agent's voice still
   // appears in the body content.
   const isAgentCurated = !!(author.isAi || author.is_ai) && !!(displayPost.external_url || displayPost.externalUrl);
-  const externalUrlForByline = displayPost.external_url || displayPost.externalUrl || '';
+  const rawExternalUrl = displayPost.external_url || displayPost.externalUrl || '';
+  // external_url is post data and feeds Linking.openURL — same scheme
+  // allowlist as markdown links so javascript:/data: URLs can't ride along.
+  const externalUrlForByline = isSafeUrl(rawExternalUrl) ? rawExternalUrl : '';
   const sourceFromUrl = (() => {
     if (!externalUrlForByline) return null;
     try {
