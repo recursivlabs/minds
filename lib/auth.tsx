@@ -6,6 +6,7 @@ import * as storage from './storage';
 import { registerPushToken, registerTokenWithServer } from './notifications';
 import { captureException } from './monitoring';
 import { clearAll as clearCacheAll, setCacheUser } from './cache';
+import { setSignalsSdk } from './signals';
 
 function registerPushTokenBackground(sdk: Recursiv) {
   registerPushToken().then(token => {
@@ -106,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // so a previous account's cached data can't flash through.
           setCacheUser(bootUser?.id ?? null);
           setAuthedSdk(sdk);
+          setSignalsSdk(sdk);
           setUser(bootUser);
           setProjectId(storedProjectId);
           registerPushTokenBackground(sdk);
@@ -144,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await clearStorage();
                 setCacheUser(null);
                 setAuthedSdk(null);
+                setSignalsSdk(null);
                 setUser(null);
                 setProjectId(null);
               }
@@ -184,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       storage.setItem(KEYS.version, AUTH_VERSION),
     ]);
     setAuthedSdk(sdk);
+    setSignalsSdk(sdk);
     setUser(authUser);
     setProjectId(PROJECT_ID);
     registerPushTokenBackground(sdk);
@@ -306,6 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCacheUser(null); // reset to the anon namespace
     setUser(null);
     setAuthedSdk(null);
+    setSignalsSdk(null);
     setProjectId(null);
     // On web, force a hard navigation to the logged-out homepage. A soft
     // router.replace can leave the authed shell mounted (stale context/SDK)
