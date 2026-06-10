@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { captureException } from './monitoring';
 
 // Lazy imports — expo-notifications/device/constants crash on web
 const getNotifications = () => {
@@ -20,7 +21,10 @@ if (Platform.OS !== 'web') {
     if (Notifications) {
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
-          shouldShowAlert: true,
+          // SDK 54 split shouldShowAlert into banner/list; the old key is
+          // ignored and foreground notifications silently don't display.
+          shouldShowBanner: true,
+          shouldShowList: true,
           shouldPlaySound: true,
           shouldSetBadge: true,
         }),
@@ -51,12 +55,17 @@ export async function registerPushToken(): Promise<string | null> {
     }
     if (finalStatus !== 'granted') return null;
 
-    const projectId = Constants?.expoConfig?.extra?.eas?.projectId;
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ||
+      Constants?.easConfig?.projectId;
     const token = await Notifications.getExpoPushTokenAsync({
       projectId: projectId || undefined,
     });
     return token.data;
-  } catch {
+  } catch (err) {
+    // A swallowed failure here means the entire push channel is silently
+    // dead for the user — it must be visible in monitoring.
+    captureException(err, { action: 'registerPushToken' });
     return null;
   }
 }
@@ -70,7 +79,9 @@ export async function registerTokenWithServer(sdk: any, token: string): Promise<
       token,
       platform: Platform.OS as 'ios' | 'android' | 'web',
     });
-  } catch {}
+  } catch (err) {
+    captureException(err, { action: 'registerTokenWithServer' });
+  }
 }
 
 /**
