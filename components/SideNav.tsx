@@ -103,7 +103,12 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
 
   React.useEffect(() => {
     if (!sdk) return;
-    const id = setInterval(() => { refreshConvos(); }, 30_000);
+    const id = setInterval(() => {
+      // Hidden tabs already refetch on visibilitychange above — polling
+      // them too is pure QPS waste at fleet scale.
+      if (typeof document !== 'undefined' && document.hidden) return;
+      refreshConvos();
+    }, 30_000);
     return () => clearInterval(id);
   }, [sdk, refreshConvos]);
 
@@ -120,9 +125,24 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         await sdk.realtime.connect();
         const sock = (sdk as any).realtime?.socket;
         if (!sock) return;
-        const onNotif = () => refreshNotifs();
+        // Debounce + jitter: a fan-out notification (popular post, org
+        // announcement) hits every online client at the same instant; an
+        // immediate refetch per event is a synchronized request spike
+        // proportional to audience size. The chat handler below already
+        // debounces for the same reason.
+        let notifTimer: ReturnType<typeof setTimeout> | null = null;
+        const onNotif = () => {
+          if (notifTimer) return;
+          notifTimer = setTimeout(() => {
+            notifTimer = null;
+            refreshNotifs();
+          }, 1000 + Math.random() * 2000);
+        };
         sock.on('notification', onNotif);
-        cleanups.push(() => sock.off?.('notification', onNotif));
+        cleanups.push(() => {
+          sock.off?.('notification', onNotif);
+          if (notifTimer) clearTimeout(notifTimer);
+        });
 
         const onConvoCreated = () => {
           // Drop any cached conversations snapshot + refetch so the
