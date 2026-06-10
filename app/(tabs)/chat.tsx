@@ -577,6 +577,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           }
 
           setMessages(prev => {
+            // If a streaming row from this same sender is still on screen, it's
+            // the in-progress smooth-reveal of THIS very message — let it finish
+            // typing out and skip the WS echo (which carries the full text and
+            // would otherwise double it mid-reveal or snap it to the end). It
+            // reconciles to the real server row on the next load.
+            if (prev.some(m => m.id.startsWith('streaming-') && (m.sender?.id) === newMsg.sender?.id)) {
+              return prev;
+            }
             // Drop any optimistic row whose content matches the
             // incoming server row. Covers two cases:
             //   - `agent-*` ids from the SSE fallback when a user
@@ -807,49 +815,51 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           createdAt: new Date().toISOString(),
           streaming: true,
         }]);
-        let acc = '';
+        // SMOOTH STREAMING (Claude-style). The network delivers tokens in
+        // irregular bursts; rendering each burst as it lands shows the network's
+        // chunkiness. Instead we accumulate into `received` and reveal it via a
+        // requestAnimationFrame loop that advances a `displayed` cursor toward
+        // `received` at a smooth, eased cadence — fast catch-up when far behind,
+        // gentle when close — so the text types out at a calm steady pace no
+        // matter how bursty the stream is.
+        let received = '';
+        let displayed = 0;
         let streamedAny = false;
-        // Coalesce token writes to at most one render per animation frame.
-        // Streaming a reply emits dozens of text_deltas per second; writing
-        // each one straight to state re-rendered the whole list AND re-parsed
-        // the bubble's markdown every token — that thrash is what made the
-        // stream stutter and the scroll lurch. Buffering into `acc` and
-        // flushing on requestAnimationFrame pins the growth to the browser's
-        // paint clock, so it types out smoothly the way Claude does.
-        let rafPending = false;
-        const flushStreaming = () => {
-          rafPending = false;
+        let streamDone = false;
+        let rafId: ReturnType<typeof requestAnimationFrame> | null = null;
+        const renderTo = (n: number, final = false) => {
           setMessages(prev => prev.map(m => m.id === streamingId
-            ? { ...m, content: acc }
+            ? { ...m, content: received.slice(0, n), ...(final ? { streaming: false } : {}) }
             : m));
         };
+        const tick = () => {
+          rafId = null;
+          const gap = received.length - displayed;
+          if (gap > 0) {
+            displayed = Math.min(received.length, displayed + Math.max(2, Math.ceil(gap * 0.3)));
+            renderTo(displayed);
+          }
+          if (displayed < received.length) {
+            rafId = requestAnimationFrame(tick);     // more to reveal
+          } else if (streamDone) {
+            renderTo(received.length, true);          // caught up + done → finalize
+          }
+          // else: caught up but stream still open → stop; the next chunk re-kicks
+        };
+        const kick = () => { if (rafId == null) rafId = requestAnimationFrame(tick); };
+
         try {
-          // chatStream() is an async generator yielding text_delta
-          // chunks. Requires ReadableStream — available on web and on
-          // RN 0.72+. Fall back to chatStreamText() if the platform
-          // can't iterate.
           const stream = sdk.agents.chatStream(otherId, {
             message: messageText,
             ...(conversationId ? { conversation_id: conversationId } : {}),
           });
           for await (const chunk of stream) {
             if (chunk?.type === 'text_delta' && typeof chunk.delta === 'string') {
-              acc += chunk.delta;
+              received += chunk.delta;
               streamedAny = true;
-              if (!rafPending) {
-                rafPending = true;
-                requestAnimationFrame(flushStreaming);
-              }
+              kick();
             }
           }
-          // Mark complete. Also write the final `acc` directly — a frame may
-          // still have been pending when the stream ended, so this guarantees
-          // the last tokens land. WS broadcast of the final stored message may
-          // arrive after this; the dedup in the onMessage handler (content +
-          // sender match for agent-* / streaming-* ids) drops it.
-          setMessages(prev => prev.map(m => m.id === streamingId
-            ? { ...m, content: acc, streaming: false }
-            : m));
         } catch (streamErr) {
           console.warn('[chat] agent stream failed, falling back to chatStreamText', streamErr);
           if (!streamedAny) {
@@ -858,12 +868,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
                 message: messageText,
                 ...(conversationId ? { conversation_id: conversationId } : {}),
               });
-              if (result?.content) {
-                setMessages(prev => prev.map(m => m.id === streamingId
-                  ? { ...m, content: result.content, streaming: false }
-                  : m));
-                streamedAny = true;
-              }
+              if (result?.content) { received = result.content; streamedAny = true; kick(); }
             } catch {}
           }
         }
@@ -879,21 +884,20 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
               || (agentData as any)?.message
               || (agentData as any)?.response
               || (typeof agentData === 'string' ? agentData : null);
-            if (reply) {
-              setMessages(prev => prev.map(m => m.id === streamingId
-                ? { ...m, content: reply, streaming: false }
-                : m));
-              streamedAny = true;
-            }
+            if (reply) { received = reply; streamedAny = true; kick(); }
           } catch (err) {
             console.warn('[chat] agent fallback also failed', err);
           }
         }
-        // If the agent produced no text at all (a tool-only turn that errored,
-        // or a server error path), REMOVE the empty placeholder rather than
-        // leaving a blank bubble. Any real reply or error the server stored
-        // arrives via the WS echo as its own row.
-        if (!streamedAny) {
+        // Stream is closed. Let the reveal loop type out the rest and finalize.
+        // If nothing was produced (tool-only/errored turn), remove the empty
+        // placeholder — any real reply/error the server stored arrives via the
+        // WS echo as its own row.
+        streamDone = true;
+        if (streamedAny) {
+          kick();
+        } else {
+          if (rafId != null) cancelAnimationFrame(rafId);
           setMessages(prev => prev.filter(m => m.id !== streamingId));
         }
         setAgentTyping(false);

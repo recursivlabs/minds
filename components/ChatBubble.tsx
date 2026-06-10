@@ -22,7 +22,10 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
   // turn or a glitch and must not show as a blank box.
   if (!content.trim() && message.streaming !== true) return null;
   const timestamp = message.createdAt || message.created_at || '';
-  const hasMarkdown = /[*`#\[\]]/.test(content);
+  // Render plain text WHILE streaming (the markdown parser is expensive and
+  // re-running it every animation frame is the other source of stream jank);
+  // apply markdown formatting once the message settles.
+  const hasMarkdown = message.streaming !== true && /[*`#\[\]]/.test(content);
   // Streaming bubbles show a caret + skip the trailing timestamp so the
   // bubble doesn't bounce-resize as new chunks land. Once `streaming`
   // goes false the timestamp + final layout render normally.
