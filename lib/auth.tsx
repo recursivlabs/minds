@@ -113,7 +113,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // (401/403) tears the session down — not billing (402) or 5xx.
           void (async () => {
             try {
-              await sdk.users.me();
+              const meRes = await sdk.users.me();
+              const me = (meRes as any).data || meRes;
+              // The API KEY decides who the server treats us as — the stored
+              // user JSON is just a display copy, and the two CAN drift (e.g.
+              // multi-account storage races). If they disagree, adopt the
+              // server's identity everywhere: stored JSON, rendered user, and
+              // the cache namespace. Without this, the chip says one account
+              // while every fetch acts as another — the "identity changed /
+              // groups I never joined / my own profile 404s" bug.
+              if (me?.id && me.id !== bootUser?.id) {
+                captureException(new Error('auth identity mismatch: stored user differs from key owner'), {
+                  phase: 'auth_boot_validate', storedId: bootUser?.id, keyOwnerId: me.id,
+                });
+                const canonical: User = {
+                  id: me.id,
+                  name: me.name || '',
+                  email: me.email || '',
+                  username: me.username || '',
+                  image: me.image ?? null,
+                  bio: me.bio || me.briefdescription || '',
+                };
+                await storage.setItem(KEYS.user, JSON.stringify(canonical));
+                setCacheUser(me.id);
+                setUser(canonical);
+              }
             } catch (err: any) {
               const status = err?.statusCode || err?.status || 0;
               if (status === 401 || status === 403) {

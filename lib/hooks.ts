@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useAuth } from './auth';
-import { getSdk, ORG_ID } from './recursiv';
+import { ORG_ID } from './recursiv';
 import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations, fetchDeduped } from './cache';
 import { filterMuted } from './muted';
 import { loadPreferences, markCuratedNow } from './onboarding';
@@ -38,7 +38,8 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   const cooldownUntilRef = React.useRef(0);
 
   const fetchPosts = React.useCallback(async (refresh = false, silent = false) => {
-    const s = sdk || getSdk();
+    if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+    const s = sdk;
     if (!s) return;
     // Appends never overlap (same offset twice); a refresh supersedes
     // whatever is running instead of racing it.
@@ -218,7 +219,8 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   // available on the SDK (older client / staging).
   const recurate = React.useCallback(async () => {
     if (sort !== 'personal' || !getPreference('aiEnabled')) return fetchPosts(true);
-    const s = sdk || getSdk();
+    if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+    const s = sdk;
     const ensurePersonal = (s as any)?.agents?.ensurePersonal;
     const refreshIfStale = (s as any)?.curator?.refreshIfStale;
     const runCurator = (s as any)?.curator?.run;
@@ -308,7 +310,8 @@ export function usePost(postId: string) {
     let cancelled = false;
     (async () => {
       try {
-        const s = sdk || getSdk();
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+        const s = sdk;
         const res = await fetchDeduped(`req:post:${postId}`, () => s.posts.get(postId));
         if (!cancelled) {
           setPost(res.data);
@@ -345,7 +348,8 @@ export function useCommunities(limit = 20) {
   const fetch = React.useCallback(async () => {
     if (limit === 0) return;
     try {
-      const s = sdk || getSdk();
+      if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+      const s = sdk;
       const res = await fetchDeduped(`req:communities:${limit}`, () =>
         s.communities.list({ limit, organization_id: ORG_ID || undefined }));
       const data = res.data || [];
@@ -401,7 +405,8 @@ export function useAgents(limit = 20) {
     let cancelled = false;
     (async () => {
       try {
-        const s = sdk || getSdk();
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+        const s = sdk;
         const res = await fetchDeduped(`req:agents:${limit}`, () => s.agents.listDiscoverable({ limit, organization_id: ORG_ID || undefined }));
         if (!cancelled) {
           const data = res.data || [];
@@ -451,7 +456,8 @@ export function useProfile(username: string) {
     let cancelled = false;
     (async () => {
       try {
-        const s = sdk || getSdk();
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+        const s = sdk;
         let res;
         try {
           res = await s.profiles.getByUsername(username);
@@ -493,7 +499,8 @@ export function useProfile(username: string) {
     if (!username) return;
     invalidatePrefix(cacheKey);
     try {
-      const s = sdk || getSdk();
+      if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+      const s = sdk;
       let res;
       try { res = await s.profiles.getByUsername(username); }
       catch { res = await s.profiles.get(username); }
@@ -632,7 +639,8 @@ export function useTags(limit = 50) {
     let cancelled = false;
     (async () => {
       try {
-        const s = sdk || getSdk();
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+        const s = sdk;
         const res = await s.tags.list({ limit });
         if (!cancelled) {
           const data = res.data || [];
@@ -665,7 +673,8 @@ export function useProfiles(limit = 20) {
     let cancelled = false;
     (async () => {
       try {
-        const s = sdk || getSdk();
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+        const s = sdk;
         let data: any[];
         if (ORG_ID) {
           const res = await s.organizations.members(ORG_ID, { limit } as any);
@@ -717,7 +726,8 @@ export function useSearchPosts(query: string) {
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const s = sdk || getSdk();
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+        const s = sdk;
         // Search posts
         const res = await s.posts.search({ q: query, limit: 20, organization_id: ORG_ID || undefined });
         if (!cancelled) setResults(res.data || []);
@@ -725,7 +735,8 @@ export function useSearchPosts(query: string) {
         // If posts.search fails, fall back to listing and client-side filtering
         if (!cancelled) {
           try {
-            const s = sdk || getSdk();
+            if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+            const s = sdk;
             const res = await s.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
             const q = query.toLowerCase();
             const filtered = (res.data || []).filter((p: any) =>
@@ -766,7 +777,8 @@ export function useSearch(query: string) {
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const s = sdk || getSdk();
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
+        const s = sdk;
         const q = query.toLowerCase();
 
         // Search in parallel
