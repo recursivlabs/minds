@@ -9,7 +9,7 @@ import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { useAuth } from '../lib/auth';
 import { postScore, postUserVote, postRepostCount } from '../lib/models';
-import { BASE_ORIGIN, ORG_ID } from '../lib/recursiv';
+import { BASE_ORIGIN, SITE_URL, ORG_ID } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
@@ -842,7 +842,9 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                 <Pressable
                   onPress={async () => {
                     setShowMenu(false);
-                    const url = `${BASE_ORIGIN}/post/${actionPostId}`;
+                    // SITE_URL, not BASE_ORIGIN — BASE_ORIGIN is the API host,
+                    // and shared links must point at the app.
+                    const url = `${SITE_URL}/post/${actionPostId}`;
                     try {
                       if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
                         if (navigator.share) {

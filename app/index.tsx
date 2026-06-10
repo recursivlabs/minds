@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
-import { BASE_URL, BASE_ORIGIN } from '../lib/recursiv';
+import { BASE_URL, SITE_URL } from '../lib/recursiv';
 import { Text, Button } from '../components';
 import { colors, spacing } from '../constants/theme';
 import { useTheme } from '../lib/theme';
@@ -881,7 +881,9 @@ export default function LandingScreen() {
               await fetch(`${BASE_URL.replace('/api/v1', '')}/api/auth/forget-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: loginId.trim(), redirectTo: `${BASE_ORIGIN}/reset-password` }),
+                // SITE_URL, not BASE_ORIGIN — the reset email must link back
+                // to the app, not the API host.
+                body: JSON.stringify({ email: loginId.trim(), redirectTo: `${SITE_URL}/reset-password` }),
               });
               setError('');
               setResetSent(true);
