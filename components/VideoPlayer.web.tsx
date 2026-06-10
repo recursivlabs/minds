@@ -38,13 +38,20 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
 
     const pollUntilReady = () => {
       setState('processing');
+      let attempt = 0;
+      const startedAt = Date.now();
       const tick = async () => {
         if (cancelled || !guid) return;
         const st = await getVideoStatus(guid).catch(() => null);
         if (cancelled) return;
         if (st?.status === 'ready') { load(); }
         else if (st?.status === 'failed') { setState('failed'); }
-        else { pollTimer = setTimeout(tick, 4000); } // still processing
+        else if (Date.now() - startedAt < 10 * 60_000) {
+          // still processing — back off (4s → 60s cap) with a hard stop so a
+          // lost encode webhook can't keep every viewer polling forever
+          attempt += 1;
+          pollTimer = setTimeout(tick, Math.min(4000 * 2 ** Math.min(attempt - 1, 4), 60_000));
+        } else { setState('failed'); }
       };
       pollTimer = setTimeout(tick, 3000);
     };
@@ -73,19 +80,19 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
         return;
       }
       if (Hls.isSupported()) {
-        hls = new Hls({ enableWorker: true, abrEwmaDefaultEstimate: 6_000_000, startLevel: -1 });
+        // capLevelToPlayerSize keeps ABR active but bounded by the rendered
+        // element — feed videos render ≤560px tall, so streaming 1080p+ to
+        // them is wasted bandwidth and Bunny egress.
+        hls = new Hls({ enableWorker: true, abrEwmaDefaultEstimate: 6_000_000, startLevel: -1, capLevelToPlayerSize: true });
         hls.loadSource(uri);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           setState('ready');
-          const levels = hls?.levels;
-          if (hls && levels && levels.length) {
-            let top = 0;
-            for (let i = 1; i < levels.length; i++) {
-              if (levels[i].height > levels[top].height) top = i;
-            }
-            hls.nextLevel = top;
-          }
+          // Do NOT pin hls.nextLevel to the top rendition here: assigning a
+          // concrete level index switches hls.js to manual mode and disables
+          // adaptive bitrate for the life of the instance — every web video
+          // streamed max bitrate regardless of connection, buffering on slow
+          // links and burning CDN egress.
         });
         hls.on(Hls.Events.ERROR, (_e, data) => {
           if (!data.fatal) return;
