@@ -1,5 +1,6 @@
 import { ORG_ID } from './recursiv';
 import { captureException } from './monitoring';
+import { invalidate } from './cache';
 
 // Username of the official support agent (a discoverable AI agent owned by the
 // Minds team). Resolved at runtime so there's no hard-coded id to drift.
@@ -17,6 +18,8 @@ export async function openSupportConversation(sdk: any): Promise<string | null> 
     const support = agents.find((a: any) => a.username === SUPPORT_AGENT_USERNAME);
     if (!support?.id) return null;
     const dm = (await sdk.chat.dm({ user_id: support.id, organization_id: ORG_ID || undefined })).data;
+    // Make the new support thread show in the sidebar immediately.
+    invalidate('conversations');
     return dm?.id ?? null;
   } catch (e) {
     captureException(e, { action: 'open_support' });

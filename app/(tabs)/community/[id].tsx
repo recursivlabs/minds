@@ -7,7 +7,7 @@ import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
-import { invalidatePrefix } from '../../../lib/cache';
+import { invalidatePrefix, getCached, setCache } from '../../../lib/cache';
 import { spacing, radius } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 
@@ -17,11 +17,16 @@ export default function CommunityDetailScreen() {
   const { sdk, user } = useAuth();
   const colors = useColors();
 
-  const [community, setCommunity] = React.useState<any>(null);
-  const [posts, setPosts] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [postsLoading, setPostsLoading] = React.useState(true);
-  const [isMember, setIsMember] = React.useState(false);
+  // Seed from cache so revisiting a community renders its header + posts
+  // instantly instead of flashing a full-screen skeleton on every open. The
+  // network fetch below still runs and reconciles in the background.
+  const cachedCommunity = getCached(`community:${id}`);
+  const cachedPosts = getCached(`community-posts:${id}`);
+  const [community, setCommunity] = React.useState<any>(cachedCommunity || null);
+  const [posts, setPosts] = React.useState<any[]>(cachedPosts || []);
+  const [loading, setLoading] = React.useState(!cachedCommunity);
+  const [postsLoading, setPostsLoading] = React.useState(!cachedPosts);
+  const [isMember, setIsMember] = React.useState(!!(cachedCommunity?.is_member || cachedCommunity?.isMember));
   const [joinLoading, setJoinLoading] = React.useState(false);
   const [showModMenu, setShowModMenu] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -41,6 +46,7 @@ export default function CommunityDetailScreen() {
         const res = await sdk.communities.get(id);
         if (!cancelled && res.data) {
           setCommunity(res.data);
+          setCache(`community:${id}`, res.data);
           setIsMember(!!(res.data as any).is_member || !!(res.data as any).isMember);
         }
       } catch (err: any) {
@@ -67,6 +73,7 @@ export default function CommunityDetailScreen() {
       const data = res.data || [];
       if (refresh) {
         setPosts(data);
+        setCache(`community-posts:${id}`, data);
       } else {
         setPosts(prev => {
           const ids = new Set(prev.map((p: any) => p.id));

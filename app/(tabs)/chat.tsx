@@ -101,6 +101,9 @@ export default function ChatScreen() {
   if (activeConvoId) {
     return (
       <ConversationView
+        // Key by id so switching threads remounts fresh — instantly showing the
+        // new thread's cached messages instead of lingering on the previous one.
+        key={activeConvoId}
         conversationId={activeConvoId}
         onBack={() => { setActiveConvoId(null); refresh(); }}
       />
@@ -127,6 +130,9 @@ export default function ChatScreen() {
       if (!userId) { setDmError('User or agent not found. Check the username.'); return; }
       const res = await sdk.chat.dm({ user_id: userId, organization_id: ORG_ID || undefined } as any);
       if (res.data?.id) {
+        // Force the sidebar's conversation list to refetch immediately so the
+        // new thread appears without waiting for the WS round-trip or a refresh.
+        invalidate('conversations');
         setActiveConvoId(res.data.id);
         setShowNewChat(false);
         setDmUsername('');
