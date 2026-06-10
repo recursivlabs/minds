@@ -1,6 +1,24 @@
 import { Platform } from 'react-native';
 
 /**
+ * Markdown link/bare-URL destinations are attacker-controlled post content that
+ * ends up in `href` (web) and `Linking.openURL` (native). Only allow schemes
+ * that can't execute script or smuggle credentials — everything else
+ * (javascript:, data:, vbscript:, intent:, file:, ...) renders as plain text.
+ */
+const SAFE_URL_SCHEME = /^(https?:|mailto:)/i;
+
+export function isSafeUrl(url: string): boolean {
+  return SAFE_URL_SCHEME.test(url.trim());
+}
+
+// The global entity-escape pass below covers & < > but not quotes, so any
+// value placed inside an HTML attribute must escape them too or the URL can
+// break out of the href and inject handlers.
+const escapeAttr = (value: string): string =>
+  value.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/**
  * Simple markdown-to-HTML converter for web.
  * Handles: **bold**, *italic*, `code`, [links](url), and line breaks.
  * No external dependencies.
@@ -29,7 +47,11 @@ export function renderMarkdownToHtml(text: string): string {
   // 2. Inline formatting applied to a single line's content.
   const inline = (line: string): string => line
     .replace(/`([^`]+)`/g, (_m, code) => stash(`<code style="background:#1a1a1e;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:#a0a0a8">${code}</code>`))
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, url) => stash(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#d4a844;text-decoration:underline">${label}</a>`))
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) => (
+      isSafeUrl(url)
+        ? stash(`<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" style="color:#d4a844;text-decoration:underline">${label}</a>`)
+        : m
+    ))
     .replace(/\bhttps?:\/\/[^\s<>()\[\]"']+/g, (m) => {
       let url = m;
       let trailing = '';
@@ -38,7 +60,7 @@ export function renderMarkdownToHtml(text: string): string {
         trailing = url[url.length - 1] + trailing;
         url = url.slice(0, -1);
       }
-      return `${stash(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#d4a844;text-decoration:underline">${url}</a>`)}${trailing}`;
+      return `${stash(`<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" style="color:#d4a844;text-decoration:underline">${url}</a>`)}${trailing}`;
     })
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
@@ -134,8 +156,13 @@ export function parseMarkdownSegments(text: string): MarkdownSegment[] {
       // Code
       segments.push({ type: 'code', text: match[6] });
     } else if (match[7]) {
-      // Markdown link [text](url)
-      segments.push({ type: 'link', text: match[8], url: match[9] });
+      // Markdown link [text](url) — unsafe schemes stay plain text so they
+      // never reach Linking.openURL on native or an href on web.
+      if (isSafeUrl(match[9])) {
+        segments.push({ type: 'link', text: match[8], url: match[9] });
+      } else {
+        segments.push({ type: 'text', text: match[7] });
+      }
     } else if (match[10]) {
       // Hashtag
       segments.push({ type: 'hashtag', text: `#${match[11]}`, tag: match[11] });
