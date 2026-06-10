@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Switch, Platform, Alert, Linking } from 'react-native';
+import { View, ScrollView, Pressable, Switch, Platform, Linking } from 'react-native';
+import { showToast } from '../../components/Toast';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
@@ -112,7 +113,7 @@ function TwoFactorSetup() {
         setSetupUri(data.totpURI || data.totp_uri);
         setStep('setup');
       }
-    } catch { Alert.alert('Error', 'Could not enable 2FA'); }
+    } catch { showToast('Could not enable 2FA', 'error'); }
     setLoading(false);
   };
 
@@ -129,11 +130,11 @@ function TwoFactorSetup() {
         setEnabled(true);
         setStep('idle');
         setSetupUri(null);
-        Alert.alert('Success', '2FA is now enabled');
+        showToast('2FA is now enabled', 'success');
       } else {
-        Alert.alert('Error', 'Invalid code. Try again.');
+        showToast('Invalid code. Try again.', 'error');
       }
-    } catch { Alert.alert('Error', 'Verification failed'); }
+    } catch { showToast('Verification failed', 'error'); }
     setLoading(false);
   };
 
@@ -240,7 +241,7 @@ export default function SettingsScreen() {
 
   const showMsg = (msg: string, isError = false) => {
     if (isError) {
-      Alert.alert('Error', msg);
+      showToast(msg, 'error');
     } else {
       setStatusMsg(msg);
       setTimeout(() => setStatusMsg(null), 3000);

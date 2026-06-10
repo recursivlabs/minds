@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
+import { showToast } from '../../../components/Toast';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
@@ -240,7 +241,7 @@ export default function CommunityDetailScreen() {
                             await (sdk.communities as any).update(community.id, { name: editName.trim(), description: editDesc.trim() });
                             setCommunity((prev: any) => prev ? { ...prev, name: editName.trim(), description: editDesc.trim() } : prev);
                             setEditMode(false);
-                          } catch { Alert.alert('Error', 'Could not update community'); }
+                          } catch { showToast('Could not update community', 'error'); }
                         }}
                         size="sm"
                       >Save</Button>
@@ -259,7 +260,7 @@ export default function CommunityDetailScreen() {
                       const res = await sdk.communities.members(community.id, { limit: 50 });
                       const members = res.data || [];
                       Alert.alert('Members', members.map((m: any) => m.user?.name || m.name || 'Unknown').join('\n') || 'No members');
-                    } catch { Alert.alert('Error', 'Could not load members'); }
+                    } catch { showToast('Could not load members', 'error'); }
                   }}
                   variant="ghost"
                   size="sm"
@@ -286,7 +287,7 @@ export default function CommunityDetailScreen() {
                                 await sdkAny.update(community.id, { archived: true });
                               }
                               router.back();
-                            } catch { Alert.alert('Error', 'Could not delete community'); }
+                            } catch { showToast('Could not delete community', 'error'); }
                           },
                         },
                       ]

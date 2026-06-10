@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, TextInput, Alert, Platform, Pressable } from 'react-native';
+import { View, TextInput, Platform, Pressable } from 'react-native';
+import { showToast } from '../../components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Card, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
@@ -42,14 +43,14 @@ export default function WalletScreen() {
     setSending(true);
     try {
       await sdk.wallet.send(sendTo.trim(), sendAmount.trim());
-      Alert.alert('Success', `Sent ${sendAmount} ETH`);
+      showToast(`Sent ${sendAmount} ETH`, 'success');
       setSendTo('');
       setSendAmount('');
       // Refresh balance
       const res = await sdk.wallet.getBalance();
       if (res.data) setWallet((prev: any) => ({ ...prev, ...res.data }));
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to send');
+      showToast(err?.message || 'Failed to send', 'error');
     }
     setSending(false);
   };

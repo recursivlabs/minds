@@ -516,6 +516,20 @@ export default function CreateScreen() {
       {/* Content area */}
       {(mode === 'post' || mode === 'blog') ? (
         <View style={{ flex: 1, padding: spacing.xl }}>
+          {/* The error/success banners below were only rendered in the
+              agent/app/community branch, so a failed post submit showed
+              NOTHING in post mode — the flagship action of the app. */}
+          {errorMsg && (
+            <Pressable onPress={() => setErrorMsg(null)} style={{ backgroundColor: colors.errorMuted, padding: spacing.md, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+              <Ionicons name="alert-circle" size={18} color={colors.error} />
+              <Text variant="body" color={colors.error} style={{ flex: 1 }}>{errorMsg}</Text>
+            </Pressable>
+          )}
+          {successMsg && (
+            <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center', marginBottom: spacing.md }}>
+              <Text variant="body" color={colors.success}>{successMsg}</Text>
+            </View>
+          )}
           {/* Community picker — optional. Default audience is global,
               matching legacy Minds + modern social conventions. */}
           <View style={{ marginBottom: spacing.md, position: 'relative' }}>

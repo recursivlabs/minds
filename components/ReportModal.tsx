@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, Modal, Pressable, ScrollView, Alert, Platform } from 'react-native';
+import { View, Modal, Pressable, ScrollView, Platform } from 'react-native';
+import { showToast } from './Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Button } from './Button';
@@ -43,7 +44,7 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
         onClose();
       }, 1500);
     } catch {
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
+      showToast('Failed to submit report. Please try again.', 'error');
     } finally {
       setSubmitting(false);
     }

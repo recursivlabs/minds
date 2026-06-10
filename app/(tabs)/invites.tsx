@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { View, ScrollView, Pressable, Platform } from 'react-native';
+import { showToast } from '../../components/Toast';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Card, Skeleton } from '../../components';
@@ -43,7 +44,7 @@ export default function InvitesScreen() {
       await sdk.inviteCodes.generate(1);
       await load();
     } catch {
-      import('react-native').then(rn => rn.Alert.alert('Error', 'Failed to generate invite code.'));
+      showToast('Failed to generate invite code.', 'error');
     }
     setGenerating(false);
   };

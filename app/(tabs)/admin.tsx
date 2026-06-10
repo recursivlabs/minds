@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Platform, Alert, TextInput } from 'react-native';
+import { View, ScrollView, Pressable, Platform, TextInput } from 'react-native';
+import { showToast } from '../../components/Toast';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton, Divider, Avatar } from '../../components';
@@ -257,19 +258,19 @@ function UsersTab({ sdk }: { sdk: any }) {
 
   const banUser = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.banUser(id, { reason: 'Admin action' }); await load(search); } catch { Alert.alert('Error', 'Failed to ban user.'); }
+    try { await sdk.admin.banUser(id, { reason: 'Admin action' }); await load(search); } catch { showToast('Failed to ban user.', 'error'); }
     setActionId('');
   };
 
   const unbanUser = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.unbanUser(id); await load(search); } catch { Alert.alert('Error', 'Failed to unban user.'); }
+    try { await sdk.admin.unbanUser(id); await load(search); } catch { showToast('Failed to unban user.', 'error'); }
     setActionId('');
   };
 
   const setRole = async (id: string, role: string) => {
     setActionId(id);
-    try { await sdk.admin.setUserRole(id, role); await load(search); } catch { Alert.alert('Error', 'Failed to set role.'); }
+    try { await sdk.admin.setUserRole(id, role); await load(search); } catch { showToast('Failed to set role.', 'error'); }
     setActionId('');
   };
 
@@ -353,7 +354,7 @@ function ContentTab({ sdk }: { sdk: any }) {
         await sdk.admin.deletePost(id);
       }
       setPosts(p => p.filter(x => x.id !== id));
-    } catch { Alert.alert('Error', 'Failed to delete post. Check your permissions.'); }
+    } catch { showToast('Failed to delete post. Check your permissions.', 'error'); }
     setDeletingId('');
   };
 
@@ -478,7 +479,7 @@ function CommunitiesTab({ sdk }: { sdk: any }) {
     try {
       await sdk.communities.delete(id);
       setCommunities(c => c.filter(x => x.id !== id));
-    } catch { Alert.alert('Error', 'Failed to delete community.'); }
+    } catch { showToast('Failed to delete community.', 'error'); }
     setDeletingId('');
   };
 
@@ -546,13 +547,13 @@ function InvitesTab({ sdk }: { sdk: any }) {
 
   const revoke = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.revokeInviteCode(id); setCodes(c => c.map(x => x.id === id ? { ...x, status: 'revoked' } : x)); } catch { Alert.alert('Error', 'Failed to revoke code.'); }
+    try { await sdk.admin.revokeInviteCode(id); setCodes(c => c.map(x => x.id === id ? { ...x, status: 'revoked' } : x)); } catch { showToast('Failed to revoke code.', 'error'); }
     setActionId('');
   };
 
   const grant = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.grantWaitlistAccess(id); setWaitlist(w => w.filter(x => x.id !== id)); } catch { Alert.alert('Error', 'Failed to grant access.'); }
+    try { await sdk.admin.grantWaitlistAccess(id); setWaitlist(w => w.filter(x => x.id !== id)); } catch { showToast('Failed to grant access.', 'error'); }
     setActionId('');
   };
 
@@ -617,7 +618,7 @@ function NetworkTab({ sdk }: { sdk: any }) {
   const save = async () => {
     if (!settings) return;
     setSaving(true);
-    try { await sdk.admin.updateNetworkSettings(settings); } catch { Alert.alert('Error', 'Failed to save settings.'); }
+    try { await sdk.admin.updateNetworkSettings(settings); } catch { showToast('Failed to save settings.', 'error'); }
     setSaving(false);
   };
 

@@ -1,9 +1,10 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Platform, Alert, Switch } from 'react-native';
+import { View, ScrollView, Pressable, Platform, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
 import { Container } from '../../components/Container';
+import { showToast } from '../../components/Toast';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius } from '../../constants/theme';
@@ -25,7 +26,7 @@ function OrgSettingsScreen() {
 
   const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
   const showSuccess = (m: string) => { setStatusMsg(m); setTimeout(() => setStatusMsg(null), 2000); };
-  const showError = (m: string) => { Alert.alert('Error', m); };
+  const showError = (m: string) => { showToast(m, 'error'); };
 
   const load = React.useCallback(async () => {
     if (!sdk) return;

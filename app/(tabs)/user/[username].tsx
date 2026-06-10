@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Alert, Platform, Modal, TextInput, Image } from 'react-native';
+import { View, ScrollView, Pressable, Platform, Modal, TextInput, Image } from 'react-native';
+import { showToast } from '../../../components/Toast';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -215,7 +216,7 @@ export default function UserProfileScreen() {
       if (Platform.OS === 'web') {
         (typeof window !== 'undefined' ? window : globalThis).alert?.(message);
       } else {
-        Alert.alert('Follow failed', message);
+        showToast(message, 'error');
       }
     } finally {
       setFollowLoading(false);
@@ -452,7 +453,7 @@ export default function UserProfileScreen() {
                     if (res.data?.id) {
                       router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
                     }
-                  } catch { Alert.alert('Error', 'Could not start chat'); }
+                  } catch { showToast('Could not start chat', 'error'); }
                 }}
                 variant="secondary"
                 size="sm"
@@ -470,7 +471,7 @@ export default function UserProfileScreen() {
                       body: JSON.stringify({ target_type: 'user', target_id: profile.id, reason: 'Reported from profile', details: '' }),
                     });
                   } catch {}
-                  Alert.alert('Report', 'User has been reported. Thank you.');
+                  showToast('User has been reported. Thank you.', 'success');
                 }}
                 variant="ghost"
                 size="sm"
@@ -670,7 +671,7 @@ export default function UserProfileScreen() {
                               throw new Error('No upload URL returned from server');
                             }
                           } catch (err: any) {
-                            Alert.alert('Avatar Error', err?.message || String(err) || 'Upload failed.');
+                            showToast(err?.message || String(err) || 'Upload failed.', 'error');
                           }
                         }
                         const newUsername = editUsername.trim();
@@ -687,7 +688,7 @@ export default function UserProfileScreen() {
                           router.replace(`/(tabs)/user/${newUsername}` as any);
                         }
                       } catch {
-                        Alert.alert('Error', 'Failed to update profile.');
+                        showToast('Failed to update profile.', 'error');
                       } finally {
                         setEditSaving(false);
                       }
