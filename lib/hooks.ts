@@ -126,6 +126,16 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
 
   React.useEffect(() => {
     if (isFresh(cacheKey) && cached) {
+      // Even when the cache is fresh, state must swap to THIS sort's data —
+      // early-returning without setPosts left the previous tab's posts
+      // rendered under the new tab until the TTL lapsed. Pagination refs
+      // belong to the old sort too, so reset them or the next loadMore
+      // fetches from the wrong offset with the wrong follow/community sets.
+      setPosts(cached);
+      offsetRef.current = cached.length;
+      followingIdsRef.current = null;
+      myCommunityIdsRef.current = null;
+      setHasMore(true);
       setLoading(false);
       return;
     }
@@ -135,7 +145,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
     followingIdsRef.current = null;
     myCommunityIdsRef.current = null;
     fetchPosts(true);
-  }, [sort]);
+  }, [cacheKey]);
 
   // Silent re-fetch — used by tab focus, polling, and any background
   // freshness check. Just re-queries the post list. Does NOT trigger
