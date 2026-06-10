@@ -52,7 +52,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { user, sdk } = useAuth();
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
-  const { communities } = useCommunities(5);
+  const { communities, fetchedOnce: communitiesFetched } = useCommunities(5);
   // Unread DM dots are STICKY: a dot is only ever cleared by OPENING the thread,
   // never by a server refresh. Two things ADD a dot — a live WS message, or the
   // server's read-cursor count on load/refresh (back-fills threads that went
@@ -349,7 +349,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // NOTE: this reflects real communityMember rows — if a community the user
   // never joined appears here, the fix is at the source (an auto-join path
   // creating the membership), not this filter.
-  const recentCommunities = (communities || [])
+  // Only show communities once a FRESH server fetch has confirmed membership
+  // this session. Without this gate a stale cached is_member=true could flash
+  // (intermittently, depending on boot timing) — the phantom QA/Support groups.
+  const recentCommunities = (communitiesFetched ? (communities || []) : [])
     .filter((c: any) => c.is_member === true || c.isMember === true)
     .slice(0, 3)
     .map((c: any) => ({

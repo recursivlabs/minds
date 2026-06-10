@@ -19,14 +19,23 @@ type CacheEntry = {
 
 const isWeb = Platform.OS === 'web' && typeof window !== 'undefined';
 const store = new Map<string, CacheEntry>();
-const BASE_KEY = 'minds:cache:v3';
+const BASE_KEY = 'minds:cache:v4';
 const AUTH_USER_KEY = 'minds:user'; // matches KEYS.user in lib/auth.tsx
 
-// Sweep the legacy SHARED (cross-account-unsafe) keys so they can't leak.
+// Sweep EVERY older cache key (shared minds:cache / minds:cache:v2, and the
+// per-user minds:cache:v3:* namespaces). v3 could still hold a poisoned
+// is_member=true entry from before the server fix, which kept the phantom
+// QA/Support communities in the sidebar. Bumping to v4 + this sweep guarantees
+// no stale community/membership data survives a deploy.
 if (isWeb) {
-  for (const k of ['minds:cache', 'minds:cache:v2']) {
-    try { window.localStorage.removeItem(k); } catch {}
-  }
+  try {
+    const stale: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith('minds:cache:') && !k.startsWith(BASE_KEY)) stale.push(k);
+    }
+    for (const k of stale) window.localStorage.removeItem(k);
+  } catch {}
 }
 
 // Resolve the current user's id synchronously from the stored auth user, so the
