@@ -836,7 +836,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           rafId = null;
           const gap = received.length - displayed;
           if (gap > 0) {
-            displayed = Math.min(received.length, displayed + Math.max(2, Math.ceil(gap * 0.3)));
+            displayed = Math.min(received.length, displayed + Math.max(2, Math.ceil(gap * 0.2)));
             renderTo(displayed);
           }
           if (displayed < received.length) {
