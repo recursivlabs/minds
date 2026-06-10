@@ -195,7 +195,11 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
     followingIdsRef.current = null;
     myCommunityIdsRef.current = null;
     fetchPosts(true);
-  }, [cacheKey]);
+    // sdk in deps: this effect's first run fires while the session is still
+    // restoring (sdk null), and fetchPosts no-ops by design (no shared-key
+    // fallback anymore). Without re-firing when sdk lands, the feed (and the
+    // trending/discover surfaces built on usePosts) stranded on empty/error.
+  }, [cacheKey, sdk]);
 
   // Silent re-fetch — used by tab focus, polling, and any background
   // freshness check. Just re-queries the post list. Does NOT trigger
