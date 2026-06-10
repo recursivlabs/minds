@@ -5,7 +5,7 @@ import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
 import { registerPushToken, registerTokenWithServer } from './notifications';
 import { captureException } from './monitoring';
-import { clearAll as clearCacheAll } from './cache';
+import { clearAll as clearCacheAll, setCacheUser } from './cache';
 
 function registerPushTokenBackground(sdk: Recursiv) {
   registerPushToken().then(token => {
@@ -108,8 +108,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
           }
+          const bootUser = JSON.parse(storedUser);
+          // Point the cache at THIS user's namespace before anything renders, so
+          // a previous account's cached data can't flash through.
+          setCacheUser(bootUser?.id ?? null);
           setAuthedSdk(sdk);
-          setUser(JSON.parse(storedUser));
+          setUser(bootUser);
           setProjectId(storedProjectId);
           registerPushTokenBackground(sdk);
         }
@@ -134,17 +138,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function persistSession(apiKey: string, authUser: User) {
-    // If the previously-stored user differs from the one we're about
-    // to persist (different browser session, same machine, different
-    // account), wipe the cache so audience-scoped data from the old
-    // user doesn't bleed into this one.
-    try {
-      const prior = await storage.getItem(KEYS.user);
-      if (prior) {
-        const parsed = JSON.parse(prior);
-        if (parsed?.id && parsed.id !== authUser.id) clearCacheAll();
-      }
-    } catch {}
+    // Point the cache at this user's namespace. Switching accounts in the same
+    // browser loads the new user's own (or empty) cache — the previous user's
+    // audience-scoped data (profile, conversations, communities) can never bleed
+    // in, since each account reads/writes only its own namespaced key.
+    setCacheUser(authUser.id);
     const sdk = createAuthedSdk(apiKey);
     await Promise.all([
       storage.setItem(KEYS.apiKey, apiKey),
@@ -272,6 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // signs in, and sees jack's audience-scoped Discover posts +
     // 404s when clicking them.
     clearCacheAll();
+    setCacheUser(null); // reset to the anon namespace
     setUser(null);
     setAuthedSdk(null);
     setProjectId(null);
