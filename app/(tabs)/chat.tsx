@@ -16,6 +16,7 @@ import { useSetActiveConvoId } from '../../lib/activeConvo';
 import { ThinkingPill } from '../../components/ThinkingPill';
 import { ensureIntroDM } from '../../lib/agentIntro';
 import { captureException } from '../../lib/monitoring';
+import { connectRealtime } from '../../lib/realtime';
 import { conversationUnreadCount, isAiActor } from '../../lib/models';
 
 export default function ChatScreen() {
@@ -46,7 +47,7 @@ export default function ChatScreen() {
     let cancelled = false;
     (async () => {
       try {
-        await sdk.realtime.connect();
+        await connectRealtime(sdk);
         if (cancelled) return;
         let lastRefresh = 0;
         unsub = sdk.realtime.onMessage(() => {
@@ -438,6 +439,45 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [partnerInfo, setPartnerInfo] = React.useState<any>(cachedOther || null);
   const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const messageIdsRef = React.useRef<Set<string>>(new Set(cachedSorted.map((m: any) => m.id)));
+  const pollInFlightRef = React.useRef(false);
+
+  // One reconcile fetch: pull the latest server messages and MERGE them into
+  // state by id. Merging (not replacing) matters: a wholesale setMessages used
+  // to truncate visible history from 50 to the poll's 20 and delete optimistic
+  // temp-*/streaming-* rows mid-send. Shared by the fallback poll interval and
+  // the socket-reconnect catch-up.
+  const fetchLatest = React.useCallback(async () => {
+    if (!sdk || pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
+    try {
+      const msgRes = await sdk.chat.messages(conversationId, { limit: 20 });
+      const rawMessages = msgRes.data || [];
+      rawMessages.forEach((m: any) => messageIdsRef.current.add(m.id));
+      const incoming = rawMessages.reverse().map((m: any) => ({
+        id: m.id,
+        content: (m.content || m.text || '').trim(),
+        sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
+        createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+      })).filter((m: any) => m.content); // Skip blank messages
+      setMessages(prev => {
+        const byId = new Map<string, any>();
+        for (const m of prev) byId.set(m.id, m);
+        for (const m of incoming) byId.set(m.id, m);
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      });
+    } catch {} finally { pollInFlightRef.current = false; }
+  }, [conversationId, sdk]);
+
+  const stopPolling = React.useCallback(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }, []);
+
+  const startPolling = React.useCallback(() => {
+    if (pollRef.current) return;
+    pollRef.current = setInterval(fetchLatest, 5000);
+  }, [fetchLatest]);
 
   // Scroll-position handling. We only auto-stick to the bottom when the user
   // is already there — so an incoming message or a streaming reply never yanks
@@ -535,6 +575,9 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   React.useEffect(() => {
     if (!sdk) return;
     let unsub: (() => void) | undefined;
+    let socket: any = null;
+    let onSocketDisconnect: (() => void) | undefined;
+    let onSocketConnect: (() => void) | undefined;
 
     // ONE stable subscription per conversation. Previously this effect also
     // depended on `loading`, so it tore down and rebuilt the socket listener
@@ -543,9 +586,26 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     // load are deduped by id, so subscribing immediately is safe.
     (async () => {
       try {
-        await sdk.realtime.connect();
+        socket = await connectRealtime(sdk);
         sdk.realtime.joinConversation(conversationId);
         wsConnectedRef.current = true;
+
+        // A drop must re-arm the polling fallback (the 2s boot check runs
+        // once and never again), and a reconnect must re-join the server-side
+        // conversation room — membership died with the old socket session —
+        // then reconcile whatever arrived while offline.
+        onSocketDisconnect = () => {
+          wsConnectedRef.current = false;
+          startPolling();
+        };
+        onSocketConnect = () => {
+          wsConnectedRef.current = true;
+          stopPolling();
+          sdk.realtime.joinConversation(conversationId);
+          fetchLatest();
+        };
+        socket?.on('disconnect', onSocketDisconnect);
+        socket?.on('connect', onSocketConnect);
 
         unsub = sdk.realtime.onMessage((msg: any) => {
           if (msg.conversationId !== conversationId) return;
@@ -624,11 +684,13 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
 
     return () => {
       unsub?.();
+      if (onSocketDisconnect) socket?.off('disconnect', onSocketDisconnect);
+      if (onSocketConnect) socket?.off('connect', onSocketConnect);
       if (wsConnectedRef.current) {
         sdk.realtime.leaveConversation(conversationId);
       }
     };
-  }, [conversationId, sdk]);
+  }, [conversationId, sdk, startPolling, stopPolling, fetchLatest]);
 
   // Rich agent thinking state. Server emits `agent_thinking` events
   // with status ('thinking' | 'generating' | 'done') during a stream.
@@ -640,7 +702,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     const clearStuckTimer = () => { if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; } };
     (async () => {
       try {
-        await sdk.realtime.connect();
+        await connectRealtime(sdk);
         unsub = sdk.realtime.onAgentThinking?.((evt: any) => {
           if (evt?.conversationId && evt.conversationId !== conversationId) return;
           if (evt?.status === 'done' || evt?.status === 'error') {
@@ -673,7 +735,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
     (async () => {
       try {
-        await sdk.realtime.connect();
+        await connectRealtime(sdk);
         unsub = sdk.realtime.onTyping?.((evt: any) => {
           if (evt?.conversationId !== conversationId) return;
           if (evt?.userId === user?.id) return;
@@ -700,38 +762,19 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   React.useEffect(() => {
     if (!sdk) return;
 
-    // Wait a moment for WS to connect before starting poll
+    // Wait a moment for WS to connect before starting poll. This is only the
+    // BOOT decision — the socket's own disconnect/connect handlers above
+    // re-arm and stop polling for the rest of the conversation's life.
     const startTimer = setTimeout(() => {
       if (wsConnectedRef.current) return; // WS connected, no need to poll
-
-      let pollInFlight = false;
-      pollRef.current = setInterval(async () => {
-        // Skip if the previous poll hasn't returned — under load a slow
-        // response must not let 5s-spaced requests pile up and stampede.
-        if (pollInFlight) return;
-        pollInFlight = true;
-        try {
-          const msgRes = await sdk.chat.messages(conversationId, { limit: 20 });
-          const rawMessages = msgRes.data || [];
-          rawMessages.forEach((m: any) => messageIdsRef.current.add(m.id));
-          const allServerMsgs = rawMessages.reverse().map((m: any) => ({
-            id: m.id,
-            content: (m.content || m.text || '').trim(),
-            sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
-            createdAt: m.createdAt || m.created_at || new Date().toISOString(),
-          })).filter((m: any) => m.content); // Skip blank messages
-
-          setMessages(allServerMsgs);
-        } catch {} finally { pollInFlight = false; }
-      }, 5000);
-
-    }, 2000); // Wait 2s for WS to connect before falling back to polling
+      startPolling();
+    }, 2000);
 
     return () => {
       clearTimeout(startTimer);
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPolling();
     };
-  }, [conversationId, sdk]);
+  }, [conversationId, sdk, startPolling, stopPolling]);
 
   // Mark as read — ONLY while the screen is actually focused. If the agent's
   // reply streams in while you're on another tab (this screen stays mounted),
