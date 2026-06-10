@@ -278,7 +278,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         setIsDeleted(true);
         onPostDeleted?.(post.id);
       } catch {
-        Alert.alert('Error', 'Failed to delete post.');
+        toast.show('Failed to delete post', 'error');
       }
     };
 
@@ -300,7 +300,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       setCurrentContent(editContent.trim());
       setIsEditing(false);
     } catch {
-      Alert.alert('Error', 'Failed to update post.');
+      toast.show('Failed to update post', 'error');
     } finally {
       setEditSaving(false);
     }

@@ -1,4 +1,5 @@
-import { View, Pressable, Platform, Alert } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
+import { showToast } from './Toast';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -40,7 +41,7 @@ export function AgentCard({ agent, onChat }: Props) {
         router.push({ pathname: '/(tabs)/chat', params: { id: res.data.id } } as any);
       }
     } catch {
-      Alert.alert('Error', 'Could not start chat with this agent. Please try again.');
+      showToast('Could not start chat with this agent. Please try again.', 'error');
     }
   };
 

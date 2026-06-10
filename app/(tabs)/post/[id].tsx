@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { showToast } from '../../../components/Toast';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +11,7 @@ import { useAuth } from '../../../lib/auth';
 import { usePost } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { setCache, invalidate } from '../../../lib/cache';
+import { captureException } from '../../../lib/monitoring';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 
@@ -89,7 +91,13 @@ export default function PostDetailScreen() {
         invalidate('posts:latest:20');
         invalidate('posts:latest:50');
       }
-    } catch { Alert.alert('Error', 'Failed to post reply.'); }
+    } catch (err) {
+      // The input was cleared optimistically before the request — restore it
+      // so a network blip can't destroy the user's typed reply.
+      setReplyText(text);
+      showToast('Reply failed — your text was restored', 'error');
+      captureException(err, { action: 'reply', postId: id });
+    }
     finally { setSubmitting(false); }
   };
 

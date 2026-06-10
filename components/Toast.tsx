@@ -20,16 +20,30 @@ export function useToast() {
   return React.useContext(ToastContext);
 }
 
+// Imperative escape hatch for call sites that can't use the hook, and the
+// cross-platform replacement for error/success Alert.alert feedback —
+// Alert.alert is a silent no-op on react-native-web. No-op until
+// ToastProvider mounts.
+let globalShow: ((message: string, type?: ToastType) => void) | null = null;
+export function showToast(message: string, type: ToastType = 'success') {
+  globalShow?.(message, type);
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<Toast[]>([]);
 
   const show = React.useCallback((message: string, type: ToastType = 'success') => {
-    const id = Date.now().toString();
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 2500);
   }, []);
+
+  React.useEffect(() => {
+    globalShow = show;
+    return () => { if (globalShow === show) globalShow = null; };
+  }, [show]);
 
   return (
     <ToastContext.Provider value={{ show }}>

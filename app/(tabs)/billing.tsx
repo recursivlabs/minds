@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { View, ScrollView, Pressable, Platform, Linking } from 'react-native';
+import { showToast } from '../../components/Toast';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Button, Card, Skeleton } from '../../components';
@@ -54,7 +55,7 @@ export default function BillingScreen() {
         else Linking.openURL(url);
       }
     } catch {
-      import('react-native').then(rn => rn.Alert.alert('Error', 'Could not open billing portal.'));
+      showToast('Could not open billing portal.', 'error');
     }
     setPortalLoading(false);
   };
