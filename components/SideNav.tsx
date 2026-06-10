@@ -79,20 +79,21 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     } catch {}
   }, [sdk]);
 
+  // Navigation-triggered refetches are throttled: neither call below is
+  // actually cached (refreshNotifs hits notifications.list directly, and the
+  // conversations refresh refetches), so every route change used to cost two
+  // API calls per click for every user — pure navigation amplification. The
+  // socket is the primary freshness path; pathname refetch is a safety net
+  // that doesn't need to fire more than once per 15s.
+  const lastNavRefetchRef = React.useRef(0);
   React.useEffect(() => {
+    if (!sdk) return;
+    const now = Date.now();
+    if (now - lastNavRefetchRef.current < 15_000) return;
+    lastNavRefetchRef.current = now;
     refreshNotifs();
-  }, [sdk, pathname]); // Refetch when navigating (cheap, cached)
-
-  // Chat-list safety net. WS fan-out (PR #1461) is the primary path
-  // for new DM delivery, but if a recipient's socket missed the event
-  // (reconnecting, just opened the tab, etc.) the conversation would
-  // be invisible until they navigated. Three defenses:
-  //   1. Refetch on pathname change (cheap, debounced via cache)
-  //   2. Refetch when the tab regains visibility
-  //   3. Light poll every 30s as a final fallback
-  React.useEffect(() => {
     refreshConvos();
-  }, [sdk, pathname, refreshConvos]);
+  }, [sdk, pathname, refreshNotifs, refreshConvos]);
 
   React.useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
