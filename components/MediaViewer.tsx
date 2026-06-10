@@ -24,13 +24,21 @@ function VideoMedia({ url, height }: { url: string; height: number }) {
     if (!guid) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
+    let attempt = 0;
+    const startedAt = Date.now();
     const poll = async () => {
       const s = await getVideoStatus(guid);
       if (!alive) return;
       // If the status lookup fails outright, optimistically try to play.
       setStatus(s ?? { status: 'ready', progress: 100, thumbnailUrl: null, hlsUrl: url });
       if (s && (s.status === 'processing' || s.status === null)) {
-        timer = setTimeout(poll, 4000);
+        // Backoff with a hard stop. A fixed 4s poll with no cap meant a video
+        // whose encode webhook was lost kept EVERY viewer polling forever —
+        // a popular stuck video becomes a self-inflicted DDoS on the status
+        // route.
+        if (Date.now() - startedAt > 10 * 60_000) return;
+        attempt += 1;
+        timer = setTimeout(poll, Math.min(4000 * 2 ** Math.min(attempt - 1, 4), 60_000));
       }
     };
     poll();

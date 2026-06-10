@@ -56,18 +56,39 @@ export interface VideoStatus {
   hlsUrl: string | null;
 }
 
+// ready/failed are terminal — never refetch them. Without this, every video
+// post issued a status GET on every card mount, and FlatList virtualization
+// remounts cards as the user scrolls, re-fetching the SAME long-encoded
+// videos over and over: N videos × every scroll pass × every viewer.
+const statusCache = new Map<string, VideoStatus>();
+const statusInflight = new Map<string, Promise<VideoStatus | null>>();
+
 /** Live encode status for a video (processing→ready), used to gate playback. */
 export async function getVideoStatus(guid: string): Promise<VideoStatus | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/video/${guid}/status`, {
-      headers: { Authorization: `Bearer ${await apiKey()}` },
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.data as VideoStatus;
-  } catch {
-    return null;
-  }
+  const cached = statusCache.get(guid);
+  if (cached) return cached;
+  const inflight = statusInflight.get(guid);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/video/${guid}/status`, {
+        headers: { Authorization: `Bearer ${await apiKey()}` },
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const st = json.data as VideoStatus;
+      if (st && (st.status === 'ready' || st.status === 'failed')) {
+        statusCache.set(guid, st);
+      }
+      return st;
+    } catch {
+      return null;
+    } finally {
+      statusInflight.delete(guid);
+    }
+  })();
+  statusInflight.set(guid, p);
+  return p;
 }
 
 async function createUpload(title: string): Promise<CreateUploadResponse> {
