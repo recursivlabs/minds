@@ -1,6 +1,6 @@
 import type * as React from 'react';
 import { useCallback, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Slot, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -91,7 +91,11 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) return null;
+  // Gate on fonts only where a splash screen covers the wait. Web has no
+  // splash — returning null left users staring at a blank white page while
+  // ~640KB of TTFs downloaded (serially, after the JS bundle). Render with
+  // the system font stack and let Roboto swap in.
+  if (!fontsLoaded && Platform.OS !== 'web') return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

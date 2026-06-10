@@ -97,25 +97,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (storedApiKey && storedUser) {
           const sdk = createAuthedSdk(storedApiKey);
-          try {
-            await sdk.users.me();
-          } catch (err: any) {
-            // Only clear session on auth errors (401/403), not billing (402) or server errors (500)
-            const status = err?.statusCode || err?.status || 0;
-            if (status === 401 || status === 403) {
-              await clearStorage();
-              setIsLoading(false);
-              return;
-            }
-          }
           const bootUser = JSON.parse(storedUser);
-          // Point the cache at THIS user's namespace before anything renders, so
-          // a previous account's cached data can't flash through.
+          // Restore the session optimistically — the stored user is what gets
+          // rendered anyway, and blocking first paint on a users.me() round
+          // trip (with the SDK's 120s timeout) meant a slow API at cutover
+          // holds the entire migrated user base on the splash screen at once.
+          // Point the cache at THIS user's namespace before anything renders,
+          // so a previous account's cached data can't flash through.
           setCacheUser(bootUser?.id ?? null);
           setAuthedSdk(sdk);
           setUser(bootUser);
           setProjectId(storedProjectId);
           registerPushTokenBackground(sdk);
+          // Validate in the background; only a definitive auth rejection
+          // (401/403) tears the session down — not billing (402) or 5xx.
+          void (async () => {
+            try {
+              await sdk.users.me();
+            } catch (err: any) {
+              const status = err?.statusCode || err?.status || 0;
+              if (status === 401 || status === 403) {
+                await clearStorage();
+                setCacheUser(null);
+                setAuthedSdk(null);
+                setUser(null);
+                setProjectId(null);
+              }
+            }
+          })();
         }
       } catch (err) {
         // An unexpected error during boot logs the user out — make it visible
