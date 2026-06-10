@@ -381,16 +381,17 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const { sdk, user } = useAuth();
   const colors = useColors();
   const setActiveConvoId = useSetActiveConvoId();
-  // Mark this conversation active ONLY while the chat screen is focused, so the
-  // SideNav suppresses its unread dot just for the thread you're actually
-  // reading. Expo-router keeps tab screens mounted, so an unmount-based cleanup
-  // never fired on a tab switch — leaving for the feed left the active id stuck
-  // on this thread, which is exactly why an agent reply that landed after you
-  // left showed no dot. Focus/blur clears it correctly.
+  // Track focus. Two things hang off it: (1) marking this conversation active so
+  // the SideNav suppresses its unread dot only for the thread you're reading, and
+  // (2) gating mark-as-read below. Expo-router keeps tab screens mounted, so an
+  // unmount-based cleanup never fired on a tab switch — focus/blur is the correct
+  // signal for "am I actually looking at this thread right now."
+  const [screenFocused, setScreenFocused] = React.useState(true);
   useFocusEffect(
     React.useCallback(() => {
+      setScreenFocused(true);
       setActiveConvoId(conversationId);
-      return () => setActiveConvoId(null);
+      return () => { setScreenFocused(false); setActiveConvoId(null); };
     }, [conversationId, setActiveConvoId])
   );
   const cachedMsgs = getCached(`messages:${conversationId}`);
@@ -520,6 +521,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         unsub = sdk.realtime.onMessage((msg: any) => {
           if (msg.conversationId !== conversationId) return;
           const senderId = msg.sender?.id || msg.senderId;
+
+          // Skip the echo of your OWN messages. The server fans every message to
+          // both the conversation room and each member's user room, and your
+          // socket is in both — so your own send echoes back, sometimes with an
+          // id that doesn't match the optimistic/reconciled row, producing a
+          // duplicate. Your sent message is already shown optimistically and
+          // reconciled from the send response; the WS path is only for inbound.
+          if (senderId && senderId === user?.id) return;
 
           const msgContent = (msg.text || msg.content || '').trim();
           if (!msgContent) return; // Skip blank messages (tool calls)
@@ -676,15 +685,20 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     };
   }, [conversationId, sdk, loading]);
 
-  // Mark as read
+  // Mark as read — ONLY while the screen is actually focused. If the agent's
+  // reply streams in while you're on another tab (this screen stays mounted),
+  // marking it read in the background would advance the server cursor and the
+  // unread dot would vanish on the next refresh. Gating on focus keeps the
+  // thread genuinely unread until you come back and look at it.
   React.useEffect(() => {
+    if (!screenFocused) return;
     if (sdk && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg?.id && !lastMsg.id.startsWith('temp-') && !lastMsg.id.startsWith('agent-') && !lastMsg.id.startsWith('streaming-')) {
         sdk.chat.markAsRead(conversationId, { message_id: lastMsg.id }).catch(() => {});
       }
     }
-  }, [conversationId, sdk, messages]);
+  }, [conversationId, sdk, messages, screenFocused]);
 
   const handleSend = async () => {
     if (!text.trim() || !sdk) return;
@@ -880,7 +894,12 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             return <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} />;
           }}
           contentContainerStyle={{
-            padding: spacing.xl,
+            paddingVertical: spacing.xl,
+            // Inset the message column to line up with the input field's TEXT
+            // (input row xl + input inner lg = 36), so the full-width agent reply
+            // doesn't cram against the sidebar on the left or bleed to the far
+            // right edge — it reads in the same column you type in.
+            paddingHorizontal: spacing.xl + spacing.lg,
             flexGrow: 1,
             justifyContent: messages.length === 0 ? 'center' : 'flex-end',
           }}
