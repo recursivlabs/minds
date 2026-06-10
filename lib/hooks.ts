@@ -336,6 +336,11 @@ export function useCommunities(limit = 20) {
   const [communities, setCommunities] = React.useState<any[]>(cached || []);
   const [loading, setLoading] = React.useState(!cached && limit > 0);
   const [error, setError] = React.useState<string | null>(null);
+  // True only after the first network fetch resolves this session. The sidebar
+  // gates its is_member-filtered list on this so a STALE cached membership can
+  // never flash before fresh server data confirms it — the intermittent phantom
+  // QA/Support communities bug (the cache says joined, the server says no).
+  const [fetchedOnce, setFetchedOnce] = React.useState(false);
 
   const fetch = React.useCallback(async () => {
     if (limit === 0) return;
@@ -350,6 +355,7 @@ export function useCommunities(limit = 20) {
       setError(err.message || 'Failed to load communities');
     } finally {
       setLoading(false);
+      setFetchedOnce(true);
     }
   }, [sdk, limit, cacheKey]);
 
@@ -375,7 +381,7 @@ export function useCommunities(limit = 20) {
     return unsub;
   }, [fetch]);
 
-  return { communities, loading, error, refresh: fetch };
+  return { communities, loading, error, fetchedOnce, refresh: fetch };
 }
 
 /**
