@@ -53,14 +53,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
   const { communities } = useCommunities(5);
-  // Unread DM dots are a UNION of two independent sources, so neither can ever
-  // wipe the other:
-  //   • serverUnread — the conversation list's read-cursor count (authoritative)
-  //   • liveUnread   — instant marks from live WS messages (id -> markedAt ms)
-  // A dot shows if EITHER says unread. That's what makes it reliable: a live
-  // message can't be erased by a racing refresh, and a missed WS event is still
-  // caught by the server count on the next refresh.
-  const [liveUnread, setLiveUnread] = React.useState<Map<string, number>>(new Map());
+  // Unread DM dots are STICKY: a dot is only ever cleared by OPENING the thread,
+  // never by a server refresh. Two things ADD a dot — a live WS message, or the
+  // server's read-cursor count on load/refresh (back-fills threads that went
+  // unread before this tab opened). `readLocallyRef` suppresses re-adding a
+  // thread we just opened until the server's read cursor catches up, so opening
+  // it doesn't flicker back on from a stale refresh that still shows it unread.
+  const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
+  const readLocallyRef = React.useRef<Set<string>>(new Set());
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
 
   // Fetch unread notification count + subscribe to live updates.
@@ -146,42 +146,24 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const activeConvoRef = React.useRef<string | null>(activeConvoIdFromPath);
   React.useEffect(() => { activeConvoRef.current = activeConvoIdFromPath; }, [activeConvoIdFromPath]);
 
-  // Source 1: server truth. The conversation list computes unread from each
-  // member's read cursor (authoritative; survives reloads, syncs across
-  // devices). The conversation you're reading is never unread.
-  const serverUnread = React.useMemo(() => {
-    const s = new Set<string>();
-    for (const c of (conversations || []) as any[]) {
-      if (c.id === activeConvoIdFromPath) continue;
-      if (conversationUnreadCount(c) > 0) s.add(c.id);
-    }
-    return s;
-  }, [conversations, activeConvoIdFromPath]);
-
-  // The rendered dot set: server truth ∪ live marks, minus the active thread.
-  const unreadConvos = React.useMemo(() => {
-    const s = new Set(serverUnread);
-    for (const id of liveUnread.keys()) if (id !== activeConvoIdFromPath) s.add(id);
-    return s;
-  }, [serverUnread, liveUnread, activeConvoIdFromPath]);
-
-  // Prune live marks once the server agrees the thread is read — but only after
-  // a short grace window, so a just-arrived message (not yet reflected in the
-  // freshly-fetched list) is never pruned out from under us. This is what lets
-  // "read on another device" clear the dot here without a hard reload.
+  // Add dots from server truth on every refresh — but ADD ONLY. The conversation
+  // list computes unread from each member's read cursor, which back-fills threads
+  // that went unread before this tab opened. We never REMOVE a dot here: a dot is
+  // cleared only by opening the thread (the rule Jack wants — it must not vanish
+  // on its own). When the server reports a thread read, we simply drop its
+  // local-read suppression so a future unread can light it up again.
   React.useEffect(() => {
     if (!conversations) return;
-    setLiveUnread(prev => {
-      if (prev.size === 0) return prev;
-      const byId = new Map((conversations as any[]).map((c) => [c.id, c]));
-      const now = Date.now();
+    setUnreadConvos(prev => {
       let changed = false;
-      const next = new Map(prev);
-      for (const [id, markedAt] of prev) {
-        const readByServer = byId.has(id) && conversationUnreadCount(byId.get(id)) === 0;
-        if (id === activeConvoIdFromPath || (readByServer && now - markedAt > 4000)) {
-          next.delete(id);
-          changed = true;
+      const next = new Set(prev);
+      for (const c of conversations as any[]) {
+        const id = c.id as string;
+        if (id === activeConvoIdFromPath) { if (next.delete(id)) changed = true; continue; }
+        if (conversationUnreadCount(c) > 0) {
+          if (!readLocallyRef.current.has(id) && !next.has(id)) { next.add(id); changed = true; }
+        } else {
+          readLocallyRef.current.delete(id);
         }
       }
       return changed ? next : prev;
@@ -245,11 +227,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           if (senderId && senderId === user?.id) return; // never light up for own sends
           // Instant mark — unless it's the thread you're actively reading.
           if (convoId !== activeConvoRef.current) {
-            setLiveUnread(prev => {
-              const n = new Map(prev);
-              n.set(convoId, Date.now());
-              return n;
-            });
+            readLocallyRef.current.delete(convoId); // a new message makes it unread again
+            setUnreadConvos(prev => (prev.has(convoId) ? prev : new Set(prev).add(convoId)));
           }
           debouncedRefresh();
         });
@@ -262,13 +241,15 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     };
   }, [sdk, user?.id, refreshConvos]);
 
-  // Clear the live mark the instant the user opens a thread (server read-cursor
-  // catches up on the next refresh; serverUnread already excludes the active one).
+  // Opening a thread is the ONLY thing that clears its dot. Suppress re-adding it
+  // until the server's read cursor catches up (readLocallyRef), so a refresh that
+  // still reports it unread doesn't flicker the dot back on right after you read.
   React.useEffect(() => {
     if (!activeConvoIdFromPath) return;
-    setLiveUnread(prev => {
+    readLocallyRef.current.add(activeConvoIdFromPath);
+    setUnreadConvos(prev => {
       if (!prev.has(activeConvoIdFromPath)) return prev;
-      const next = new Map(prev);
+      const next = new Set(prev);
       next.delete(activeConvoIdFromPath);
       return next;
     });
@@ -344,7 +325,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         onPress={() => {
           router.push(item.name === 'index' ? '/(tabs)' : `/(tabs)/${item.name}` as any);
         }}
-        style={({ pressed }) => ({
+        style={({ pressed, hovered }: any) => ({
           flexDirection: 'row' as const,
           alignItems: 'center' as const,
           gap: spacing.md,
@@ -353,7 +334,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           marginHorizontal: collapsed ? 0 : spacing.md,
           marginRight: collapsed ? 0 : spacing.lg,
           borderRadius: radius.md,
-          backgroundColor: active ? colors.accentSubtle : 'transparent',
+          backgroundColor: active ? colors.accentSubtle : hovered ? colors.glass : 'transparent',
           opacity: pressed ? 0.7 : 1,
           justifyContent: collapsed ? 'center' as const : 'flex-start' as const,
           ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
@@ -481,24 +462,34 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                     No recent activity
                   </Text>
                 ) : (
-                  inboxItems.map((item) => (
+                  inboxItems.map((item) => {
+                    const isUnread = item.type === 'dm' && unreadConvos.has(item.id);
+                    return (
                     <Pressable
                       key={`${item.type}-${item.id}`}
                       onPress={() => {
                         if (item.type === 'dm') {
-                          setLiveUnread(prev => { if (!prev.has(item.id)) return prev; const next = new Map(prev); next.delete(item.id); return next; });
+                          readLocallyRef.current.add(item.id);
+                          setUnreadConvos(prev => { if (!prev.has(item.id)) return prev; const next = new Set(prev); next.delete(item.id); return next; });
                           router.push({ pathname: '/(tabs)/chat', params: { id: item.id } } as any);
                         } else {
                           router.push(`/(tabs)/community/${item.id}` as any);
                         }
                       }}
-                      style={({ pressed }) => ({
+                      style={({ pressed, hovered }: any) => ({
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: spacing.sm,
                         paddingVertical: spacing.sm,
+                        paddingHorizontal: spacing.sm,
                         borderRadius: radius.sm,
-                        opacity: pressed ? 0.7 : 1,
+                        // Faint full-row highlight for unread, so it reads at a glance —
+                        // not just the dot. Hover sits on top for web responsiveness.
+                        backgroundColor: pressed
+                          ? colors.surfaceHover
+                          : isUnread
+                            ? (hovered ? colors.accentMuted : colors.accentSubtle)
+                            : hovered ? colors.glass : 'transparent',
                         ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
                       })}
                     >
@@ -507,14 +498,15 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                         <Text
                           variant="caption"
                           numberOfLines={1}
-                          style={{ fontWeight: '400', fontSize: 13 }}
+                          color={isUnread ? colors.text : undefined}
+                          style={{ fontWeight: isUnread ? '600' : '400', fontSize: 13 }}
                         >
                           {item.name}
                         </Text>
                         {item.preview ? (
                           <Text
                             variant="caption"
-                            color={colors.textMuted}
+                            color={isUnread ? colors.textSecondary : colors.textMuted}
                             numberOfLines={1}
                             style={{ fontSize: 11 }}
                           >
@@ -522,7 +514,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                           </Text>
                         ) : null}
                       </View>
-                      {item.type === 'dm' && unreadConvos.has(item.id) && (
+                      {isUnread && (
                         <View
                           style={{
                             width: 8,
@@ -533,7 +525,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                         />
                       )}
                     </Pressable>
-                  ))
+                    );
+                  })
                 )}
               </ScrollView>
             </View>
@@ -552,7 +545,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               if (slug) router.push(`/(tabs)/user/${slug}` as any);
               else router.push('/(tabs)/profile');
             }}
-            style={({ pressed }) => ({
+            style={({ pressed, hovered }: any) => ({
               flexDirection: 'row' as const,
               alignItems: 'center' as const,
               gap: spacing.md,
@@ -561,11 +554,13 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               marginHorizontal: collapsed ? 0 : spacing.md,
               marginRight: collapsed ? 0 : spacing.lg,
               borderRadius: radius.md,
-              backgroundColor: (isActive('profile') || (user?.username && pathname?.includes(`/user/${user.username}`))) ? colors.accentSubtle : 'transparent',
+              backgroundColor: (isActive('profile') || (user?.username && pathname?.includes(`/user/${user.username}`)))
+                ? colors.accentSubtle
+                : hovered ? colors.glass : 'transparent',
               opacity: pressed ? 0.7 : 1,
               justifyContent: collapsed ? 'center' as const : 'flex-start' as const,
               marginTop: spacing.xs,
-              ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
             })}
           >
             <Avatar uri={user?.image} name={user?.name} size="xs" />
