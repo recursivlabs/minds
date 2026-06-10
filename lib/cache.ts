@@ -157,3 +157,25 @@ export function invalidatePrefix(prefix: string): void {
   for (const key of removed) notify(key);
   if (removed.length === 0) notify(prefix); // still wake listeners
 }
+
+// ── Request deduplication ────────────────────────────────────────────────
+// Concurrent callers fetching the same resource share one promise instead of
+// issuing duplicate requests. Multiple mounted hook instances (e.g. the
+// sidebar and a screen both rendering useCommunities, or two usePost(id)
+// consumers) used to multiply API QPS by the number of consumers, and the
+// duplicate responses raced each other into the cache.
+const inflight = new Map<string, Promise<any>>();
+
+export function fetchDeduped<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<T>;
+  const p = (async () => {
+    try {
+      return await fn();
+    } finally {
+      inflight.delete(key);
+    }
+  })();
+  inflight.set(key, p);
+  return p;
+}

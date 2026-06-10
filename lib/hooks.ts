@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useAuth } from './auth';
 import { getSdk, ORG_ID } from './recursiv';
-import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations } from './cache';
+import { getCached, setCache, isFresh, invalidatePrefix, subscribeToInvalidations, fetchDeduped } from './cache';
 import { filterMuted } from './muted';
 import { loadPreferences, markCuratedNow } from './onboarding';
 import { buildCuratorRequest } from './curator';
@@ -24,10 +24,26 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   const offsetRef = React.useRef(0);
   const followingIdsRef = React.useRef<Set<string> | null>(null);
   const myCommunityIdsRef = React.useRef<Set<string> | null>(null);
+  // Concurrency control. Without these, every onEndReached tick near the
+  // bottom fired another identical page fetch while one was in flight, a
+  // focus-refresh racing a loadMore corrupted the shared offset (silently
+  // skipping pages), and errors retried instantly on every scroll frame —
+  // client load scaled inversely with backend health.
+  const reqIdRef = React.useRef(0);
+  const inFlightRef = React.useRef(false);
+  const failuresRef = React.useRef(0);
+  const cooldownUntilRef = React.useRef(0);
 
   const fetchPosts = React.useCallback(async (refresh = false, silent = false) => {
     const s = sdk || getSdk();
     if (!s) return;
+    // Appends never overlap (same offset twice); a refresh supersedes
+    // whatever is running instead of racing it.
+    if (inFlightRef.current && !refresh) return;
+    const myReq = ++reqIdRef.current;
+    inFlightRef.current = true;
+    // A superseded request must not commit state or advance the offset.
+    const stale = () => reqIdRef.current !== myReq;
     try {
       if (refresh) {
         if (!silent) setRefreshing(true);
@@ -36,7 +52,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
 
       if (sort === 'following' && user?.id && !followingIdsRef.current) {
         try {
-          const followingRes = await s.profiles.following(user.id, { limit: 500 });
+          const followingRes = await fetchDeduped(`req:following:${user.id}`, () => s.profiles.following(user.id, { limit: 500 }));
           const ids = new Set((followingRes.data || []).map((p: any) => p.id));
           ids.add(user.id); // your own posts belong in your Following feed
           followingIdsRef.current = ids;
@@ -82,7 +98,9 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       let more = true;
       let data: any[] = [];
       for (let page = 0; page < 5 && more; page++) {
-        const res = await s.posts.list({ ...baseParams, offset: baseOffset + rawCount } as any);
+        const pageOffset = baseOffset + rawCount;
+        const res = await fetchDeduped(`req:${cacheKey}:${pageOffset}`, () =>
+          s.posts.list({ ...baseParams, offset: pageOffset } as any));
         const raw = res.data || [];
         rawCount += raw.length;
         more = res.meta?.has_more ?? raw.length >= limit;
@@ -95,8 +113,9 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
         }
         visible = filterMuted(visible);
         data = data.concat(visible);
-        if (data.length > 0 || raw.length === 0) break;
+        if (data.length > 0 || raw.length === 0 || stale()) break;
       }
+      if (stale()) return;
 
       if (sort === 'score') {
         // Boost posts from communities the user has joined
@@ -131,12 +150,23 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       }
       setHasMore(more);
       offsetRef.current = baseOffset + rawCount;
+      failuresRef.current = 0;
+      cooldownUntilRef.current = 0;
     } catch (err: any) {
       captureException(err, { hook: 'usePosts', sort });
-      setError(err.message || 'Failed to load posts');
+      if (!stale()) {
+        setError(err.message || 'Failed to load posts');
+        // Exponential cooldown (2s → 4s → … → 30s cap) so a degraded API
+        // isn't hammered by every scroll tick near the bottom of the feed.
+        failuresRef.current += 1;
+        cooldownUntilRef.current = Date.now() + Math.min(2000 * 2 ** (failuresRef.current - 1), 30_000);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!stale()) {
+        inFlightRef.current = false;
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [sdk, sort, limit, user?.id, cacheKey]);
 
@@ -234,6 +264,7 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   }, [fetchPosts, sort, sdk]);
 
   const loadMore = React.useCallback(() => {
+    if (Date.now() < cooldownUntilRef.current) return;
     if (hasMore && !loading && !refreshing) fetchPosts(false);
   }, [fetchPosts, hasMore, loading, refreshing]);
 
@@ -271,7 +302,7 @@ export function usePost(postId: string) {
     (async () => {
       try {
         const s = sdk || getSdk();
-        const res = await s.posts.get(postId);
+        const res = await fetchDeduped(`req:post:${postId}`, () => s.posts.get(postId));
         if (!cancelled) {
           setPost(res.data);
           setCache(cacheKey, res.data);
@@ -303,7 +334,8 @@ export function useCommunities(limit = 20) {
     if (limit === 0) return;
     try {
       const s = sdk || getSdk();
-      const res = await s.communities.list({ limit, organization_id: ORG_ID || undefined });
+      const res = await fetchDeduped(`req:communities:${limit}`, () =>
+        s.communities.list({ limit, organization_id: ORG_ID || undefined }));
       const data = res.data || [];
       setCommunities(data);
       setCache(cacheKey, data);
@@ -357,7 +389,7 @@ export function useAgents(limit = 20) {
     (async () => {
       try {
         const s = sdk || getSdk();
-        const res = await s.agents.listDiscoverable({ limit, organization_id: ORG_ID || undefined });
+        const res = await fetchDeduped(`req:agents:${limit}`, () => s.agents.listDiscoverable({ limit, organization_id: ORG_ID || undefined }));
         if (!cancelled) {
           const data = res.data || [];
           setAgents(data);
@@ -626,7 +658,7 @@ export function useProfiles(limit = 20) {
           const res = await s.organizations.members(ORG_ID, { limit } as any);
           data = (res.data || []).map((m: any) => m.user || m);
         } else {
-          const res = await s.profiles.list({ limit } as any);
+          const res = await fetchDeduped(`req:profiles:${limit}`, () => s.profiles.list({ limit } as any));
           data = res.data || [];
         }
         // Filter out AI agents — they show in the Agents section
