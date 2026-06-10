@@ -131,9 +131,13 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     return () => { cleanups.forEach(fn => fn()); };
   }, [sdk, refreshNotifs, refreshConvos]);
 
-  // Active conversation id — set by ConversationView on mount via the shared
-  // ActiveConvoProvider context. One source of truth, web + native.
-  const activeConvoIdFromPath = useActiveConvoId();
+  // Active conversation id — set by ConversationView via the shared
+  // ActiveConvoProvider context. We only honor it while the user is actually on
+  // the chat route: if they've navigated to the feed (but the chat tab stays
+  // mounted), nothing should count as "actively being read", so its dot is free
+  // to light up. Defense-in-depth alongside the focus-based clear in chat.tsx.
+  const rawActiveConvoId = useActiveConvoId();
+  const activeConvoIdFromPath = pathname.includes('chat') ? rawActiveConvoId : null;
 
   // Keep the live WS handler reading the *current* active conversation without
   // re-subscribing on every navigation (the old code tore down + rebuilt the

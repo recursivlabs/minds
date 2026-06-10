@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
 import { Container } from '../../components/Container';
@@ -381,12 +381,18 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const { sdk, user } = useAuth();
   const colors = useColors();
   const setActiveConvoId = useSetActiveConvoId();
-  // Mark this conversation as active so the SideNav's unread badge
-  // ignores incoming messages for it. Cleared on unmount.
-  React.useEffect(() => {
-    setActiveConvoId(conversationId);
-    return () => setActiveConvoId(null);
-  }, [conversationId, setActiveConvoId]);
+  // Mark this conversation active ONLY while the chat screen is focused, so the
+  // SideNav suppresses its unread dot just for the thread you're actually
+  // reading. Expo-router keeps tab screens mounted, so an unmount-based cleanup
+  // never fired on a tab switch — leaving for the feed left the active id stuck
+  // on this thread, which is exactly why an agent reply that landed after you
+  // left showed no dot. Focus/blur clears it correctly.
+  useFocusEffect(
+    React.useCallback(() => {
+      setActiveConvoId(conversationId);
+      return () => setActiveConvoId(null);
+    }, [conversationId, setActiveConvoId])
+  );
   const cachedMsgs = getCached(`messages:${conversationId}`);
   const cachedSorted = React.useMemo(() => {
     if (!cachedMsgs) return [];
