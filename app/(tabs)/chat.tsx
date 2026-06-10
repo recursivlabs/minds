@@ -402,10 +402,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     if (!cachedMsgs) return [];
     return [...cachedMsgs].reverse().map((m: any) => ({
       id: m.id,
-      content: m.content || m.text || '',
+      content: (m.content || m.text || '').trim(),
       sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
       createdAt: m.createdAt || m.created_at || new Date().toISOString(),
-    }));
+    })).filter((m: any) => m.content); // never render empty bubbles
   }, [cachedMsgs]);
   const [messages, setMessages] = React.useState<any[]>(cachedSorted);
   const [loading, setLoading] = React.useState(cachedSorted.length === 0);
@@ -515,10 +515,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         setCache(`messages:${conversationId}`, rawMessages);
         const sorted = [...rawMessages].reverse().map((m: any) => ({
           id: m.id,
-          content: m.content || m.text || '',
+          content: (m.content || m.text || '').trim(),
           sender: m.sender || { id: m.senderId || m.sender_id, name: m.senderName },
           createdAt: m.createdAt || m.created_at || new Date().toISOString(),
-        }));
+        })).filter((m: any) => m.content); // never render empty bubbles (tool-only agent turns)
         setMessages(sorted);
         messageIdsRef.current = new Set(sorted.map((m: any) => m.id));
       }
@@ -533,10 +533,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const wsConnectedRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (!sdk || loading) return;
+    if (!sdk) return;
     let unsub: (() => void) | undefined;
 
-    // Try WebSocket first
+    // ONE stable subscription per conversation. Previously this effect also
+    // depended on `loading`, so it tore down and rebuilt the socket listener
+    // every time a load started/finished — the churn that made the chat feel
+    // like it might break on every click. Messages arriving during the initial
+    // load are deduped by id, so subscribing immediately is safe.
     (async () => {
       try {
         await sdk.realtime.connect();
@@ -616,7 +620,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         sdk.realtime.leaveConversation(conversationId);
       }
     };
-  }, [conversationId, sdk, loading]);
+  }, [conversationId, sdk]);
 
   // Rich agent thinking state. Server emits `agent_thinking` events
   // with status ('thinking' | 'generating' | 'done') during a stream.
@@ -624,22 +628,31 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   React.useEffect(() => {
     if (!sdk) return;
     let unsub: (() => void) | undefined;
+    let stuckTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearStuckTimer = () => { if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; } };
     (async () => {
       try {
         await sdk.realtime.connect();
         unsub = sdk.realtime.onAgentThinking?.((evt: any) => {
           if (evt?.conversationId && evt.conversationId !== conversationId) return;
-          if (evt?.status === 'done') {
+          if (evt?.status === 'done' || evt?.status === 'error') {
             setAgentStatus('done');
             setAgentTyping(false);
+            clearStuckTimer();
           } else {
             setAgentStatus(evt?.status ?? 'thinking');
             setAgentTyping(true);
+            // Safety net: best-in-class typing indicators always auto-expire.
+            // If the server dies mid-stream or hits an error path that never
+            // emits a terminal event, this clears the indicator instead of
+            // letting it spin forever. Reset on each new activity event.
+            clearStuckTimer();
+            stuckTimer = setTimeout(() => setAgentTyping(false), 30000);
           }
         });
       } catch {}
     })();
-    return () => { unsub?.(); };
+    return () => { unsub?.(); clearStuckTimer(); };
   }, [conversationId, sdk]);
 
   // Bidirectional human typing indicator.
@@ -673,9 +686,11 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     };
   }, [conversationId, sdk, user?.id]);
 
-  // Fallback polling — only if WebSocket didn't connect
+  // Fallback polling — only if WebSocket didn't connect. Stable per
+  // conversation (no `loading` dep, which used to restart the interval on every
+  // load transition).
   React.useEffect(() => {
-    if (!sdk || loading) return;
+    if (!sdk) return;
 
     // Wait a moment for WS to connect before starting poll
     const startTimer = setTimeout(() => {
@@ -708,7 +723,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       clearTimeout(startTimer);
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [conversationId, sdk, loading]);
+  }, [conversationId, sdk]);
 
   // Mark as read — ONLY while the screen is actually focused. If the agent's
   // reply streams in while you're on another tab (this screen stays mounted),
@@ -868,10 +883,18 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
               setMessages(prev => prev.map(m => m.id === streamingId
                 ? { ...m, content: reply, streaming: false }
                 : m));
+              streamedAny = true;
             }
           } catch (err) {
             console.warn('[chat] agent fallback also failed', err);
           }
+        }
+        // If the agent produced no text at all (a tool-only turn that errored,
+        // or a server error path), REMOVE the empty placeholder rather than
+        // leaving a blank bubble. Any real reply or error the server stored
+        // arrives via the WS echo as its own row.
+        if (!streamedAny) {
+          setMessages(prev => prev.filter(m => m.id !== streamingId));
         }
         setAgentTyping(false);
       }
