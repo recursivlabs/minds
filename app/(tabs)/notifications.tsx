@@ -11,6 +11,7 @@ import { ORG_ID } from '../../lib/recursiv';
 import { loadLastCuratedAt } from '../../lib/onboarding';
 import { getPreference } from '../../lib/preferences';
 import { getItemSync, setItem } from '../../lib/storage';
+import { invalidate } from '../../lib/cache';
 import { spacing } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
@@ -86,22 +87,36 @@ export default function NotificationsScreen() {
   // Initial load.
   React.useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
-  // Live updates: refetch the moment a notification lands over the socket, so
-  // a new reply/follow/vote shows up here without a manual refresh (X parity).
+  // Live updates: refetch when a notification lands over the socket, so a new
+  // reply/follow/vote shows up here without a manual refresh (X parity).
+  // Debounced with per-client jitter: fan-out events (a popular post getting
+  // 20 likes, an org announcement) hit every online recipient at the same
+  // instant, and an immediate refetch per event turns that into a
+  // synchronized request spike proportional to audience size.
   React.useEffect(() => {
     if (!sdk) return;
     let cleanup: (() => void) | undefined;
+    let pending: ReturnType<typeof setTimeout> | null = null;
     (async () => {
       try {
         await sdk.realtime.connect();
         const sock = (sdk as any).realtime?.socket;
         if (!sock) return;
-        const onNotif = () => loadNotifications();
+        const onNotif = () => {
+          if (pending) return; // burst-coalesce: one refetch per window
+          pending = setTimeout(() => {
+            pending = null;
+            loadNotifications();
+          }, 1000 + Math.random() * 2000);
+        };
         sock.on('notification', onNotif);
         cleanup = () => sock.off?.('notification', onNotif);
       } catch {}
     })();
-    return () => { cleanup?.(); };
+    return () => {
+      cleanup?.();
+      if (pending) clearTimeout(pending);
+    };
   }, [sdk, loadNotifications]);
 
   // Group similar notifications targeting the same post / user within
@@ -147,7 +162,9 @@ export default function NotificationsScreen() {
       if (notif._curatedAt) setAgentNotifReadAt(notif._curatedAt);
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
     } else if (notif.id && notif.status === 'unread' && sdk) {
-      sdk.notifications.markAsRead(notif.id).catch(() => {});
+      sdk.notifications.markAsRead(notif.id)
+        .then(() => invalidate('notifications')) // nudge the tab badge now, not in 60s
+        .catch(() => {});
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
     }
 
@@ -181,6 +198,7 @@ export default function NotificationsScreen() {
     if (!sdk) return;
     try {
       await sdk.notifications.markAllAsRead();
+      invalidate('notifications'); // nudge the tab badge now, not in 60s
     } catch {}
   };
 

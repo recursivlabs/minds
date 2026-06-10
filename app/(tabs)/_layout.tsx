@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
-import { View, Platform, useWindowDimensions } from 'react-native';
+import { View, Platform, AppState, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../constants/theme';
@@ -8,6 +8,7 @@ import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { isUsernamePicked } from '../../lib/onboarding';
+import { subscribeToInvalidations } from '../../lib/cache';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 
 export default function TabLayout() {
@@ -51,17 +52,42 @@ export default function TabLayout() {
     if (!sdk) return;
     let active = true;
     const check = async () => {
+      // Don't poll a backgrounded app / hidden tab — battery and QPS waste,
+      // and at cutover scale a fleet of idle tabs is real load.
+      if (Platform.OS === 'web') {
+        if (typeof document !== 'undefined' && document.hidden) return;
+      } else if (AppState.currentState !== 'active') return;
       try {
-        const res = await sdk.notifications.list({ limit: 20, organization_id: ORG_ID || undefined });
+        const res = await sdk.notifications.list({ limit: 20, status: 'unread', organization_id: ORG_ID || undefined } as any);
         if (active) {
-          const unread = (res.data || []).filter((n: any) => !n.read && !n.is_read).length;
+          // Read state lives in `status` — the old `read`/`is_read` fields
+          // don't exist on the SDK type, so every notification passed this
+          // filter and the badge showed the full fetch count forever, even
+          // after Mark all read.
+          const unread = (res.data || []).filter((n: any) => n.status === 'unread').length;
           setUnreadCount(unread);
         }
       } catch {}
     };
     check();
     const interval = setInterval(check, 60_000); // check every 60s
-    return () => { active = false; clearInterval(interval); };
+    // Re-check the moment the app/tab comes back, and when another screen
+    // marks notifications read (signalled via cache invalidation).
+    let removeWake: (() => void) | undefined;
+    if (Platform.OS === 'web') {
+      if (typeof document !== 'undefined') {
+        const onVis = () => { if (!document.hidden) check(); };
+        document.addEventListener('visibilitychange', onVis);
+        removeWake = () => document.removeEventListener('visibilitychange', onVis);
+      }
+    } else {
+      const sub = AppState.addEventListener('change', (st) => { if (st === 'active') check(); });
+      removeWake = () => sub.remove();
+    }
+    const unsubInval = subscribeToInvalidations((key) => {
+      if (key.startsWith('notifications')) check();
+    });
+    return () => { active = false; clearInterval(interval); removeWake?.(); unsubInval(); };
   }, [sdk]);
 
   if (isDesktop) {
