@@ -12,7 +12,7 @@ import { useProfile, useMyProfile, useCommunities } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { getFollowRelationship } from '../../../lib/moderation';
 import { getBookmarks } from '../../../lib/bookmarks';
-import { getCached } from '../../../lib/cache';
+import { getCached, invalidate } from '../../../lib/cache';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { profileFollowerCount, profileFollowingCount } from '../../../lib/models';
@@ -201,6 +201,13 @@ export default function UserProfileScreen() {
       // copy so the next tap re-pulls.
       setFollowersList(null);
       setFollowingList(null);
+      // Reconcile the CURRENT user's own counts too: following someone bumps
+      // your "following" count, which is shown on your own profile (a different
+      // cache). Invalidate it so it's fresh the next time you view your profile
+      // instead of showing a stale number until the cache expires.
+      invalidate('myprofile');
+      if (user?.username) invalidate(`profile:${user.username}`);
+      if (user?.id) invalidate(`profile:${user.id}`);
     } catch (err: any) {
       setIsFollowing(wasFollowing);
       setFollowerOffset(prev => wasFollowing ? prev + 1 : prev - 1);
