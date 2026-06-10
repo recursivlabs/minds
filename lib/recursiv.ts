@@ -16,8 +16,6 @@ export const SITE_URL =
   process.env.EXPO_PUBLIC_SITE_URL ||
   'https://minds.on.recursiv.io';
 
-export const API_KEY = process.env.EXPO_PUBLIC_RECURSIV_API_KEY || '';
-
 // Hardcoded fallbacks point at the Minds 2.0 project on prod. Expo's bundler
 // inlines EXPO_PUBLIC_* at build time, so when Coolify env is empty (which is
 // the current state for recursiv-minds), these fallbacks bake into the bundle.
@@ -38,23 +36,8 @@ export function createAuthedSdk(apiKey: string): Recursiv {
   });
 }
 
-/**
- * Default SDK instance for public data.
- */
-let _sdk: Recursiv | null = null;
-
-export function getSdk(): Recursiv {
-  if (!_sdk) {
-    if (!API_KEY) throw new Error('No API key configured');
-    _sdk = new Recursiv({
-      apiKey: API_KEY,
-      baseUrl: BASE_URL,
-      timeout: 120_000,
-    });
-  }
-  return _sdk;
-}
-
-export const sdk = API_KEY
-  ? new Recursiv({ apiKey: API_KEY, baseUrl: BASE_URL, timeout: 120_000 })
-  : (null as unknown as Recursiv);
+// NOTE: there is intentionally NO shared/default SDK here. A baked app key in
+// a public bundle is extractable by anyone, and any fetch made with it acts as
+// the KEY OWNER, not the signed-in user (the phantom-communities identity bug).
+// Public pre-auth flows use the anon SDK in lib/auth.tsx; everything else must
+// use the signed-in user's SDK from useAuth().

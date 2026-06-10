@@ -18,8 +18,15 @@
  * count.
  */
 import { Platform } from 'react-native';
-import { getSdk, BASE_URL } from './recursiv';
+import { BASE_URL } from './recursiv';
 import { getItemSync } from './storage';
+
+// Signals are PER-USER engagement events, so they must go out under the
+// signed-in user's key — never a shared app key (which attributed everyone's
+// views to the key owner). Auth registers the active SDK here on sign-in /
+// session restore and clears it on sign-out.
+let activeSdk: any = null;
+export function setSignalsSdk(s: any): void { activeSdk = s; }
 
 type SignalType =
   | 'view'
@@ -82,9 +89,9 @@ async function flush() {
     // of Recursiv, but every resource holds the same client reference.
     // Borrow it from `posts` so we don't have to wait for an npm
     // publish that adds a SignalsResource.
-    const sdk: any = getSdk();
+    const sdk: any = activeSdk;
     const httpClient = sdk?.posts?.client || sdk?.notifications?.client;
-    if (!httpClient?.post) return;
+    if (!httpClient?.post) { queue.unshift(...batch); return; } // not signed in yet — keep for after login
     if (batchSupported !== false) {
       try {
         await httpClient.post('/signals/batch', { events: batch });
