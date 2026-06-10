@@ -743,6 +743,20 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
         }]);
         let acc = '';
         let streamedAny = false;
+        // Coalesce token writes to at most one render per animation frame.
+        // Streaming a reply emits dozens of text_deltas per second; writing
+        // each one straight to state re-rendered the whole list AND re-parsed
+        // the bubble's markdown every token — that thrash is what made the
+        // stream stutter and the scroll lurch. Buffering into `acc` and
+        // flushing on requestAnimationFrame pins the growth to the browser's
+        // paint clock, so it types out smoothly the way Claude does.
+        let rafPending = false;
+        const flushStreaming = () => {
+          rafPending = false;
+          setMessages(prev => prev.map(m => m.id === streamingId
+            ? { ...m, content: acc }
+            : m));
+        };
         try {
           // chatStream() is an async generator yielding text_delta
           // chunks. Requires ReadableStream — available on web and on
@@ -756,17 +770,19 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             if (chunk?.type === 'text_delta' && typeof chunk.delta === 'string') {
               acc += chunk.delta;
               streamedAny = true;
-              setMessages(prev => prev.map(m => m.id === streamingId
-                ? { ...m, content: acc }
-                : m));
+              if (!rafPending) {
+                rafPending = true;
+                requestAnimationFrame(flushStreaming);
+              }
             }
           }
-          // Mark complete. WS broadcast of the final stored message
-          // may arrive after this; the dedup in the onMessage handler
-          // (content + sender match for agent-* / streaming-* ids)
-          // drops it.
+          // Mark complete. Also write the final `acc` directly — a frame may
+          // still have been pending when the stream ended, so this guarantees
+          // the last tokens land. WS broadcast of the final stored message may
+          // arrive after this; the dedup in the onMessage handler (content +
+          // sender match for agent-* / streaming-* ids) drops it.
           setMessages(prev => prev.map(m => m.id === streamingId
-            ? { ...m, streaming: false }
+            ? { ...m, content: acc, streaming: false }
             : m));
         } catch (streamErr) {
           console.warn('[chat] agent stream failed, falling back to chatStreamText', streamErr);
@@ -863,10 +879,20 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             justifyContent: messages.length === 0 ? 'center' : 'flex-end',
           }}
           onScroll={handleScroll}
-          scrollEventThrottle={100}
+          // 16ms (~60fps) so the at-bottom test tracks fast streaming growth
+          // instead of lagging behind it at 100ms.
+          scrollEventThrottle={16}
           // Only follow new content when the user is already at the bottom, so
           // streaming tokens / incoming messages never interrupt scroll-back.
-          onContentSizeChange={() => { if (atBottomRef.current) flatListRef.current?.scrollToEnd({ animated: false }); }}
+          // On web we set scrollTop synchronously in the same layout pass the
+          // content grew (no animated post-paint catch-up frame) — that catch-up
+          // is exactly what read as a jump. Native keeps scrollToEnd.
+          onContentSizeChange={() => {
+            if (!atBottomRef.current) return;
+            const node: any = (flatListRef.current as any)?.getScrollableNode?.();
+            if (node && typeof node.scrollHeight === 'number') node.scrollTop = node.scrollHeight;
+            else flatListRef.current?.scrollToEnd({ animated: false });
+          }}
           ListFooterComponent={
             <>
               <ThinkingPill

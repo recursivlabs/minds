@@ -53,8 +53,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
   const { communities } = useCommunities(5);
-  const [unreadConvos, setUnreadConvos] = React.useState<Set<string>>(new Set());
-  const [lastMessageConvoId, setLastMessageConvoId] = React.useState<string | null>(null);
+  // Unread DM dots are a UNION of two independent sources, so neither can ever
+  // wipe the other:
+  //   • serverUnread — the conversation list's read-cursor count (authoritative)
+  //   • liveUnread   — instant marks from live WS messages (id -> markedAt ms)
+  // A dot shows if EITHER says unread. That's what makes it reliable: a live
+  // message can't be erased by a racing refresh, and a missed WS event is still
+  // caught by the server count on the next refresh.
+  const [liveUnread, setLiveUnread] = React.useState<Map<string, number>>(new Map());
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
 
   // Fetch unread notification count + subscribe to live updates.
@@ -129,25 +135,52 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // ActiveConvoProvider context. One source of truth, web + native.
   const activeConvoIdFromPath = useActiveConvoId();
 
-  // Seed unread dots from the server's unread counts on every conversation
-  // refresh. The live WS listener below only catches messages that land while
-  // the SideNav is mounted + subscribed — so a message delivered earlier (e.g.
-  // the personal agent's first DM, or anything that arrived before this tab
-  // opened) would show no unread dot. This back-fills from server truth. Items
-  // are cleared from the set when the user opens the conversation.
+  // Keep the live WS handler reading the *current* active conversation without
+  // re-subscribing on every navigation (the old code tore down + rebuilt the
+  // socket listener on each route change, leaving a gap where a message could
+  // slip through). A ref gives the handler fresh state with a stable effect.
+  const activeConvoRef = React.useRef<string | null>(activeConvoIdFromPath);
+  React.useEffect(() => { activeConvoRef.current = activeConvoIdFromPath; }, [activeConvoIdFromPath]);
+
+  // Source 1: server truth. The conversation list computes unread from each
+  // member's read cursor (authoritative; survives reloads, syncs across
+  // devices). The conversation you're reading is never unread.
+  const serverUnread = React.useMemo(() => {
+    const s = new Set<string>();
+    for (const c of (conversations || []) as any[]) {
+      if (c.id === activeConvoIdFromPath) continue;
+      if (conversationUnreadCount(c) > 0) s.add(c.id);
+    }
+    return s;
+  }, [conversations, activeConvoIdFromPath]);
+
+  // The rendered dot set: server truth ∪ live marks, minus the active thread.
+  const unreadConvos = React.useMemo(() => {
+    const s = new Set(serverUnread);
+    for (const id of liveUnread.keys()) if (id !== activeConvoIdFromPath) s.add(id);
+    return s;
+  }, [serverUnread, liveUnread, activeConvoIdFromPath]);
+
+  // Prune live marks once the server agrees the thread is read — but only after
+  // a short grace window, so a just-arrived message (not yet reflected in the
+  // freshly-fetched list) is never pruned out from under us. This is what lets
+  // "read on another device" clear the dot here without a hard reload.
   React.useEffect(() => {
     if (!conversations) return;
-    setUnreadConvos(prev => {
-      const next = new Set(prev);
-      for (const c of conversations as any[]) {
-        const id = c.id as string;
-        // The conversation you're reading is never unread.
-        if (id === activeConvoIdFromPath) { next.delete(id); continue; }
-        const unread = conversationUnreadCount(c) > 0;
-        if (unread) next.add(id);
-        else next.delete(id); // server says read elsewhere → clear the dot
+    setLiveUnread(prev => {
+      if (prev.size === 0) return prev;
+      const byId = new Map((conversations as any[]).map((c) => [c.id, c]));
+      const now = Date.now();
+      let changed = false;
+      const next = new Map(prev);
+      for (const [id, markedAt] of prev) {
+        const readByServer = byId.has(id) && conversationUnreadCount(byId.get(id)) === 0;
+        if (id === activeConvoIdFromPath || (readByServer && now - markedAt > 4000)) {
+          next.delete(id);
+          changed = true;
+        }
       }
-      return next;
+      return changed ? next : prev;
     });
   }, [conversations, activeConvoIdFromPath]);
 
@@ -179,42 +212,59 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   }, [sdk, user?.id, user?.name, refreshConvos]);
 
 
-  // Real-time unread tracking + conversation reordering
+  // Source 2: live WS. ONE stable subscription for the SideNav's lifetime (deps
+  // are all stable: refreshConvos is memoized on sdk). The server fans every
+  // chat_message — human OR agent — out to each member's `user:<id>` room, so
+  // we get them without joining any thread. On reconnect we re-sync from the
+  // server to backfill anything missed while the socket was down.
   React.useEffect(() => {
     if (!sdk) return;
     let unsub: (() => void) | undefined;
+    let socket: any;
+    let onConnect: (() => void) | undefined;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    // Coalesce bursts: one reconcile fetch per ~600ms, not per message.
+    const debouncedRefresh = () => {
+      if (refreshTimer) return;
+      refreshTimer = setTimeout(() => { refreshTimer = null; refreshConvos(); }, 600);
+    };
     (async () => {
       try {
         await sdk.realtime.connect();
-        let lastConvoRefresh = 0;
+        socket = sdk.realtime.getSocket?.();
+        onConnect = () => refreshConvos(); // reconnect → resync missed dots fast
+        socket?.on?.('connect', onConnect);
         unsub = sdk.realtime.onMessage((msg: any) => {
           const convoId = msg.conversationId || msg.conversation_id;
           if (!convoId) return;
           const senderId = msg.senderId || msg.sender?.id;
-          if (senderId === user?.id) return;
-          // Don't mark unread for the conversation the user is
-          // actively reading — Samson lighting up gold while you're
-          // chatting with him is the bug Jack flagged.
-          if (convoId !== activeConvoIdFromPath) {
-            setUnreadConvos(prev => new Set(prev).add(convoId));
+          if (senderId && senderId === user?.id) return; // never light up for own sends
+          // Instant mark — unless it's the thread you're actively reading.
+          if (convoId !== activeConvoRef.current) {
+            setLiveUnread(prev => {
+              const n = new Map(prev);
+              n.set(convoId, Date.now());
+              return n;
+            });
           }
-          setLastMessageConvoId(convoId);
-          // Throttle: a busy thread shouldn't refetch the conversation list
-          // once per message.
-          const now = Date.now();
-          if (now - lastConvoRefresh >= 1500) { lastConvoRefresh = now; refreshConvos(); }
+          debouncedRefresh();
         });
       } catch {}
     })();
-    return () => { unsub?.(); };
-  }, [sdk, user?.id, refreshConvos, activeConvoIdFromPath]);
+    return () => {
+      unsub?.();
+      if (socket && onConnect) socket.off?.('connect', onConnect);
+      if (refreshTimer) clearTimeout(refreshTimer);
+    };
+  }, [sdk, user?.id, refreshConvos]);
 
-  // Clear unread when the user navigates into a conversation.
+  // Clear the live mark the instant the user opens a thread (server read-cursor
+  // catches up on the next refresh; serverUnread already excludes the active one).
   React.useEffect(() => {
     if (!activeConvoIdFromPath) return;
-    setUnreadConvos(prev => {
+    setLiveUnread(prev => {
       if (!prev.has(activeConvoIdFromPath)) return prev;
-      const next = new Set(prev);
+      const next = new Map(prev);
       next.delete(activeConvoIdFromPath);
       return next;
     });
@@ -432,7 +482,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                       key={`${item.type}-${item.id}`}
                       onPress={() => {
                         if (item.type === 'dm') {
-                          setUnreadConvos(prev => { const next = new Set(prev); next.delete(item.id); return next; });
+                          setLiveUnread(prev => { if (!prev.has(item.id)) return prev; const next = new Map(prev); next.delete(item.id); return next; });
                           router.push({ pathname: '/(tabs)/chat', params: { id: item.id } } as any);
                         } else {
                           router.push(`/(tabs)/community/${item.id}` as any);
