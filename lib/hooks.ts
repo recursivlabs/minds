@@ -63,18 +63,40 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       // intentionally omit organization_id when requesting personal —
       // otherwise the curator-inserted posts (no organization_id) get
       // filtered out by the server's org_id filter.
-      const listParams: Record<string, any> = {
-        limit,
-        offset: refresh ? 0 : offsetRef.current,
-      };
+      const baseParams: Record<string, any> = { limit };
       if (sort === 'personal') {
-        listParams.audience_user_id = 'me';
+        baseParams.audience_user_id = 'me';
       } else if (ORG_ID) {
-        listParams.organization_id = ORG_ID;
+        baseParams.organization_id = ORG_ID;
       }
 
-      const res = await s.posts.list(listParams as any);
-      let data = res.data || [];
+      // Client-side filters (followed authors, muted users) can wipe out an
+      // entire server page, so pagination must be tracked in RAW server rows:
+      // advancing the offset by the filtered count refetches the same rows
+      // forever once a page filters to zero, and deriving hasMore from the
+      // filtered count truncates the feed after any heavily-filtered page.
+      // When a page filters to nothing, keep pulling (bounded) so the user
+      // never sees an empty append while posts remain.
+      const baseOffset = refresh ? 0 : offsetRef.current;
+      let rawCount = 0;
+      let more = true;
+      let data: any[] = [];
+      for (let page = 0; page < 5 && more; page++) {
+        const res = await s.posts.list({ ...baseParams, offset: baseOffset + rawCount } as any);
+        const raw = res.data || [];
+        rawCount += raw.length;
+        more = res.meta?.has_more ?? raw.length >= limit;
+        let visible = raw;
+        if (sort === 'following' && followingIdsRef.current) {
+          visible = visible.filter((p: any) => {
+            const authorId = p.author?.id || p.userId || p.user_id;
+            return followingIdsRef.current?.has(authorId);
+          });
+        }
+        visible = filterMuted(visible);
+        data = data.concat(visible);
+        if (data.length > 0 || raw.length === 0) break;
+      }
 
       if (sort === 'score') {
         // Boost posts from communities the user has joined
@@ -89,15 +111,9 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
           new Date(b.createdAt || b.created_at || 0).getTime() -
           new Date(a.createdAt || a.created_at || 0).getTime()
         );
-      } else if (sort === 'following' && followingIdsRef.current) {
-        data = data.filter((p: any) => {
-          const authorId = p.author?.id || p.userId || p.user_id;
-          return followingIdsRef.current?.has(authorId);
-        });
       }
 
-      // Filter muted users + pre-cache individual posts
-      data = filterMuted(data);
+      // Pre-cache individual posts
       data.forEach((p: any) => { if (p.id) setCache(`post:${p.id}`, p); });
 
       if (refresh) {
@@ -113,8 +129,8 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
           return merged;
         });
       }
-      setHasMore(res.meta?.has_more ?? data.length >= limit);
-      offsetRef.current = (refresh ? 0 : offsetRef.current) + data.length;
+      setHasMore(more);
+      offsetRef.current = baseOffset + rawCount;
     } catch (err: any) {
       captureException(err, { hook: 'usePosts', sort });
       setError(err.message || 'Failed to load posts');
