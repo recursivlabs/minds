@@ -101,9 +101,6 @@ export default function ChatScreen() {
   if (activeConvoId) {
     return (
       <ConversationView
-        // Key by id so switching threads remounts fresh — instantly showing the
-        // new thread's cached messages instead of lingering on the previous one.
-        key={activeConvoId}
         conversationId={activeConvoId}
         onBack={() => { setActiveConvoId(null); refresh(); }}
       />
@@ -429,7 +426,11 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   }, [conversationId]);
   const cachedOther = React.useMemo(() => {
     if (!cachedConvo) return null;
-    return cachedConvo.participants?.find((p: any) => p.id !== user?.id) || cachedConvo.participants?.[0];
+    // Read members too (the conversation-list DTO uses `members`, which carry
+    // is_ai) so the agent/bubble styling is correct from the cache and doesn't
+    // flip once the detail fetch resolves.
+    const parts = cachedConvo.participants || cachedConvo.members || [];
+    return parts.find((p: any) => (p.id ?? p.userId) !== user?.id) || parts[0] || null;
   }, [cachedConvo, user?.id]);
   const [partnerName, setPartnerName] = React.useState<string>(
     cachedConvo?.name || cachedOther?.name || 'Conversation'
@@ -456,6 +457,24 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     atBottomRef.current = near;
     setShowJump(prev => (prev === !near ? prev : !near));
   }, []);
+
+  // This component is intentionally NOT remounted on thread switch (no key) —
+  // remounting churned the socket subscription + re-flipped the agent styling +
+  // re-scrolled, which read as nasty bugs when navigating quickly. Instead,
+  // reset the view from the NEW thread's cache here so we never linger on the
+  // previous thread's messages. The network load effect below then reconciles.
+  const convoIdRef = React.useRef(conversationId);
+  React.useEffect(() => {
+    if (convoIdRef.current === conversationId) return;
+    convoIdRef.current = conversationId;
+    setMessages(cachedSorted);
+    messageIdsRef.current = new Set(cachedSorted.map((m: any) => m.id));
+    setLoading(cachedSorted.length === 0);
+    setPartnerName(cachedConvo?.name || cachedOther?.name || 'Conversation');
+    setPartnerInfo(cachedOther || null);
+    atBottomRef.current = true;
+    setShowJump(false);
+  }, [conversationId, cachedSorted, cachedConvo, cachedOther]);
 
   // Agent conversations render Claude-style (full-width assistant text);
   // human DMs keep iMessage bubbles on both sides.
@@ -728,25 +747,31 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     }]);
 
     try {
-      const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText });
-      const serverMsgId = sendRes?.data?.id;
-
-      // Reconcile: replace the temp row with the real one. WS may also
-      // emit the same id; messageIdsRef.add() lets the WS handler dedupe.
-      if (serverMsgId) {
-        messageIdsRef.current.add(serverMsgId);
-        setMessages(prev => prev.map(m => m.id === tempId
-          ? { ...m, id: serverMsgId, pending: false }
-          : m));
-      } else {
-        setMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false } : m));
-      }
-
       const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
       const otherName = partnerInfo?.name || partnerInfo?.user?.name || 'Agent';
       const isAgent = partnerInfo?.isAi || partnerInfo?.is_ai
         || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai
         || partnerInfo?.type === 'agent' || partnerInfo?.user?.type === 'agent';
+
+      // Persist the user message. For AGENT chats the streaming endpoint below
+      // (/agents/:id/chat/stream) inserts the user message itself — so calling
+      // chat.send too stored it TWICE, which is the duplicate that reappeared
+      // after refresh. Only call chat.send for human DMs; for agents just clear
+      // the optimistic row's pending state and let chatStream persist it.
+      if (!isAgent) {
+        const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText });
+        const serverMsgId = sendRes?.data?.id;
+        if (serverMsgId) {
+          messageIdsRef.current.add(serverMsgId);
+          setMessages(prev => prev.map(m => m.id === tempId
+            ? { ...m, id: serverMsgId, pending: false }
+            : m));
+        } else {
+          setMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false } : m));
+        }
+      } else {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false } : m));
+      }
 
       // Agent reply path. The server's POST /chat/messages does NOT
       // auto-trigger an agent response — the client is responsible
