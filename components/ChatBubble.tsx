@@ -17,6 +17,10 @@ interface Props {
 export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agentChat }: Props) {
   const colors = useColors();
   const content = message.content || message.text || message.body || '';
+  // Never render an empty bubble. A streaming placeholder legitimately starts
+  // empty (caret only), but a non-streaming empty message is a tool-only agent
+  // turn or a glitch and must not show as a blank box.
+  if (!content.trim() && message.streaming !== true) return null;
   const timestamp = message.createdAt || message.created_at || '';
   const hasMarkdown = /[*`#\[\]]/.test(content);
   // Streaming bubbles show a caret + skip the trailing timestamp so the
