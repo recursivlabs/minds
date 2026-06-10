@@ -289,7 +289,12 @@ export function useCommunities(limit = 20) {
   }, [sdk, limit, cacheKey]);
 
   React.useEffect(() => {
-    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    // Always revalidate on mount (stale-while-revalidate). We still render the
+    // cached list instantly, but we MUST refetch so a stale `is_member` flag
+    // can't persist — otherwise communities a user left (or that a server bug
+    // once mislabeled as joined, e.g. the phantom QA/Support communities) linger
+    // in the sidebar forever because the cache looked "fresh".
+    if (cached) setLoading(false);
     fetch();
   }, [fetch]);
 
