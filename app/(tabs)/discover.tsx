@@ -681,7 +681,7 @@ export default function DiscoverScreen() {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const res = await sdk.profiles.search({ q: searchQuery, limit: 20 });
+        const res = await sdk.profiles.search({ q: searchQuery, limit: 20, organization_id: ORG_ID || undefined } as any);
         if (!cancelled) setSearchedPeople(res.data || []);
       } catch {
         if (!cancelled) setSearchedPeople([]);

@@ -679,14 +679,16 @@ export function useProfiles(limit = 20) {
       try {
         if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
         const s = sdk;
-        let data: any[];
-        if (ORG_ID) {
-          const res = await s.organizations.members(ORG_ID, { limit } as any);
-          data = (res.data || []).map((m: any) => m.user || m);
-        } else {
-          const res = await fetchDeduped(`req:profiles:${limit}`, () => s.profiles.list({ limit } as any));
-          data = res.data || [];
-        }
+        // The people directory is the app's real user base = project_members.
+        // The session key is project-bound (projectId=Minds), so the server
+        // scopes /profiles to project_members automatically; we pass org_id
+        // only as a fallback for non-project-bound keys. (Previously this
+        // used organizations.members(ORG), which returned org_members — the
+        // operator team — and hid real users like project-member agents.)
+        const res = await fetchDeduped(`req:profiles:${limit}`, () =>
+          s.profiles.list({ limit, organization_id: ORG_ID || undefined } as any)
+        );
+        let data: any[] = res.data || [];
         // Filter out AI agents — they show in the Agents section
         data = data.filter((p: any) => !p.isAi && !p.is_ai && p.type !== 'agent');
         if (!cancelled) {
@@ -788,7 +790,7 @@ export function useSearch(query: string) {
         // Search in parallel
         const [postRes, profileRes, commRes] = await Promise.allSettled([
           s.posts.search({ q: query, limit: 10, organization_id: ORG_ID || undefined }),
-          s.profiles.search ? s.profiles.search({ q: query, limit: 10 }) : Promise.reject('no search'),
+          s.profiles.search ? s.profiles.search({ q: query, limit: 10, organization_id: ORG_ID || undefined }) : Promise.reject('no search'),
           s.communities.list({ limit: 50, organization_id: ORG_ID || undefined }),
         ]);
 
