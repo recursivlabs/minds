@@ -344,7 +344,9 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       };
     })
     .filter(Boolean)
-    .slice(0, 4) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string }>;
+    // Show a real inbox, not a teaser. The panel scrolls, so the cap only
+    // exists to keep the render light — 4 was hiding active threads.
+    .slice(0, 10) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string }>;
   // Communities the user is a member of. Strict is_member check (only true).
   // NOTE: this reflects real communityMember rows — if a community the user
   // never joined appears here, the fix is at the source (an auto-join path
@@ -354,7 +356,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // (intermittently, depending on boot timing) — the phantom QA/Support groups.
   const recentCommunities = (communitiesFetched ? (communities || []) : [])
     .filter((c: any) => c.is_member === true || c.isMember === true)
-    .slice(0, 3)
+    .slice(0, 5)
     .map((c: any) => ({
       id: c.id,
       type: 'community' as const,
