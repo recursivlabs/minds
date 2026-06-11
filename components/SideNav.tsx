@@ -364,7 +364,74 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       avatar: c.image || c.avatar || null,
       preview: `${c.memberCount || c.member_count || 0} members`,
     }));
-  const inboxItems = [...recentDMs, ...recentCommunities];
+  // Shared row renderer for the sidebar's Recent (DMs/agents) and Communities
+  // sections. Unread treatment only applies to DMs — communities are nav, not
+  // inbox (Reddit model: places you go, not things that message you).
+  const renderInboxRow = (item: { id: string; type: 'dm' | 'community'; name: string; avatar: string | null; preview: string }) => {
+    const isUnread = item.type === 'dm' && unreadConvos.has(item.id);
+    return (
+      <Pressable
+        key={`${item.type}-${item.id}`}
+        onPress={() => {
+          if (item.type === 'dm') {
+            readLocallyRef.current.add(item.id);
+            setUnreadConvos(prev => { if (!prev.has(item.id)) return prev; const next = new Set(prev); next.delete(item.id); return next; });
+            router.push({ pathname: '/(tabs)/chat', params: { id: item.id } } as any);
+          } else {
+            router.push(`/(tabs)/community/${item.id}` as any);
+          }
+        }}
+        style={({ pressed, hovered }: any) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.sm,
+          borderRadius: radius.sm,
+          // Faint full-row highlight for unread, so it reads at a glance —
+          // not just the dot. Hover sits on top for web responsiveness.
+          backgroundColor: pressed
+            ? colors.surfaceHover
+            : isUnread
+              ? (hovered ? colors.accentMuted : colors.accentSubtle)
+              : hovered ? colors.glass : 'transparent',
+          ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+        })}
+      >
+        <Avatar uri={item.avatar} name={item.name} size="xs" />
+        <View style={{ flex: 1 }}>
+          <Text
+            variant="caption"
+            numberOfLines={1}
+            color={isUnread ? colors.text : undefined}
+            style={{ fontWeight: isUnread ? '600' : '400', fontSize: 13 }}
+          >
+            {item.name}
+          </Text>
+          {item.preview ? (
+            <Text
+              variant="caption"
+              color={isUnread ? colors.textSecondary : colors.textMuted}
+              numberOfLines={1}
+              style={{ fontSize: 11 }}
+            >
+              {item.preview}
+            </Text>
+          ) : null}
+        </View>
+        {isUnread && (
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: colors.accent,
+            }}
+          />
+        )}
+      </Pressable>
+    );
+  };
 
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.name);
@@ -494,88 +561,57 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           {/* Inbox section — only when expanded */}
           {!collapsed && (
             <View style={{ paddingHorizontal: spacing.lg }}>
-              <Text
-                variant="caption"
-                color={colors.textMuted}
-                style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing.md }}
-              >
-                Recent
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+                <Text
+                  variant="caption"
+                  color={colors.textMuted}
+                  style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}
+                >
+                  Recent
+                </Text>
+                {/* Subtle gateway to the full chat page (X-style on web). */}
+                <Pressable
+                  onPress={() => router.push('/(tabs)/chat' as any)}
+                  hitSlop={8}
+                  style={({ hovered }: any) => ({
+                    borderRadius: radius.sm,
+                    paddingHorizontal: spacing.xs,
+                    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                  })}
+                >
+                  {({ hovered }: any) => (
+                    <Text variant="caption" color={hovered ? colors.text : colors.textMuted} style={{ fontSize: 11 }}>
+                      See all
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
               <ScrollView
                 style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
               >
-                {inboxItems.length === 0 ? (
+                {recentDMs.length === 0 ? (
                   <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>
                     No recent activity
                   </Text>
                 ) : (
-                  inboxItems.map((item) => {
-                    const isUnread = item.type === 'dm' && unreadConvos.has(item.id);
-                    return (
-                    <Pressable
-                      key={`${item.type}-${item.id}`}
-                      onPress={() => {
-                        if (item.type === 'dm') {
-                          readLocallyRef.current.add(item.id);
-                          setUnreadConvos(prev => { if (!prev.has(item.id)) return prev; const next = new Set(prev); next.delete(item.id); return next; });
-                          router.push({ pathname: '/(tabs)/chat', params: { id: item.id } } as any);
-                        } else {
-                          router.push(`/(tabs)/community/${item.id}` as any);
-                        }
-                      }}
-                      style={({ pressed, hovered }: any) => ({
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: spacing.sm,
-                        paddingVertical: spacing.sm,
-                        paddingHorizontal: spacing.sm,
-                        borderRadius: radius.sm,
-                        // Faint full-row highlight for unread, so it reads at a glance —
-                        // not just the dot. Hover sits on top for web responsiveness.
-                        backgroundColor: pressed
-                          ? colors.surfaceHover
-                          : isUnread
-                            ? (hovered ? colors.accentMuted : colors.accentSubtle)
-                            : hovered ? colors.glass : 'transparent',
-                        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-                      })}
+                  recentDMs.map(renderInboxRow)
+                )}
+
+                {/* Communities: nav, not inbox (Reddit model) — your joined
+                    communities as a distinct section, places you GO. */}
+                {recentCommunities.length > 0 && (
+                  <>
+                    <Text
+                      variant="caption"
+                      color={colors.textMuted}
+                      style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: spacing.xl, marginBottom: spacing.md }}
                     >
-                      <Avatar uri={item.avatar} name={item.name} size="xs" />
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          variant="caption"
-                          numberOfLines={1}
-                          color={isUnread ? colors.text : undefined}
-                          style={{ fontWeight: isUnread ? '600' : '400', fontSize: 13 }}
-                        >
-                          {item.name}
-                        </Text>
-                        {item.preview ? (
-                          <Text
-                            variant="caption"
-                            color={isUnread ? colors.textSecondary : colors.textMuted}
-                            numberOfLines={1}
-                            style={{ fontSize: 11 }}
-                          >
-                            {item.preview}
-                          </Text>
-                        ) : null}
-                      </View>
-                      {isUnread && (
-                        <View
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: 4,
-                            backgroundColor: colors.accent,
-                          }}
-                        />
-                      )}
-                    </Pressable>
-                    );
-                  })
+                      Communities
+                    </Text>
+                    {recentCommunities.map(renderInboxRow)}
+                  </>
                 )}
               </ScrollView>
             </View>
