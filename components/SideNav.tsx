@@ -567,7 +567,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                   color={colors.textMuted}
                   style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}
                 >
-                  Recent
+                  Messages
                 </Text>
                 {/* Subtle gateway to the full chat page (X-style on web). */}
                 <Pressable
@@ -603,13 +603,31 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                     communities as a distinct section, places you GO. */}
                 {recentCommunities.length > 0 && (
                   <>
-                    <Text
-                      variant="caption"
-                      color={colors.textMuted}
-                      style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: spacing.xl, marginBottom: spacing.md }}
-                    >
-                      Communities
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xl, marginBottom: spacing.md }}>
+                      <Text
+                        variant="caption"
+                        color={colors.textMuted}
+                        style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}
+                      >
+                        Communities
+                      </Text>
+                      {/* Gateway to the full communities list (Discover → Communities). */}
+                      <Pressable
+                        onPress={() => router.push('/(tabs)/discover?tab=communities' as any)}
+                        hitSlop={8}
+                        style={() => ({
+                          borderRadius: radius.sm,
+                          paddingHorizontal: spacing.xs,
+                          ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                        })}
+                      >
+                        {({ hovered }: any) => (
+                          <Text variant="caption" color={hovered ? colors.text : colors.textMuted} style={{ fontSize: 11 }}>
+                            See all
+                          </Text>
+                        )}
+                      </Pressable>
+                    </View>
                     {recentCommunities.map(renderInboxRow)}
                   </>
                 )}
