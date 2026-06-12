@@ -784,9 +784,22 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   React.useEffect(() => {
     if (!screenFocused) return;
     if (sdk && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg?.id && !lastMsg.id.startsWith('temp-') && !lastMsg.id.startsWith('agent-') && !lastMsg.id.startsWith('streaming-')) {
-        sdk.chat.markAsRead(conversationId, { message_id: lastMsg.id }).catch(() => {});
+      // Mark read up to the latest PERSISTED message. Scan back past optimistic/
+      // streaming temp rows (agent replies stream in with temp ids) — if we only
+      // checked the very last row and it was a temp, we'd skip marking entirely
+      // and the thread would pop back to unread after a refresh once that reply
+      // persisted with a real id. When the temp later resolves to a real id, this
+      // effect re-runs and advances the cursor onto it.
+      let lastReal: any = null;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i];
+        if (m?.id && !m.id.startsWith('temp-') && !m.id.startsWith('agent-') && !m.id.startsWith('streaming-')) {
+          lastReal = m;
+          break;
+        }
+      }
+      if (lastReal?.id) {
+        sdk.chat.markAsRead(conversationId, { message_id: lastReal.id }).catch(() => {});
       }
     }
   }, [conversationId, sdk, messages, screenFocused]);
