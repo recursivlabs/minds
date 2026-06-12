@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Platform } from 'react-native';
+import { router } from 'expo-router';
 import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
@@ -312,13 +312,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthedSdk(null);
     setSignalsSdk(null);
     setProjectId(null);
-    // On web, force a hard navigation to the logged-out homepage. A soft
-    // router.replace can leave the authed shell mounted (stale context/SDK)
-    // until the user manually refreshes — a full reload guarantees a clean
-    // signed-out state.
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.location.replace('/');
-    }
+    // All auth state + storage is cleared above, so a soft navigation renders
+    // the logged-out landing immediately — no feed flash, no manual refresh —
+    // on web and native alike. (Web previously hard-reloaded, which left the
+    // old feed visible during the reload; native did nothing at all, leaving
+    // the user stranded on the authed shell.)
+    router.replace('/');
   }, []);
 
   const value = React.useMemo(

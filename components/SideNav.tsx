@@ -498,21 +498,13 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         backgroundColor: colors.bg,
         borderRightWidth: 1,
         borderRightColor: colors.borderSubtle,
+        paddingTop: spacing['3xl'],
+        paddingBottom: spacing.xl,
         ...(Platform.OS === 'web' ? { transition: 'width 0.2s ease' } as any : {}),
       }}
     >
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingTop: spacing['3xl'],
-          paddingBottom: spacing.xl,
-          justifyContent: 'space-between',
-          minHeight: '100%' as any,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Top section */}
-        <View>
+        {/* Top section — fixed (logo + nav + separator) */}
+        <View style={{ flexShrink: 0 }}>
           {/* Logo (auto-collapses with the nav — no manual toggle, no theme
               switch; theme lives in Settings now) */}
           <View
@@ -557,10 +549,12 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               }}
             />
           )}
+        </View>
 
-          {/* Inbox section — only when expanded */}
-          {!collapsed && (
-            <View style={{ paddingHorizontal: spacing.lg }}>
+        {/* Inbox section — flex:1, the ONLY scrollable region, so the user
+            profile below stays pinned to the bottom. */}
+        {!collapsed && (
+          <View style={{ flex: 1, minHeight: 0 as any, paddingHorizontal: spacing.lg }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
                 <Text
                   variant="caption"
@@ -634,10 +628,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               </ScrollView>
             </View>
           )}
-        </View>
 
-        {/* Bottom section */}
-        <View style={{ gap: spacing.xs, marginTop: spacing.xl }}>
+        {/* Bottom section — fixed, pinned to the bottom (the inbox above
+            takes the remaining space and scrolls internally). */}
+        <View style={{ flexShrink: 0, gap: spacing.xs, marginTop: spacing.xl }}>
           {BOTTOM_ITEMS.map(renderNavItem)}
 
           {/* User profile — route directly to the canonical /user/<username>
@@ -681,7 +675,6 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             )}
           </Pressable>
         </View>
-      </ScrollView>
     </View>
   );
 }
