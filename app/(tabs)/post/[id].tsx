@@ -33,20 +33,34 @@ export default function PostDetailScreen() {
   // people's) never appeared until a full refresh. We merge by id and preserve
   // any local optimistic replies the server hasn't returned yet, so a freshly
   // posted reply is never clobbered by a lagging server list.
+  // Navigating between posts reuses this screen instance, so reset replies when
+  // the post id changes. Without this, the optimistic-merge below preserves the
+  // PREVIOUS post's replies and they show on every subsequent post.
   React.useEffect(() => {
-    if (!post) return;
+    setReplies([]);
+    setRepliesLoading(true);
+  }, [id]);
+
+  React.useEffect(() => {
+    // Ignore a stale post object from the previous route until the fetch for
+    // THIS id lands — otherwise its replies would merge into the new post.
+    if (!post || post.id !== id) return;
     const serverReplies = post.replies || [];
     setReplies(prev => {
       const byId = new Map<string, any>();
       for (const r of serverReplies) if (r?.id) byId.set(r.id, r);
-      for (const r of prev) if (r?.id && !byId.has(r.id)) byId.set(r.id, r);
+      // Preserve only optimistic replies that belong to THIS post.
+      for (const r of prev) {
+        const rt = r?.reply_to_id ?? r?.replyToId ?? id;
+        if (r?.id && !byId.has(r.id) && rt === id) byId.set(r.id, r);
+      }
       return Array.from(byId.values()).sort((a, b) =>
         new Date(a.createdAt || a.created_at || 0).getTime() - new Date(b.createdAt || b.created_at || 0).getTime()
       );
     });
     setRepliesLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?.replies]);
+  }, [post, id]);
 
   const handleReply = async () => {
     if (!replyText.trim() || !sdk || !id) return;
