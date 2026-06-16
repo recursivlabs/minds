@@ -105,7 +105,12 @@ export default function FeedScreen() {
       const personal = ((agentsList as any).data || []).find(
         (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
       );
-      setAgentCtaState(dismissed || setUp || personal ? 'hidden' : 'show');
+      // The For You feed is now ranked server-side by the recommender — it no
+      // longer requires the user to set up a personal agent, so the setup CTA
+      // is retired. (The personal agent still exists as an optional DM /
+      // ask-agent surface, just not a feed prerequisite.)
+      void dismissed; void setUp; void personal;
+      setAgentCtaState('hidden');
       const parsed = lastTs ? Number(lastTs) : Number.NaN;
       setLastCurateAt(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
 

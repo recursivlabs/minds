@@ -77,16 +77,12 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
         }
       }
 
-      // 'personal' = the user's private brief feed authored by their
-      // personal AI agent. The server scopes via audience_user_id.
-      // Personal-feed posts are user-scoped, not org-scoped, so we
-      // intentionally omit organization_id when requesting personal —
-      // otherwise the curator-inserted posts (no organization_id) get
-      // filtered out by the server's org_id filter.
+      // 'personal' (For You) is now served by the server-side recommender
+      // (sdk.curator.forYou — a cheap, LLM-free ranking of existing app posts),
+      // NOT the old per-user agent brief. It needs no audience/org param (the
+      // key's project scope drives it). Other sorts page the shared post list.
       const baseParams: Record<string, any> = { limit };
-      if (sort === 'personal') {
-        baseParams.audience_user_id = 'me';
-      } else if (ORG_ID) {
+      if (ORG_ID) {
         baseParams.organization_id = ORG_ID;
       }
 
@@ -103,8 +99,14 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       let data: any[] = [];
       for (let page = 0; page < 5 && more; page++) {
         const pageOffset = baseOffset + rawCount;
-        const res = await fetchDeduped(`req:${cacheKey}:${pageOffset}`, () =>
-          s.posts.list({ ...baseParams, offset: pageOffset } as any));
+        const res: any = await fetchDeduped(`req:${cacheKey}:${pageOffset}`, () =>
+          sort === 'personal' && typeof (s as any).curator?.forYou === 'function'
+            // For You → the server-side recommender (ranks existing posts;
+            // returns the same shape as posts.list, so the rest is unchanged).
+            // Guard: if the deployed SDK predates forYou, fall back to the
+            // org-scoped post list so the feed degrades gracefully (no crash).
+            ? (s as any).curator.forYou({ limit, offset: pageOffset })
+            : s.posts.list({ ...baseParams, offset: pageOffset } as any));
         const raw = res.data || [];
         rawCount += raw.length;
         more = res.meta?.has_more ?? raw.length >= limit;
@@ -221,60 +223,13 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
   // sees fresher content on the NEXT view, not after a long spinner.
   // Falls back to the legacy awaited path only if refreshIfStale isn't
   // available on the SDK (older client / staging).
+  // Pull-to-refresh on the For You feed. The feed is now ranked server-side by
+  // the recommender (sdk.curator.forYou), so "recurate" is just a re-fetch —
+  // which re-ranks against the latest posts + signals. No per-user LLM
+  // round-trip. Kept under the same name so call sites are unchanged.
   const recurate = React.useCallback(async () => {
-    if (sort !== 'personal' || !getPreference('aiEnabled')) return fetchPosts(true);
-    if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
-    const s = sdk;
-    const ensurePersonal = (s as any)?.agents?.ensurePersonal;
-    const refreshIfStale = (s as any)?.curator?.refreshIfStale;
-    const runCurator = (s as any)?.curator?.run;
-    try {
-      const stored = await loadPreferences();
-      const prefs = stored || {
-        interests: ['ai', 'tech', 'startups', 'science'],
-        free_text_interests: '',
-        vibes: ['news'],
-        persona: 'curious',
-        agent_name: undefined,
-        paste_sources: {},
-      };
-      // The agent upsert is idempotent config-sync, not per-gesture work —
-      // doing it on EVERY pull-to-refresh made the most-used gesture in the
-      // app cost an extra write per pull, for everyone, all day.
-      if (typeof ensurePersonal === 'function' && !ensuredPersonalThisSession) {
-        await ensurePersonal.call((s as any).agents, {
-          preferences: {
-            interests: prefs.interests,
-            free_text_interests: prefs.free_text_interests,
-            vibes: prefs.vibes,
-            persona: prefs.persona,
-          },
-          overrides: prefs.agent_name ? { name: prefs.agent_name } : undefined,
-        });
-        ensuredPersonalThisSession = true;
-      }
-      const request = buildCuratorRequest({
-        agentName: prefs.agent_name || undefined,
-        interests: prefs.interests,
-        vibes: prefs.vibes,
-        persona: prefs.persona as any,
-        pasteSources: prefs.paste_sources as any,
-      });
-      if (typeof refreshIfStale === 'function') {
-        const res: any = await refreshIfStale.call((s as any).curator, request);
-        if (res?.data?.status === 'started') await markCuratedNow();
-        // 'fresh' or 'already-running' → do nothing extra; the feed
-        // re-fetch below picks up whatever is already in the post table.
-      } else if (typeof runCurator === 'function') {
-        // Legacy SDK fallback path. Awaits the run.
-        await runCurator.call((s as any).curator, request);
-        await markCuratedNow();
-      }
-    } catch {
-      // Curator blip is non-fatal; we still re-fetch below.
-    }
     return fetchPosts(true);
-  }, [fetchPosts, sort, sdk]);
+  }, [fetchPosts]);
 
   const loadMore = React.useCallback(() => {
     if (Date.now() < cooldownUntilRef.current) return;
