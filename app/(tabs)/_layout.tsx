@@ -127,6 +127,7 @@ export default function TabLayout() {
             <Tabs.Screen name="post/[id]" options={{ href: null }} />
             <Tabs.Screen name="user/[username]" options={{ href: null }} />
             <Tabs.Screen name="community/[id]" options={{ href: null }} />
+            <Tabs.Screen name="communities" options={{ href: null }} />
           </Tabs>
         </View>
         </View>
@@ -223,6 +224,7 @@ export default function TabLayout() {
       <Tabs.Screen name="post/[id]" options={{ href: null }} />
       <Tabs.Screen name="user/[username]" options={{ href: null }} />
       <Tabs.Screen name="community/[id]" options={{ href: null }} />
+      <Tabs.Screen name="communities" options={{ href: null }} />
     </Tabs>
   );
 }

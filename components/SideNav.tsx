@@ -605,9 +605,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                       >
                         Communities
                       </Text>
-                      {/* Gateway to the full communities list (Discover → Communities). */}
+                      {/* Gateway to YOUR joined communities (like "See all" for
+                          Messages → chat) — NOT Discover, which is every community. */}
                       <Pressable
-                        onPress={() => router.push('/(tabs)/discover?tab=communities' as any)}
+                        onPress={() => router.push('/(tabs)/communities' as any)}
                         hitSlop={8}
                         style={() => ({
                           borderRadius: radius.sm,

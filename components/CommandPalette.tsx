@@ -350,14 +350,24 @@ export function CommandPalette() {
   }, [results.length]);
 
   const onSubmit = React.useCallback(() => {
+    const q = query.trim();
     const r = results[activeIdx];
+    const isSlash = q.startsWith('/');
+    // A plain keyword + Enter must ALWAYS run a keyword search — never fire a
+    // stale empty-state suggestion (e.g. "Write a post" → create page) that
+    // lingers during the 200ms search debounce or when the query is still
+    // resolving. Only honor a highlighted row if it's a live hit for this
+    // query (post/user/recent) or an explicit slash command.
+    if (q && !isSlash && (loading || !r || r.kind === 'command')) {
+      runFind(q);
+      return;
+    }
     if (r) {
       r.onPress();
-    } else if (query.trim()) {
-      // Fallback: enter a search if no result is highlighted.
-      runFind(query.trim());
+    } else if (q) {
+      runFind(q);
     }
-  }, [results, activeIdx, query, runFind]);
+  }, [results, activeIdx, query, loading, runFind]);
 
   if (Platform.OS !== 'web') {
     // Native gets a different palette UX (bottom sheet) — kept simple

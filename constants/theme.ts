@@ -125,24 +125,27 @@ export const darkColors: ColorTokens = {
 };
 
 export const lightColors: ColorTokens = {
-  // Linear-style off-white. Slightly cooler than #ffffff; not warm.
-  bg: '#fafafa',
+  // Cooler light-grey canvas so white surfaces/cards visibly separate from the
+  // background (the old #fafafa was ~indistinguishable from white = flat,
+  // structureless feel). White stays for raised surfaces so they "pop".
+  bg: '#f1f1f4',
   surface: '#ffffff',
   surfaceRaised: '#ffffff',
-  surfaceHover: 'rgba(0,0,0,0.04)',
+  surfaceHover: 'rgba(0,0,0,0.055)',
 
-  glass: 'rgba(0,0,0,0.025)',
-  glassBorder: 'rgba(0,0,0,0.08)',
+  glass: 'rgba(0,0,0,0.035)',
+  glassBorder: 'rgba(0,0,0,0.12)',
 
-  // Tight, sharp borders — Linear hairlines
-  border: 'rgba(0,0,0,0.10)',
-  borderSubtle: 'rgba(0,0,0,0.06)',
+  // Stronger hairlines — at 0.5px the old 6–10% black borders were nearly
+  // invisible, so dividers/cards/structure read as missing. Bumped for clarity.
+  border: 'rgba(0,0,0,0.16)',
+  borderSubtle: 'rgba(0,0,0,0.10)',
   borderFocus: '#a07e24',
 
   // Near-black for primary, real grey hierarchy. AAA on white.
   text: '#0a0a0a',
-  textSecondary: '#4a4a4a',
-  textMuted: '#8a8a8a',
+  textSecondary: '#3f3f3f',
+  textMuted: '#646464',
   textInverse: '#ffffff',
   textOnAccent: '#ffffff',
 

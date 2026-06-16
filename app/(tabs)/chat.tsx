@@ -1016,6 +1016,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
             paddingHorizontal: spacing.xl + spacing.lg,
             flexGrow: 1,
             justifyContent: messages.length === 0 ? 'center' : 'flex-end',
+            // Constrain to a Claude-like reading column on web so the thread
+            // isn't stretched edge-to-edge on wide screens. Centered, and the
+            // input row below uses the same width so they stay aligned.
+            ...(Platform.OS === 'web' ? { maxWidth: 760, width: '100%', alignSelf: 'center' } as any : {}),
           }}
           onScroll={handleScroll}
           // 16ms (~60fps) so the at-bottom test tracks fast streaming growth
@@ -1148,6 +1152,9 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           borderTopWidth: 0.5,
           borderTopColor: colors.borderSubtle,
           paddingBottom: insets.bottom || spacing.md,
+          // Match the message column width on web so the composer sits in the
+          // same centered Claude-width column instead of stretching full-bleed.
+          ...(Platform.OS === 'web' ? { maxWidth: 760, width: '100%', alignSelf: 'center' } as any : {}),
         }}
       >
         <TextInput

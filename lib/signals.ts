@@ -38,7 +38,8 @@ type SignalType =
   | 'hide'
   | 'share'
   | 'mute_source'
-  | 'open_chat';
+  | 'open_chat'
+  | 'ask_agent';
 
 interface SignalInput {
   postId?: string;

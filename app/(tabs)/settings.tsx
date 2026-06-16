@@ -73,15 +73,62 @@ function SettingRow({
   return body;
 }
 
+// Turn a raw user-agent into a human label ("Chrome on macOS"). The sessions
+// list previously read non-existent fields (s.device/s.userAgent) so EVERY row
+// fell through to "Unknown device" — the real field is `user_agent`.
+function friendlyUA(ua?: string | null): string {
+  if (!ua) return 'Unknown device';
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /OPR\/|Opera/.test(ua) ? 'Opera' :
+    /Chrome\//.test(ua) ? 'Chrome' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Safari\//.test(ua) ? 'Safari' :
+    /Expo|okhttp|Dart|axios|node-fetch|node/i.test(ua) ? 'Minds app' : null;
+  const os =
+    /iPhone|iPad|iOS/.test(ua) ? 'iOS' :
+    /Android/.test(ua) ? 'Android' :
+    /Mac OS X|Macintosh/.test(ua) ? 'macOS' :
+    /Windows/.test(ua) ? 'Windows' :
+    /Linux/.test(ua) ? 'Linux' : null;
+  if (browser && os) return `${browser} on ${os}`;
+  return browser || os || 'Unknown device';
+}
+
+// Custom toggle instead of the platform <Switch> — React Native Web's Switch
+// doesn't reliably honor trackColor.true and falls back to its default green/
+// teal track, which clashes with Minds' gold accent. This Pressable version is
+// gold-on / neutral-off everywhere with no platform-default color bleed.
 function Toggle({ value, onValueChange }: { value: boolean; onValueChange: (v: boolean) => void }) {
   const colors = useColors();
   return (
-    <Switch
-      value={value}
-      onValueChange={onValueChange}
-      trackColor={{ true: colors.accent, false: colors.glass }}
-      thumbColor={colors.text}
-    />
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      hitSlop={6}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      style={{
+        width: 44,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: value ? colors.accent : colors.glass,
+        borderWidth: 0.5,
+        borderColor: value ? colors.accent : colors.borderSubtle,
+        padding: 2,
+        justifyContent: 'center',
+        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+      }}
+    >
+      <View
+        style={{
+          width: 21,
+          height: 21,
+          borderRadius: 11,
+          backgroundColor: value ? colors.textOnAccent : colors.text,
+          alignSelf: value ? 'flex-end' : 'flex-start',
+        }}
+      />
+    </Pressable>
   );
 }
 
@@ -290,6 +337,20 @@ export default function SettingsScreen() {
     } catch { showMsg('Failed to revoke session.', true); }
   };
 
+  const [showAllSessions, setShowAllSessions] = React.useState(false);
+
+  const revokeOtherSessions = async () => {
+    if (!sdk) return;
+    setSaving('sessions');
+    try {
+      await sdk.settings.revokeAllSessions();
+      // Server keeps the current session alive; mirror that locally.
+      setSessions(s => s.filter((x: any) => x.is_current));
+      showMsg('Signed out of all other sessions.');
+    } catch { showMsg('Failed to revoke sessions.', true); }
+    setSaving('');
+  };
+
   const deleteAccount = async () => {
     if (!sdk || !deletePw) return;
     setSaving('delete');
@@ -347,26 +408,61 @@ export default function SettingsScreen() {
         <Section title="Security">
           <TwoFactorSetup />
           <Divider marginVertical={spacing.lg} />
-          <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>Active Sessions</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+            <Text variant="label" color={colors.textMuted}>
+              Active Sessions{sessions.length > 0 ? ` (${sessions.length})` : ''}
+            </Text>
+            {sessions.filter((s: any) => !s.is_current).length > 0 && (
+              <Button onPress={revokeOtherSessions} loading={saving === 'sessions'} variant="ghost" size="sm" accentColor={colors.error}>
+                Revoke all others
+              </Button>
+            )}
+          </View>
           {sessions.length === 0 ? (
             <Text variant="caption" color={colors.textMuted}>No active sessions</Text>
-          ) : sessions.map((s: any) => (
-            <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyMedium">{s.device || s.userAgent || 'Unknown device'}</Text>
-                <Text variant="caption" color={colors.textMuted}>{s.ip || ''} {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''}</Text>
-              </View>
-              <Button onPress={() => revokeSession(s.id)} variant="ghost" size="sm">Revoke</Button>
-            </View>
-          ))}
+          ) : (() => {
+            // Current device first, then the rest; collapse the long tail so a
+            // pile of sessions doesn't swamp the screen.
+            const ordered = [...sessions].sort((a: any, b: any) => (b.is_current ? 1 : 0) - (a.is_current ? 1 : 0));
+            const visible = showAllSessions ? ordered : ordered.slice(0, 4);
+            return (
+              <>
+                {visible.map((s: any) => (
+                  <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                        <Text variant="bodyMedium">{friendlyUA(s.user_agent)}</Text>
+                        {s.is_current && <Text variant="caption" color={colors.accent}>This device</Text>}
+                      </View>
+                      <Text variant="caption" color={colors.textMuted}>
+                        {[s.ip_address, s.created_at ? `since ${new Date(s.created_at).toLocaleDateString()}` : ''].filter(Boolean).join('  ·  ')}
+                      </Text>
+                    </View>
+                    {!s.is_current && <Button onPress={() => revokeSession(s.id)} variant="ghost" size="sm">Revoke</Button>}
+                  </View>
+                ))}
+                {ordered.length > 4 && (
+                  <Pressable onPress={() => setShowAllSessions(v => !v)} style={{ paddingVertical: spacing.sm }}>
+                    <Text variant="caption" color={colors.accent}>
+                      {showAllSessions ? 'Show fewer' : `Show all ${ordered.length} sessions`}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            );
+          })()}
           <Divider marginVertical={spacing.lg} />
           <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>Login History</Text>
           {loginHistory.length === 0 ? (
             <Text variant="caption" color={colors.textMuted}>No login history</Text>
           ) : loginHistory.map((e: any, i: number) => (
-            <View key={i} style={{ paddingVertical: spacing.xs }}>
-              <Text variant="body">{e.device || e.userAgent || 'Unknown'}</Text>
-              <Text variant="caption" color={colors.textMuted}>{e.ip || ''} {e.createdAt ? new Date(e.createdAt).toLocaleDateString() : ''}</Text>
+            <View key={e.id || i} style={{ paddingVertical: spacing.xs }}>
+              <Text variant="body">
+                {friendlyUA(e.user_agent)}{e.success === false ? '  ·  failed' : ''}
+              </Text>
+              <Text variant="caption" color={colors.textMuted}>
+                {[e.ip_address, e.created_at ? new Date(e.created_at).toLocaleString() : ''].filter(Boolean).join('  ·  ')}
+              </Text>
             </View>
           ))}
         </Section>

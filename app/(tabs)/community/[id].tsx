@@ -38,6 +38,28 @@ export default function CommunityDetailScreen() {
   const offsetRef = React.useRef(0);
   const isCreator = community?.created_by?.id === user?.id || community?.createdBy?.id === user?.id;
 
+  // Switching community→community reuses this same screen (the route param
+  // changes WITHOUT a remount), so the initial cache-seeded state above only
+  // runs on first mount. Re-seed every per-community piece from the NEW id's
+  // cache on each id change — otherwise the previous community's header + posts
+  // linger and swap in stages. Skip the first run (already seeded).
+  const lastIdRef = React.useRef(id);
+  React.useEffect(() => {
+    if (lastIdRef.current === id) return;
+    lastIdRef.current = id;
+    const cc = getCached(`community:${id}`);
+    const cp = getCached(`community-posts:${id}`);
+    setCommunity(cc || null);
+    setPosts(cp || []);
+    setLoading(!cc);
+    setPostsLoading(!cp);
+    setIsMember(!!(cc?.is_member || cc?.isMember));
+    setHasMore(true);
+    setEditMode(false);
+    setShowModMenu(false);
+    offsetRef.current = 0;
+  }, [id]);
+
   // Load community details
   React.useEffect(() => {
     if (!id || !sdk) return;
@@ -121,13 +143,35 @@ export default function CommunityDetailScreen() {
     setJoinLoading(false);
   };
 
-  if (loading) {
+  // Unified loading: hold ONE cohesive skeleton (header + post rows) until BOTH
+  // the community details and its first posts page are ready, so switching from
+  // one community to another reveals everything at once instead of staggering
+  // the avatar/info in, then the posts a beat later (which read as broken).
+  // Fully-cached communities skip this — both seed instantly.
+  if (loading || (postsLoading && posts.length === 0)) {
     return (
       <Container safeTop padded={false}>
-        <ScreenHeader title="" />
-        <View style={{ padding: spacing.xl, gap: spacing.lg, alignItems: 'center' }}>
-          <Skeleton width={56} height={56} borderRadius={28} />
-          <Skeleton width={180} height={20} />
+        <ScreenHeader title={community?.name || ''} />
+        <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+            <Skeleton width={64} height={64} borderRadius={32} />
+            <View style={{ flex: 1, gap: spacing.sm }}>
+              <Skeleton width={180} height={20} />
+              <Skeleton width={120} height={12} />
+            </View>
+          </View>
+          <Skeleton width="90%" height={14} />
+          <View style={{ gap: spacing.lg, marginTop: spacing.md }}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={{ gap: spacing.sm }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                  <Skeleton width={40} height={40} borderRadius={20} />
+                  <Skeleton width={140} height={14} />
+                </View>
+                <Skeleton width="100%" height={48} />
+              </View>
+            ))}
+          </View>
         </View>
       </Container>
     );

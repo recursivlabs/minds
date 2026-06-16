@@ -17,6 +17,7 @@ import { logSignal } from '../lib/signals';
 import { isMuted, toggleMute } from '../lib/muted';
 import { blockUser } from '../lib/moderation';
 import { getCached } from '../lib/cache';
+import { askAgent, buildPostContextPrompt } from '../lib/askAgent';
 import { LinkPreview } from './LinkPreview';
 import { MediaViewer } from './MediaViewer';
 import { Badge, getBadges } from './Badge';
@@ -690,6 +691,31 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           })}
         >
           <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={saved ? colors.accent : colors.textMuted} />
+        </Pressable>
+
+        {/* Ask your agent about this post (Grok-on-X style). Opens the personal
+            agent DM seeded with the post's context. Server meters the LLM call
+            against the user's Minds+/Pro allowance — a paid, usage-driving surface. */}
+        <Pressable
+          onPress={(e: any) => {
+            e?.stopPropagation?.();
+            logSignal('ask_agent', { postId: actionPostId, metadata: { source: 'postcard_ask_agent' } });
+            const author = (displayPost as any)?.author?.username || (displayPost as any)?.author?.name
+              || (post as any)?.author?.username || 'someone';
+            askAgent(sdk, router, buildPostContextPrompt({
+              author,
+              content: rawContent,
+              url: `${SITE_URL}/post/${actionPostId}`,
+            }));
+          }}
+          hitSlop={8}
+          style={({ hovered }: any) => ({
+            borderRadius: radius.full, padding: spacing.xs,
+            backgroundColor: hovered ? colors.glass : 'transparent',
+            ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease', cursor: 'pointer' } as any : {}),
+          })}
+        >
+          <Ionicons name="sparkles-outline" size={16} color={colors.textMuted} />
         </Pressable>
 
         <Pressable

@@ -14,7 +14,11 @@ export function NSFWOverlay({ children }: Props) {
   const colors = useColors();
 
   return (
-    <View style={{ position: 'relative', overflow: 'hidden', borderRadius: radius.md }}>
+    // minHeight guarantees a short text post still gives the mask enough
+    // vertical room to show the full "Sensitive content" label + View button
+    // without clipping — otherwise a one-line post renders a cramped, broken-
+    // looking overlay. Drops once revealed so real content isn't padded.
+    <View style={{ position: 'relative', overflow: 'hidden', borderRadius: radius.md, minHeight: revealed ? undefined : 150 }}>
       {children}
 
       {!revealed ? (
