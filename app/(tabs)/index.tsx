@@ -17,31 +17,6 @@ import { spacing, radius } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
 const PROFILE_NUDGE_DISMISSED_KEY = 'minds:profileNudge:dismissed';
-const LAST_CURATE_AT_KEY = 'minds:lastCurateAt';
-
-function formatRelativeTime(ts: number): string {
-  const diffMs = Date.now() - ts;
-  if (diffMs < 60_000) return 'just now';
-  const m = Math.floor(diffMs / 60_000);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
-
-// Animated "…" that cycles while the agent is thinking, so curation reads as
-// active work rather than a frozen UI.
-function useThinkingDots(active: boolean): string {
-  const [n, setN] = React.useState(0);
-  React.useEffect(() => {
-    if (!active) { setN(0); return; }
-    const id = setInterval(() => setN(x => (x + 1) % 4), 400);
-    return () => clearInterval(id);
-  }, [active]);
-  return '.'.repeat(n);
-}
-
 type FeedTab = 'foryou' | 'following';
 
 export default function FeedScreen() {
@@ -82,23 +57,14 @@ export default function FeedScreen() {
   // it stays gone. Hard-default to "hide" so we don't flash the CTA
   // before storage + agents.list resolve.
   const [agentCtaState, setAgentCtaState] = React.useState<'hidden' | 'show'>('hidden');
-  const [lastCurateAt, setLastCurateAt] = React.useState<number | null>(null);
-  const [, forceTick] = React.useReducer((x: number) => x + 1, 0);
-
-  // Tick once a minute so "5m ago" stays accurate without a remount.
-  React.useEffect(() => {
-    const id = setInterval(() => forceTick(), 60_000);
-    return () => clearInterval(id);
-  }, []);
 
   React.useEffect(() => {
     if (!user?.id || !sdk) return;
     let active = true;
     (async () => {
-      const [dismissed, setUp, lastTs, agentsList] = await Promise.all([
+      const [dismissed, setUp, agentsList] = await Promise.all([
         isAgentCtaDismissed(),
         isAgentSetUp(),
-        getItem(LAST_CURATE_AT_KEY),
         sdk.agents.list({ limit: 50 }).catch(() => ({ data: [] as any[] })),
       ]);
       if (!active) return;
@@ -111,8 +77,6 @@ export default function FeedScreen() {
       // ask-agent surface, just not a feed prerequisite.)
       void dismissed; void setUp; void personal;
       setAgentCtaState('hidden');
-      const parsed = lastTs ? Number(lastTs) : Number.NaN;
-      setLastCurateAt(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
 
       // One-time persona heal: some personal agents were provisioned with the
       // generic org (sales/SDR) system prompt, so they mis-describe their role
@@ -147,24 +111,10 @@ export default function FeedScreen() {
     foryou: aiEnabled ? 'personal' : 'latest',
     following: 'following',
   } as const;
-  const { posts, setPosts, loading: postsLoading, error: feedError, refreshing, refresh, recurate, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
+  const { posts, setPosts, loading: postsLoading, error: feedError, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
 
-  // Curating wrapper: drives the live "your agent is curating…" banner and
-  // refreshes the timestamp the moment it finishes, so the banner flips to
-  // "just now" without needing a manual reload.
-  const [curating, setCurating] = React.useState(false);
-  const curatingDots = useThinkingDots(curating);
-  const handleCurate = React.useCallback(async () => {
-    setCurating(true);
-    try {
-      await recurate();
-    } finally {
-      setCurating(false);
-      const now = Date.now();
-      setLastCurateAt(now);
-      void setItem(LAST_CURATE_AT_KEY, String(now));
-    }
-  }, [recurate]);
+  // For You is ranked server-side by the recommender now — pull-to-refresh just
+  // re-fetches (which re-ranks). No more "your agent is curating…" banner.
 
   // Horizontal-swipe nav between feed filters. Pan past 60px without
   // significant vertical drift cycles to the next/previous tab. Vertical
@@ -403,25 +353,6 @@ export default function FeedScreen() {
                   </View>
                 </Pressable>
               )}
-              {activeTab === 'foryou' && agentCtaState === 'hidden' && (curating || (lastCurateAt && posts.length > 0)) && (
-                <View style={{
-                  flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-                  paddingHorizontal: spacing.xl, paddingVertical: spacing.md,
-                  borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
-                  backgroundColor: colors.surface,
-                }}>
-                  {curating ? (
-                    <ActivityIndicator size="small" color={colors.accent} />
-                  ) : (
-                    <Ionicons name="sparkles" size={14} color={colors.accent} />
-                  )}
-                  <Text variant="caption" color={curating ? colors.accent : colors.textSecondary} style={{ flex: 1 }}>
-                    {curating
-                      ? `Your agent is curating your feed${curatingDots}`
-                      : `Your agent curated this ${formatRelativeTime(lastCurateAt as number)}`}
-                  </Text>
-                </View>
-              )}
               {profileIncomplete && !nudgeDismissed && (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: spacing.md,
@@ -463,7 +394,7 @@ export default function FeedScreen() {
               </Pressable>
             </>
           }
-          onRefresh={handleCurate}
+          onRefresh={refresh}
           refreshing={refreshing}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
@@ -509,7 +440,7 @@ export default function FeedScreen() {
                 </Text>
                 <View style={{ alignSelf: 'center' }}>
                   {activeTab === 'foryou' ? (
-                    <Button onPress={handleCurate} disabled={refreshing} size="sm">
+                    <Button onPress={refresh} disabled={refreshing} size="sm">
                       {refreshing ? 'Curating…' : 'Curate now'}
                     </Button>
                   ) : (
@@ -534,7 +465,7 @@ export default function FeedScreen() {
       </View>
       {activeTab === 'foryou' && (
         <Pressable
-          onPress={handleCurate}
+          onPress={refresh}
           disabled={refreshing}
           hitSlop={8}
           style={({ pressed }) => ({
