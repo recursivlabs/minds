@@ -1,4 +1,5 @@
 import { ORG_ID } from './recursiv';
+import { resolvePersonalAgent } from './resolvePersonalAgent';
 
 // Opens the signed-in user's PERSONAL agent DM, seeds it with `prompt`, and
 // navigates to the chat. Shared by the command palette ("/ask") and the
@@ -8,10 +9,7 @@ import { ORG_ID } from './recursiv';
 export async function askAgent(sdk: any, router: any, prompt: string): Promise<void> {
   if (!sdk) return;
   try {
-    const list = await sdk.agents.list({ limit: 50 });
-    const personal = (list.data || []).find(
-      (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
-    );
+    const personal = await resolvePersonalAgent(sdk);
     // No personal agent yet → send them through setup; they can retry after.
     if (!personal) {
       router.push('/agent' as any);

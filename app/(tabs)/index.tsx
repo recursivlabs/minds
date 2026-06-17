@@ -15,6 +15,7 @@ import { loadPreferences, isAgentCtaDismissed, markAgentCtaDismissed, isAgentSet
 import { MINDS_PERSONAL_AGENT_SYSTEM_PROMPT } from '../../lib/curator/prompts';
 import { spacing, radius } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
+import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
 
 const PROFILE_NUDGE_DISMISSED_KEY = 'minds:profileNudge:dismissed';
 type FeedTab = 'foryou' | 'following';
@@ -62,15 +63,12 @@ export default function FeedScreen() {
     if (!user?.id || !sdk) return;
     let active = true;
     (async () => {
-      const [dismissed, setUp, agentsList] = await Promise.all([
+      const [dismissed, setUp, personal] = await Promise.all([
         isAgentCtaDismissed(),
         isAgentSetUp(),
-        sdk.agents.list({ limit: 50 }).catch(() => ({ data: [] as any[] })),
+        resolvePersonalAgent(sdk).catch(() => null),
       ]);
       if (!active) return;
-      const personal = ((agentsList as any).data || []).find(
-        (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
-      );
       // The For You feed is now ranked server-side by the recommender — it no
       // longer requires the user to set up a personal agent, so the setup CTA
       // is retired. (The personal agent still exists as an optional DM /

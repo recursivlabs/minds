@@ -36,6 +36,7 @@ import { getCached, setCache } from '../lib/cache';
 import { ORG_ID } from '../lib/recursiv';
 import { spacing, radius, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
 
 type ResultKind = 'post' | 'user' | 'community' | 'agent' | 'command' | 'recent';
 interface Result {
@@ -135,10 +136,7 @@ export function CommandPalette() {
   const runAskAgent = React.useCallback(async (prompt: string) => {
     if (!sdk) return;
     try {
-      const list = await sdk.agents.list({ limit: 50 });
-      const personal = (list.data || []).find(
-        (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
-      );
+      const personal = await resolvePersonalAgent(sdk);
       if (!personal) {
         close();
         router.push('/agent' as any);

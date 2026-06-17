@@ -19,6 +19,7 @@ import { invalidate } from '../lib/cache';
 import { ensureIntroDM, INTRO_DM_TEMPLATE as _IDT, firstName as _FN } from '../lib/agentIntro';
 import { spacing, radius, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
 
 // Model options — must match server allowlist in lib/modelAllowlist.ts.
 // IDs are dotted (OpenRouter convention), not dashed. Keep list short to
@@ -102,10 +103,7 @@ export default function AgentSetupScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await sdk.agents.list({ limit: 50 });
-        const personal = (list.data || []).find(
-          (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
-        );
+        const personal = await resolvePersonalAgent(sdk);
         const stored = await loadPreferences();
         if (cancelled) return;
         if (personal) {

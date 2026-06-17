@@ -13,6 +13,7 @@ import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 import { profileFollowerCount } from '../../lib/models';
+import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
 
 function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
   const colors = useColors();
@@ -766,8 +767,7 @@ export default function DiscoverScreen() {
           onAsk={async () => {
             if (!sdk) return;
             try {
-              const list = await sdk.agents.list({ limit: 50 });
-              const personal = (list.data || []).find((a: any) => a.agent_type === 'personal' || a.agentType === 'personal');
+              const personal = await resolvePersonalAgent(sdk);
               if (!personal) { router.push('/agent' as any); return; }
               const dm = await sdk.chat.dm({ user_id: personal.id, organization_id: ORG_ID || undefined } as any);
               if (dm.data?.id) router.push(`/(tabs)/chat?id=${dm.data.id}` as any);

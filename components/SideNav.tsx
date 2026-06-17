@@ -14,6 +14,7 @@ import { invalidate } from '../lib/cache';
 import { getPreference } from '../lib/preferences';
 import { useActiveConvoId } from '../lib/activeConvo';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
+import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
 
 const COLLAPSED_WIDTH = 68;
 const EXPANDED_WIDTH = 264;
@@ -210,10 +211,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     introBackfilledRef.current = true;
     (async () => {
       try {
-        const list = await sdk.agents.list({ limit: 50 });
-        const personal = (list.data || []).find(
-          (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
-        );
+        const personal = await resolvePersonalAgent(sdk);
         if (!personal) return;
         await ensureIntroDM(sdk, personal.id, user?.name);
         invalidate('conversations');
