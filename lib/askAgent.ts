@@ -18,12 +18,12 @@ export async function askAgent(sdk: any, router: any, prompt: string): Promise<v
     const dm = await sdk.chat.dm({ user_id: personal.id, organization_id: ORG_ID || undefined } as any);
     const convoId = dm.data?.id;
     if (!convoId) return;
-    // Send the prompt right away so the agent sees it on open (the DM screen
-    // picks up the WS broadcast).
-    try {
-      await sdk.chat.send({ conversation_id: convoId, content: prompt });
-    } catch {}
-    router.push(`/(tabs)/chat?id=${convoId}` as any);
+    // Hand the prompt to the chat screen as a route param — it sends via
+    // handleSend → agents.chatStream, the ONLY path that actually triggers an
+    // agent reply. Sending here with chat.send merely inserted the message
+    // (no reply, not visible until refresh), which was the "asked my agent,
+    // got no answer" bug.
+    router.push(`/(tabs)/chat?id=${convoId}&prompt=${encodeURIComponent(prompt)}` as any);
   } catch {}
 }
 

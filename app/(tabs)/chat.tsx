@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
 import { Container } from '../../components/Container';
@@ -410,6 +410,13 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const [loading, setLoading] = React.useState(cachedSorted.length === 0);
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  // Prompt handed in via route params by the "Ask my agent" button / command
+  // palette. We send it from HERE (via handleSend → agents.chatStream), not
+  // from askAgent(), because that path used chat.send which only inserts the
+  // message and never triggers the agent (no reply, not visible until refresh).
+  const routeParams = useLocalSearchParams<{ prompt?: string }>();
+  const router = useRouter();
+  const autoSentPromptRef = React.useRef<string | null>(null);
   const [agentTyping, setAgentTyping] = React.useState(false);
   const [agentStatus, setAgentStatus] = React.useState<'thinking' | 'generating' | 'done' | null>(null);
   const [humanTyping, setHumanTyping] = React.useState<{ userId: string; userName: string } | null>(null);
@@ -802,10 +809,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     }
   }, [conversationId, sdk, messages, screenFocused]);
 
-  const handleSend = async () => {
-    if (!text.trim() || !sdk) return;
-    const messageText = text.trim();
-    setText('');
+  const handleSend = async (overrideText?: string) => {
+    const messageText = (typeof overrideText === 'string' ? overrideText : text).trim();
+    if (!messageText || !sdk) return;
+    if (typeof overrideText !== 'string') setText('');
     setSending(true);
     // Sending always pins you to the bottom — you want to see your own
     // message and the reply that follows.
@@ -966,6 +973,19 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
       setSending(false);
     }
   };
+
+  // Fire a route-param prompt once the recipient is resolved (so agent
+  // detection + agents.chatStream work). Runs once per distinct prompt, then
+  // clears it from the URL so navigating back / remounting doesn't resend.
+  React.useEffect(() => {
+    const p = typeof routeParams.prompt === 'string' ? routeParams.prompt : null;
+    if (!p || !partnerInfo) return;
+    if (autoSentPromptRef.current === p) return;
+    autoSentPromptRef.current = p;
+    void handleSend(p);
+    try { router.setParams({ prompt: undefined } as any); } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeParams.prompt, partnerInfo]);
 
   return (
     <KeyboardAvoidingView
@@ -1194,7 +1214,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           }}
         />
         <Pressable
-          onPress={handleSend}
+          onPress={() => handleSend()}
           disabled={!text.trim() || sending}
           style={({ pressed }) => ({
             width: 44,
