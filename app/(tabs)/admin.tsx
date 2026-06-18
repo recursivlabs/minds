@@ -12,7 +12,7 @@ import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
-type Tab = 'dashboard' | 'users' | 'content' | 'reports' | 'communities' | 'invites' | 'network';
+type Tab = 'dashboard' | 'users' | 'content' | 'reports' | 'communities';
 
 const BUSINESS_AI_AGENT_ID = '411ac3a9-dfbc-4463-8963-2e26a645211e';
 
@@ -142,6 +142,28 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
   );
 }
 
+function IconStat({ icon, label, value }: { icon: any; label: string; value: number | string }) {
+  const colors = useColors();
+  return (
+    <Card style={{ flexGrow: 1, flexBasis: '46%' as any, minWidth: 130 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
+        <Ionicons name={icon} size={15} color={colors.textMuted} />
+        <Text variant="caption" color={colors.textMuted}>{label}</Text>
+      </View>
+      <Text variant="h2" color={colors.text}>{value}</Text>
+    </Card>
+  );
+}
+
+// Compact number formatting for big metrics (1.2k, 3.4M).
+function fmt(n: number | string | undefined): string {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!isFinite(v)) return String(n ?? '—');
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
+  return String(v);
+}
+
 /* --- Dashboard --- */
 function DashboardTab({ sdk }: { sdk: any }) {
   const colors = useColors();
@@ -190,39 +212,68 @@ function DashboardTab({ sdk }: { sdk: any }) {
     </View>
   );
 
+  const weekTotal = signups.slice(-7).reduce((a, d) => a + (d.count || 0), 0);
+  const peak = Math.max(1, ...signups.map((d) => d.count || 0));
+
   return (
-    <View style={{ gap: spacing.xl }}>
-      <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
-        <StatCard label="Users" value={stats?.users ?? '---'} />
-        <StatCard label="Posts" value={stats?.posts ?? '---'} />
-        <StatCard label="Communities" value={stats?.communities ?? '---'} />
-        <StatCard label="Agents" value={stats?.agents ?? '---'} />
-        <StatCard label="Messages" value={stats?.messages ?? '---'} />
-        <StatCard label="New today" value={stats?.today ?? '---'} />
-      </View>
-      {signups.length > 0 && (() => {
-        const maxCount = Math.max(1, ...signups.map((d) => d.count));
-        return (
-          <Card>
-            <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>
-              Signups · last {signups.length} days
-            </Text>
-            <View style={{ gap: spacing.xs }}>
-              {signups.map((d, i) => (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Text variant="caption" color={colors.textMuted} style={{ width: 56, fontSize: 10 }}>
-                    {d.date ? new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : `Day ${i + 1}`}
-                  </Text>
-                  <View style={{ flex: 1, height: 14, backgroundColor: colors.glass, borderRadius: radius.xs, overflow: 'hidden' }}>
-                    <View style={{ height: 14, width: `${Math.round((d.count / maxCount) * 100)}%` as any, backgroundColor: colors.accent, borderRadius: radius.xs }} />
-                  </View>
-                  <Text variant="caption" color={colors.accent} style={{ width: 28, textAlign: 'right', fontSize: 11 }}>{d.count}</Text>
-                </View>
+    <View style={{ gap: spacing.lg }}>
+      {/* Hero — the headline metric, alive */}
+      <Card style={{ borderColor: colors.accentMuted }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: spacing.lg }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1, textTransform: 'uppercase' as any }}>Total users</Text>
+            <Text style={{ ...typography.hero, color: colors.accent, marginTop: spacing.xs } as any}>{fmt(stats?.users)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+              <Text variant="caption" color={colors.success || colors.accent}>↑ {stats?.today ?? 0} today</Text>
+              <Text variant="caption" color={colors.textMuted}>· {weekTotal} this week</Text>
+            </View>
+          </View>
+          {/* sparkline of recent signups */}
+          {signups.length > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 44 }}>
+              {signups.slice(-14).map((d, i) => (
+                <View key={i} style={{
+                  width: 5,
+                  height: Math.max(3, Math.round((d.count / peak) * 44)),
+                  backgroundColor: i === signups.slice(-14).length - 1 ? colors.accent : colors.accentMuted,
+                  borderRadius: 2,
+                }} />
               ))}
             </View>
-          </Card>
-        );
-      })()}
+          )}
+        </View>
+      </Card>
+
+      {/* Stat grid with icons */}
+      <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
+        <IconStat icon="document-text-outline" label="Posts" value={fmt(stats?.posts)} />
+        <IconStat icon="people-outline" label="Communities" value={fmt(stats?.communities)} />
+        <IconStat icon="chatbubbles-outline" label="Messages" value={fmt(stats?.messages)} />
+        <IconStat icon="sparkles-outline" label="Agents" value={fmt(stats?.agents)} />
+      </View>
+
+      {/* Signups chart */}
+      {signups.length > 0 && (
+        <Card>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+            <Text variant="label" color={colors.textMuted}>Signups</Text>
+            <Text variant="caption" color={colors.textMuted}>last {signups.length} days</Text>
+          </View>
+          <View style={{ gap: spacing.xs }}>
+            {signups.map((d, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Text variant="caption" color={colors.textMuted} style={{ width: 52, fontSize: 10 }}>
+                  {d.date ? new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : `Day ${i + 1}`}
+                </Text>
+                <View style={{ flex: 1, height: 16, backgroundColor: colors.glass, borderRadius: radius.xs, overflow: 'hidden' }}>
+                  <View style={{ height: 16, width: `${Math.round((d.count / peak) * 100)}%` as any, backgroundColor: colors.accent, borderRadius: radius.xs }} />
+                </View>
+                <Text variant="caption" color={d.count ? colors.accent : colors.textMuted} style={{ width: 26, textAlign: 'right', fontSize: 11 }}>{d.count}</Text>
+              </View>
+            ))}
+          </View>
+        </Card>
+      )}
     </View>
   );
 }
@@ -268,13 +319,21 @@ function UsersTab({ sdk }: { sdk: any }) {
 
   const banUser = async (id: string) => {
     setActionId(id);
-    try { await sdk.admin.banUser(id, { reason: 'Admin action' }); await load(search); } catch { showToast('Failed to ban user.', 'error'); }
+    // SDK wants reason as a STRING, not an object — passing { reason } sent a
+    // malformed body and the ban silently failed.
+    try { await sdk.admin.banUser(id, 'Admin action'); await load(search); } catch { showToast('Failed to ban user.', 'error'); }
     setActionId('');
   };
 
   const unbanUser = async (id: string) => {
     setActionId(id);
     try { await sdk.admin.unbanUser(id); await load(search); } catch { showToast('Failed to unban user.', 'error'); }
+    setActionId('');
+  };
+
+  const deleteUser = async (id: string) => {
+    setActionId(id);
+    try { await sdk.admin.deleteUser(id); setUsers(us => us.filter(u => u.id !== id)); } catch { showToast('Failed to delete user.', 'error'); }
     setActionId('');
   };
 
@@ -315,7 +374,7 @@ function UsersTab({ sdk }: { sdk: any }) {
                 {u.username ? `@${u.username}` : ''}{u.email ? ` · ${u.email}` : ''}
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
               {banned ? (
                 <Button onPress={() => unbanUser(u.id)} variant="ghost" size="sm" loading={actionId === u.id}>Unban</Button>
               ) : (
@@ -324,6 +383,9 @@ function UsersTab({ sdk }: { sdk: any }) {
               {u.role !== 'admin' && (
                 <Button onPress={() => setRole(u.id, 'admin')} variant="ghost" size="sm" loading={actionId === u.id}>Make admin</Button>
               )}
+              <Pressable onPress={() => deleteUser(u.id)} disabled={actionId === u.id} hitSlop={8} style={{ opacity: actionId === u.id ? 0.4 : 1, padding: spacing.xs }}>
+                <Ionicons name="trash-outline" size={18} color={colors.error} />
+              </Pressable>
             </View>
           </View>
         </Card>
@@ -576,131 +638,6 @@ function CommunitiesTab({ sdk }: { sdk: any }) {
   );
 }
 
-function InvitesTab({ sdk }: { sdk: any }) {
-  const colors = useColors();
-  const [codes, setCodes] = React.useState<any[]>([]);
-  const [waitlist, setWaitlist] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [actionId, setActionId] = React.useState('');
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const [c, w] = await Promise.all([
-          sdk.admin.listInviteCodes({ status: 'all' }).catch(() => []),
-          sdk.admin.listWaitlist({ status: 'pending' }).catch(() => []),
-        ]);
-        setCodes(Array.isArray(c) ? c : c?.data || []);
-        setWaitlist(Array.isArray(w) ? w : w?.data || []);
-      } catch {}
-      setLoading(false);
-    })();
-  }, [sdk]);
-
-  const revoke = async (id: string) => {
-    setActionId(id);
-    try { await sdk.admin.revokeInviteCode(id); setCodes(c => c.map(x => x.id === id ? { ...x, status: 'revoked' } : x)); } catch { showToast('Failed to revoke code.', 'error'); }
-    setActionId('');
-  };
-
-  const grant = async (id: string) => {
-    setActionId(id);
-    try { await sdk.admin.grantWaitlistAccess(id); setWaitlist(w => w.filter(x => x.id !== id)); } catch { showToast('Failed to grant access.', 'error'); }
-    setActionId('');
-  };
-
-  if (loading) return <Skeleton height={200} />;
-
-  return (
-    <View style={{ gap: spacing.xl }}>
-      <Card>
-        <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Invite Codes</Text>
-        {codes.length === 0 ? (
-          <Text variant="caption" color={colors.textMuted}>No invite codes.</Text>
-        ) : codes.slice(0, 30).map((c: any) => (
-          <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}>
-            <View style={{ flex: 1 }}>
-              <Text variant="mono" numberOfLines={1}>{c.code || c.id}</Text>
-              <Text variant="caption" color={colors.textMuted}>{c.status || (c.used ? 'used' : 'active')}</Text>
-            </View>
-            {(!c.used && c.status !== 'revoked') && (
-              <Button onPress={() => revoke(c.id)} variant="ghost" size="sm" accentColor={colors.error} loading={actionId === c.id}>Revoke</Button>
-            )}
-          </View>
-        ))}
-      </Card>
-      <Card>
-        <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Waitlist</Text>
-        {waitlist.length === 0 ? (
-          <Text variant="caption" color={colors.textMuted}>No pending waitlist entries.</Text>
-        ) : waitlist.map((w: any) => (
-          <View key={w.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}>
-            <View style={{ flex: 1 }}>
-              <Text variant="bodyMedium">{w.email || w.name || 'User'}</Text>
-              {w.created_at && <Text variant="caption" color={colors.textMuted}>{new Date(w.created_at).toLocaleDateString()}</Text>}
-            </View>
-            <Button onPress={() => grant(w.id)} size="sm" loading={actionId === w.id}>Grant Access</Button>
-          </View>
-        ))}
-      </Card>
-    </View>
-  );
-}
-
-/* --- Network --- */
-function NetworkTab({ sdk }: { sdk: any }) {
-  const colors = useColors();
-  const [settings, setSettings] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const s = await sdk.admin.getNetworkSettings();
-        setSettings((s as any)?.data || s);
-      } catch {
-        setError('Requires network admin access to view settings.');
-      }
-      setLoading(false);
-    })();
-  }, [sdk]);
-
-  const save = async () => {
-    if (!settings) return;
-    setSaving(true);
-    try { await sdk.admin.updateNetworkSettings(settings); } catch { showToast('Failed to save settings.', 'error'); }
-    setSaving(false);
-  };
-
-  if (loading) return <Skeleton height={200} />;
-  if (error || !settings) {
-    return (
-      <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.md }}>
-        <Ionicons name="lock-closed-outline" size={32} color={colors.textMuted} />
-        <Text variant="body" color={colors.textMuted} align="center">{error || 'Could not load network settings.'}</Text>
-        <Text variant="caption" color={colors.textMuted} align="center">This requires network-level admin privileges.</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ gap: spacing.xl }}>
-      <Card>
-        <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.xs }}>Network Configuration</Text>
-        <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.md }}>
-          These are network-wide settings. They apply to every app sharing this network — edit with care.
-        </Text>
-        <Input label="Network name" value={settings.name || ''} onChangeText={t => setSettings((s: any) => ({ ...s, name: t }))} placeholder="Minds" />
-        <Input label="Description" value={settings.description || ''} onChangeText={t => setSettings((s: any) => ({ ...s, description: t }))} placeholder="A free speech social network" multiline />
-        <Input label="Logo URL" value={settings.logo_url || settings.logo || ''} onChangeText={t => setSettings((s: any) => ({ ...s, logo_url: t }))} placeholder="https://..." autoCapitalize="none" />
-        <Input label="Primary color" value={settings.primary_color || settings.accent_color || ''} onChangeText={t => setSettings((s: any) => ({ ...s, primary_color: t }))} placeholder="#d4a844" autoCapitalize="none" />
-        <Button onPress={save} loading={saving} size="sm">Save Network Settings</Button>
-      </Card>
-    </View>
-  );
-}
 
 /* --- Main --- */
 import { withAdminGuard } from '../../lib/guards';
@@ -724,7 +661,7 @@ function AdminScreen() {
       <View style={{ backgroundColor: colors.bg, zIndex: 1 }}>
         <ScreenHeader title="Admin" />
         <TabBar
-          tabs={(['dashboard', 'users', 'content', 'reports', 'communities', 'invites', 'network'] as const).map(t => ({ key: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+          tabs={(['dashboard', 'users', 'content', 'reports', 'communities'] as const).map(t => ({ key: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
           active={tab}
           onChange={(k) => setTab(k as Tab)}
           scrollable
@@ -737,8 +674,6 @@ function AdminScreen() {
         {tab === 'content' && <ContentTab sdk={sdk} />}
         {tab === 'reports' && <ReportsTab sdk={sdk} />}
         {tab === 'communities' && <CommunitiesTab sdk={sdk} />}
-        {tab === 'invites' && <InvitesTab sdk={sdk} />}
-        {tab === 'network' && <NetworkTab sdk={sdk} />}
       </ScrollView>
     </Container>
   );
