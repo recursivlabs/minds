@@ -8,8 +8,7 @@ import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { TabBar } from '../../components/TabBar';
 import { useAuth } from '../../lib/auth';
-import { ORG_ID, BASE_URL } from '../../lib/recursiv';
-import { getItem } from '../../lib/storage';
+import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
@@ -154,19 +153,27 @@ function DashboardTab({ sdk }: { sdk: any }) {
   React.useEffect(() => {
     (async () => {
       try {
-        // Count from actual list endpoints (accurate for org-scoped data)
-        const [membersRes, postsRes, commRes, agentsRes] = await Promise.all([
-          sdk.organizations.members(ORG_ID, { limit: 200 }).catch(() => ({ data: [] })),
-          sdk.posts.list({ limit: 200, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
-          sdk.communities.list({ limit: 100, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
-          sdk.agents.listDiscoverable({ limit: 100, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
+        // Real counts from the admin stats endpoint (scoped server-side), plus
+        // the signups time series for the chart. The old version counted org
+        // *members* (teammates ≈ 1) — wrong surface for an app dashboard.
+        const [statsRes, signupsRes, agentsRes] = await Promise.all([
+          sdk.admin.getStats().catch(() => null),
+          sdk.admin.getSignupsByDay(14).catch(() => null),
+          sdk.agents.listDiscoverable({ limit: 100 }).catch(() => ({ data: [] })),
         ]);
+        const s = statsRes?.data || statsRes || {};
         setStats({
-          users: (membersRes.data || []).length,
-          posts: (postsRes.data || []).length,
-          communities: (commRes.data || []).length,
+          users: s.active_users ?? s.total_users ?? 0,
+          posts: s.total_posts ?? 0,
+          communities: s.total_communities ?? 0,
           agents: (agentsRes.data || []).length,
+          messages: s.total_messages ?? 0,
+          today: s.today_signups ?? 0,
         });
+        setSignups((signupsRes?.data || []).map((d: any) => ({
+          date: d.day || d.date,
+          count: d.signups ?? d.count ?? 0,
+        })));
       } catch {
         setError('Could not load dashboard data.');
       }
@@ -186,33 +193,36 @@ function DashboardTab({ sdk }: { sdk: any }) {
   return (
     <View style={{ gap: spacing.xl }}>
       <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
-        <StatCard label="Members" value={stats?.users ?? '---'} />
+        <StatCard label="Users" value={stats?.users ?? '---'} />
         <StatCard label="Posts" value={stats?.posts ?? '---'} />
         <StatCard label="Communities" value={stats?.communities ?? '---'} />
         <StatCard label="Agents" value={stats?.agents ?? '---'} />
+        <StatCard label="Messages" value={stats?.messages ?? '---'} />
+        <StatCard label="New today" value={stats?.today ?? '---'} />
       </View>
-      {false && (
-        <Card>
-          <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Signups</Text>
-          <View style={{ gap: spacing.xs }}>
-            {[].map((d: any, i: number) => {
-              const count = 0;
-              const maxCount = 1;
-              return (
+      {signups.length > 0 && (() => {
+        const maxCount = Math.max(1, ...signups.map((d) => d.count));
+        return (
+          <Card>
+            <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>
+              Signups · last {signups.length} days
+            </Text>
+            <View style={{ gap: spacing.xs }}>
+              {signups.map((d, i) => (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Text variant="caption" color={colors.textMuted} style={{ width: 60, fontSize: 10 }}>
+                  <Text variant="caption" color={colors.textMuted} style={{ width: 56, fontSize: 10 }}>
                     {d.date ? new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : `Day ${i + 1}`}
                   </Text>
-                  <View style={{ flex: 1, height: 14, backgroundColor: colors.glass, borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ height: 14, width: `${(count / maxCount) * 100}%` as any, backgroundColor: colors.accent, borderRadius: 3 }} />
+                  <View style={{ flex: 1, height: 14, backgroundColor: colors.glass, borderRadius: radius.xs, overflow: 'hidden' }}>
+                    <View style={{ height: 14, width: `${Math.round((d.count / maxCount) * 100)}%` as any, backgroundColor: colors.accent, borderRadius: radius.xs }} />
                   </View>
-                  <Text variant="caption" color={colors.accent} style={{ width: 28, textAlign: 'right', fontSize: 11 }}>{count}</Text>
+                  <Text variant="caption" color={colors.accent} style={{ width: 28, textAlign: 'right', fontSize: 11 }}>{d.count}</Text>
                 </View>
-              );
-            })}
-          </View>
-        </Card>
-      )}
+              ))}
+            </View>
+          </Card>
+        );
+      })()}
     </View>
   );
 }
@@ -230,9 +240,9 @@ function UsersTab({ sdk }: { sdk: any }) {
     setLoading(true);
     setError(null);
     try {
-      // Try admin endpoint first
-      const res = await sdk.admin.listUsers({ search: q || undefined, limit: 50, organization_id: ORG_ID || undefined });
-      setUsers(Array.isArray(res) ? res : res?.users || []);
+      // Admin endpoint returns { data: [...] } — scoped server-side.
+      const res = await sdk.admin.listUsers({ search: q || undefined, limit: 50 });
+      setUsers(Array.isArray(res) ? res : res?.data || []);
     } catch {
       // Fallback to org members
       if (ORG_ID) {
@@ -289,27 +299,36 @@ function UsersTab({ sdk }: { sdk: any }) {
         </View>
       ) : users.length === 0 ? (
         <Text variant="caption" color={colors.textMuted} align="center">No users found.</Text>
-      ) : users.map((u: any) => (
+      ) : users.map((u: any) => {
+        const banned = !!(u.banned_at || u.banned);
+        return (
         <Card key={u.id}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1 }}>
-              <Text variant="bodyMedium">{u.name || u.username || 'User'}</Text>
-              <Text variant="caption" color={colors.textMuted}>{u.email || u.username || ''} {u.role ? `- ${u.role}` : ''}</Text>
-              {u.banned && <Text variant="caption" color={colors.error}>Banned</Text>}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <Avatar uri={u.image} name={u.name || u.username} size="md" />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Text variant="bodyMedium" numberOfLines={1}>{u.name || u.username || 'User'}</Text>
+                {u.role === 'admin' && <Text variant="caption" color={colors.accent}>admin</Text>}
+                {banned && <Text variant="caption" color={colors.error}>banned</Text>}
+              </View>
+              <Text variant="caption" color={colors.textMuted} numberOfLines={1}>
+                {u.username ? `@${u.username}` : ''}{u.email ? ` · ${u.email}` : ''}
+              </Text>
             </View>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              {u.banned ? (
+              {banned ? (
                 <Button onPress={() => unbanUser(u.id)} variant="ghost" size="sm" loading={actionId === u.id}>Unban</Button>
               ) : (
                 <Button onPress={() => banUser(u.id)} variant="ghost" size="sm" accentColor={colors.error} loading={actionId === u.id}>Ban</Button>
               )}
               {u.role !== 'admin' && (
-                <Button onPress={() => setRole(u.id, 'admin')} variant="ghost" size="sm" loading={actionId === u.id}>Make Admin</Button>
+                <Button onPress={() => setRole(u.id, 'admin')} variant="ghost" size="sm" loading={actionId === u.id}>Make admin</Button>
               )}
             </View>
           </View>
         </Card>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -327,9 +346,9 @@ function ContentTab({ sdk }: { sdk: any }) {
     setLoading(true);
     setError(null);
     try {
-      // Try admin endpoint with org scope
-      const res = await sdk.admin.listPosts({ search: q || undefined, limit: 50, organization_id: ORG_ID || undefined });
-      setPosts(Array.isArray(res) ? res : res?.posts || []);
+      // Admin endpoint returns { data: [...] } — scoped server-side.
+      const res = await sdk.admin.listPosts({ search: q || undefined, limit: 50 });
+      setPosts(Array.isArray(res) ? res : res?.data || []);
     } catch {
       // Fallback to org posts
       try {
@@ -398,60 +417,93 @@ function ReportsTab({ sdk }: { sdk: any }) {
   const colors = useColors();
   const [reports, setReports] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [actionId, setActionId] = React.useState('');
+  const [showResolved, setShowResolved] = React.useState(false);
   const router = useRouter();
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        // SDK's HttpClient keeps baseUrl private, so sdk.client?.baseUrl is
-        // undefined at runtime — use the shared BASE_URL constant and the
-        // stored API key directly.
-        const apiKey = await getItem('minds:api_key');
-        if (apiKey) {
-          const res = await fetch(`${BASE_URL}/reports`, {
-            headers: { Authorization: `Bearer ${apiKey}` },
-          });
-          if (res.ok) {
-            const json = await res.json();
-            setReports(json.data || []);
-          }
-        }
-      } catch {}
-      setLoading(false);
-    })();
+  const load = React.useCallback(async () => {
+    try {
+      const res = await sdk.admin.listReports({ limit: 100 });
+      setReports(Array.isArray(res) ? res : res?.data || []);
+    } catch {}
+    setLoading(false);
   }, [sdk]);
+  React.useEffect(() => { load(); }, [load]);
+
+  const resolve = async (id: string) => {
+    setActionId(id);
+    try { await sdk.admin.resolveReport(id); setReports(rs => rs.map(r => r.id === id ? { ...r, status: 'resolved' } : r)); }
+    catch { showToast('Failed to resolve report.', 'error'); }
+    setActionId('');
+  };
+  const dismiss = async (id: string) => {
+    setActionId(id);
+    try { await sdk.admin.dismissReport(id); setReports(rs => rs.map(r => r.id === id ? { ...r, status: 'dismissed' } : r)); }
+    catch { showToast('Failed to dismiss report.', 'error'); }
+    setActionId('');
+  };
+  const removeContent = async (r: any) => {
+    setActionId(r.id);
+    try {
+      if (r.target_type === 'post') await sdk.admin.deletePost(r.target_id);
+      await sdk.admin.resolveReport(r.id);
+      setReports(rs => rs.map(x => x.id === r.id ? { ...x, status: 'resolved' } : x));
+      showToast('Content removed.', 'success');
+    } catch { showToast('Failed to remove content.', 'error'); }
+    setActionId('');
+  };
 
   if (loading) return <Skeleton height={200} />;
 
+  const pending = reports.filter(r => (r.status || 'pending') === 'pending');
+  const visible = showResolved ? reports : pending;
+
   return (
     <View style={{ gap: spacing.xl }}>
-      <Text variant="label" color={colors.textMuted}>{reports.length} report{reports.length !== 1 ? 's' : ''}</Text>
-      {reports.length === 0 ? (
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text variant="label" color={colors.textMuted}>{pending.length} open · {reports.length} total</Text>
+        <Button onPress={() => setShowResolved(s => !s)} variant="ghost" size="sm">
+          {showResolved ? 'Hide resolved' : 'Show all'}
+        </Button>
+      </View>
+      {visible.length === 0 ? (
         <View style={{ alignItems: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
           <Ionicons name="shield-checkmark-outline" size={40} color={colors.accent} />
-          <Text variant="h2" color={colors.text}>No reports</Text>
+          <Text variant="h2" color={colors.text}>All clear</Text>
           <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 300 }}>
-            When users report content, it will appear here for review.
+            No open reports. When users report content, it appears here for review.
           </Text>
         </View>
-      ) : reports.map((r: any) => (
+      ) : visible.map((r: any) => {
+        const resolved = (r.status || 'pending') !== 'pending';
+        return (
         <Card key={r.id}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ flex: 1 }}>
-              <Text variant="bodyMedium">{r.reason}</Text>
-              <Text variant="caption" color={colors.textMuted}>
-                {r.target_type} · {r.status} · {r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}
-              </Text>
-              {r.details && <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs }}>{r.details}</Text>}
-            </View>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <View style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="bodyMedium">{r.reason || 'Reported'}</Text>
+                <Text variant="caption" color={resolved ? colors.textMuted : colors.accent}>
+                  {r.target_type} · {r.status || 'pending'}{r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString()}` : ''}
+                </Text>
+                {r.details ? <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs }}>{r.details}</Text> : null}
+              </View>
               {r.target_type === 'post' && (
                 <Button onPress={() => router.push(`/(tabs)/post/${r.target_id}` as any)} variant="ghost" size="sm">View</Button>
               )}
             </View>
+            {!resolved && (
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm }}>
+                <Button onPress={() => dismiss(r.id)} variant="ghost" size="sm" loading={actionId === r.id}>Dismiss</Button>
+                {r.target_type === 'post' && (
+                  <Button onPress={() => removeContent(r)} variant="ghost" size="sm" accentColor={colors.error} loading={actionId === r.id}>Remove</Button>
+                )}
+                <Button onPress={() => resolve(r.id)} size="sm" loading={actionId === r.id}>Resolve</Button>
+              </View>
+            )}
           </View>
         </Card>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -538,8 +590,8 @@ function InvitesTab({ sdk }: { sdk: any }) {
           sdk.admin.listInviteCodes({ status: 'all' }).catch(() => []),
           sdk.admin.listWaitlist({ status: 'pending' }).catch(() => []),
         ]);
-        setCodes(Array.isArray(c) ? c : c?.codes || []);
-        setWaitlist(Array.isArray(w) ? w : w?.entries || []);
+        setCodes(Array.isArray(c) ? c : c?.data || []);
+        setWaitlist(Array.isArray(w) ? w : w?.data || []);
       } catch {}
       setLoading(false);
     })();
@@ -607,7 +659,7 @@ function NetworkTab({ sdk }: { sdk: any }) {
     (async () => {
       try {
         const s = await sdk.admin.getNetworkSettings();
-        setSettings(s);
+        setSettings((s as any)?.data || s);
       } catch {
         setError('Requires network admin access to view settings.');
       }
@@ -636,7 +688,10 @@ function NetworkTab({ sdk }: { sdk: any }) {
   return (
     <View style={{ gap: spacing.xl }}>
       <Card>
-        <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.md }}>Network Configuration</Text>
+        <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.xs }}>Network Configuration</Text>
+        <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.md }}>
+          These are network-wide settings. They apply to every app sharing this network — edit with care.
+        </Text>
         <Input label="Network name" value={settings.name || ''} onChangeText={t => setSettings((s: any) => ({ ...s, name: t }))} placeholder="Minds" />
         <Input label="Description" value={settings.description || ''} onChangeText={t => setSettings((s: any) => ({ ...s, description: t }))} placeholder="A free speech social network" multiline />
         <Input label="Logo URL" value={settings.logo_url || settings.logo || ''} onChangeText={t => setSettings((s: any) => ({ ...s, logo_url: t }))} placeholder="https://..." autoCapitalize="none" />
