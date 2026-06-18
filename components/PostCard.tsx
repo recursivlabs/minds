@@ -53,6 +53,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [score, setScore] = React.useState(postScore(post));
   const [showMenu, setShowMenu] = React.useState(false);
   const [menuPos, setMenuPos] = React.useState<{ x: number; y: number } | null>(null);
+  // Measured menu height — the position clamp needs the REAL height (the old
+  // fixed 220px estimate let taller menus, e.g. own-post + admin actions, spill
+  // off the bottom of the screen). Reset on each open so it re-measures.
+  const [menuH, setMenuH] = React.useState(0);
   const [showReport, setShowReport] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(post.content || post.body || '');
@@ -760,23 +764,36 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         >
           {(() => {
             const MENU_WIDTH = 180;
-            const MENU_HEIGHT_EST = 220;
             const screen = Dimensions.get('window');
+            // Use the measured height once we have it; fall back to a generous
+            // estimate for the very first frame before onLayout fires.
+            const menuHeight = menuH || 260;
+            const maxMenuH = screen.height - 16;
             const x = Math.min(Math.max(8, (menuPos?.x ?? 16) - MENU_WIDTH + 24), screen.width - MENU_WIDTH - 8);
-            const y = Math.min(Math.max(8, (menuPos?.y ?? 16) + 8), screen.height - MENU_HEIGHT_EST - 8);
+            // Clamp so the WHOLE menu is on-screen. If it's taller than the
+            // viewport it pins to the top and scrolls (web) instead of clipping.
+            const y = Math.min(
+              Math.max(8, (menuPos?.y ?? 16) + 8),
+              Math.max(8, screen.height - Math.min(menuHeight, maxMenuH) - 8)
+            );
             return (
               <View
+                onLayout={(e) => {
+                  const h = e.nativeEvent.layout.height;
+                  if (h && Math.abs(h - menuH) > 1) setMenuH(h);
+                }}
                 style={{
                   position: 'absolute',
                   top: y,
                   left: x,
                   width: MENU_WIDTH,
+                  maxHeight: maxMenuH,
                   backgroundColor: colors.surfaceRaised,
                   borderRadius: radius.md,
                   borderWidth: 1,
                   borderColor: colors.border,
                   padding: spacing.xs,
-                  ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)' } as any : { elevation: 12 }),
+                  ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)', overflowY: 'auto' } as any : { elevation: 12 }),
                 }}
               >
                 {!isOwnPost && (
