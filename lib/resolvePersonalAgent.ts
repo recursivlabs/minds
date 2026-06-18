@@ -32,12 +32,12 @@ export async function resolvePersonalAgent(sdk: any): Promise<any | null> {
     // Older API without the filter — fall through to the wider scan.
   }
 
-  // Fallback: scan a large page and match client-side. Covers the pre-filter
-  // deploy window; the filtered path above is the durable fix.
-  try {
-    const res = await sdk.agents.list({ limit: 100 });
-    return (res?.data || []).find(isPersonal) ?? null;
-  } catch {
-    return null;
-  }
+  // Fallback: scan a large page and match client-side. NOTE: we deliberately do
+  // NOT catch here. If this call fails (e.g. the API is rate-limiting / 429),
+  // that's a transient LOOKUP FAILURE — not proof the user has no personal
+  // agent. Returning null here would make callers route an existing-agent user
+  // to the "create agent" screen. Let it throw so callers (all wrapped in
+  // try/catch) treat it as "couldn't resolve right now" and no-op instead.
+  const res = await sdk.agents.list({ limit: 100 });
+  return (res?.data || []).find(isPersonal) ?? null;
 }
