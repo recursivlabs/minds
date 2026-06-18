@@ -53,6 +53,9 @@ interface User {
   username: string;
   image: string | null;
   bio: string;
+  // Network-level role from /users/me. Gates the admin nav + badge. Optional
+  // because older cached user JSON (pre-this-field) won't have it.
+  role?: 'user' | 'admin';
 }
 
 interface AuthContextValue {
@@ -124,21 +127,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // the cache namespace. Without this, the chip says one account
               // while every fetch acts as another — the "identity changed /
               // groups I never joined / my own profile 404s" bug.
-              if (me?.id && me.id !== bootUser?.id) {
-                captureException(new Error('auth identity mismatch: stored user differs from key owner'), {
-                  phase: 'auth_boot_validate', storedId: bootUser?.id, keyOwnerId: me.id,
-                });
+              if (me?.id) {
+                if (me.id !== bootUser?.id) {
+                  captureException(new Error('auth identity mismatch: stored user differs from key owner'), {
+                    phase: 'auth_boot_validate', storedId: bootUser?.id, keyOwnerId: me.id,
+                  });
+                }
+                // Always adopt the server's canonical user — not only on an
+                // identity MISMATCH. The cached bootUser is a stale display copy
+                // and can be missing fields the server now returns (notably
+                // `role`, which gates the admin UI). Without syncing on the
+                // normal same-account path, a role change never reaches the
+                // client and the admin nav stays hidden forever.
                 const canonical: User = {
                   id: me.id,
-                  name: me.name || '',
-                  email: me.email || '',
-                  username: me.username || '',
-                  image: me.image ?? null,
-                  bio: me.bio || me.briefdescription || '',
+                  name: me.name || bootUser?.name || '',
+                  email: me.email || bootUser?.email || '',
+                  username: me.username || bootUser?.username || '',
+                  image: me.image ?? bootUser?.image ?? null,
+                  bio: me.bio || me.briefdescription || bootUser?.bio || '',
+                  role: me.role ?? (me.is_admin ? 'admin' : undefined),
                 };
-                await storage.setItem(KEYS.user, JSON.stringify(canonical));
-                setCacheUser(me.id);
-                setUser(canonical);
+                if (JSON.stringify(canonical) !== JSON.stringify(bootUser)) {
+                  await storage.setItem(KEYS.user, JSON.stringify(canonical));
+                  setCacheUser(me.id);
+                  setUser(canonical);
+                }
               }
             } catch (err: any) {
               const status = err?.statusCode || err?.status || 0;
