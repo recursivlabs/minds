@@ -38,6 +38,23 @@ export async function connectRealtime(sdk: any): Promise<any | null> {
     // drop it so socket.io's auto-reconnect survives transient failures.
     socket.off('connect_error');
 
+    // (2b) Back off reconnection. socket.io defaults retry ~every 1s (max 5s)
+    // with weak jitter — so when the socket drops (a blip, or an API restart
+    // that drops EVERY client at once) they all re-hit /realtime/ws-token in
+    // near-lockstep, which rate-limits it (429), which keeps the socket from
+    // reconnecting, which spills into poll-storming the REST API. A blip turns
+    // into a self-sustaining outage that only a re-login clears. Widen the
+    // window and add strong jitter so clients de-sync and the auth endpoint
+    // recovers. A real single-user blip still reconnects in ~1-3s (socket.io
+    // resets the delay on a successful connect); only sustained failure backs
+    // off toward the 30s cap.
+    const mgr: any = (socket as any).io;
+    if (mgr) {
+      mgr.reconnectionDelay?.(2000);     // first retry ~2s (was ~1s)
+      mgr.reconnectionDelayMax?.(30000); // cap at ~30s (was ~5s)
+      mgr.randomizationFactor?.(0.5);    // ±50% jitter — break the herd lockstep
+    }
+
     // (3) socket.io reads `auth` on every connection attempt; the function
     // form lets each reconnect fetch a fresh WS token instead of replaying
     // the expired boot-time one.
