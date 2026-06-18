@@ -18,6 +18,7 @@ import { ensureIntroDM } from '../../lib/agentIntro';
 import { captureException } from '../../lib/monitoring';
 import { connectRealtime } from '../../lib/realtime';
 import { conversationUnreadCount, isAiActor } from '../../lib/models';
+import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -80,10 +81,7 @@ export default function ChatScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await sdk.agents.list({ limit: 50 });
-        const personal = (list.data || []).find(
-          (a: any) => a.agent_type === 'personal' || a.agentType === 'personal',
-        );
+        const personal = await resolvePersonalAgent(sdk);
         if (!personal || cancelled) return;
         // Open the DM AND post the intro if the thread is empty.
         // Covers accounts whose original /agent setup swallowed the
