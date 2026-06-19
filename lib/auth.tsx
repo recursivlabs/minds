@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
 import * as storage from './storage';
+import { captureRefFromUrl, getPendingRef, clearPendingRef } from './referral';
 import { registerPushToken, registerTokenWithServer } from './notifications';
 import { captureException } from './monitoring';
 import { clearAll as clearCacheAll, setCacheUser } from './cache';
@@ -85,6 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authedSdk, setAuthedSdk] = React.useState<Recursiv | null>(null);
   const [projectId, setProjectId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+
+  // Capture a referral code (?ref=) from the landing URL before anything else,
+  // so a friend who arrives via an invite link gets attributed on signup.
+  React.useEffect(() => { captureRefFromUrl(); }, []);
 
   React.useEffect(() => {
     (async () => {
@@ -308,6 +313,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       image: result.user?.image ?? null,
       bio: '',
     });
+
+    // Credit the referrer: if this person arrived via an invite link (?ref=),
+    // redeem that code now that they have an account, attributing the signup.
+    try {
+      const ref = await getPendingRef();
+      if (ref) {
+        await createAuthedSdk(result.apiKey).inviteCodes.redeem(ref).catch(() => {});
+        clearPendingRef();
+      }
+    } catch {}
   }, []);
 
   const signIn = React.useCallback(async (email: string, password: string) => {

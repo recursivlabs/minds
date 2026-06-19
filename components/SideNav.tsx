@@ -1,10 +1,12 @@
 import * as React from 'react';
-import { View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Pressable, Platform, ScrollView, useWindowDimensions, Share } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
+import { getReferralLink } from '../lib/referral';
+import { showToast } from './Toast';
 import { ORG_ID } from '../lib/recursiv';
 import { useTheme } from '../lib/theme';
 import { conversationUnreadCount } from '../lib/models';
@@ -51,6 +53,24 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, sdk } = useAuth();
+  const [referBusy, setReferBusy] = React.useState(false);
+  const handleRefer = async () => {
+    if (referBusy) return;
+    setReferBusy(true);
+    try {
+      const link = await getReferralLink(sdk);
+      if (!link) { showToast('Could not create your invite link', 'error'); return; }
+      if (Platform.OS === 'web') {
+        const nav = navigator as any;
+        if (nav?.share) { try { await nav.share({ title: 'Join me on Minds', url: link }); return; } catch {} }
+        try { await nav.clipboard.writeText(link); showToast('Invite link copied — paste it anywhere', 'success'); }
+        catch { showToast(link, 'success'); }
+      } else {
+        await Share.share({ message: `Join me on Minds\n${link}` });
+      }
+    } catch { showToast('Could not share your invite', 'error'); }
+    finally { setReferBusy(false); }
+  };
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
   const { communities, fetchedOnce: communitiesFetched } = useCommunities(5);
@@ -676,6 +696,28 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               </Pressable>
             )}
           </View>
+
+          {/* Subtle "Refer friends + earn" CTA under the username (Replit-style):
+              shares the user's invite link; signups via it credit them. */}
+          {!collapsed && (
+            <Pressable
+              onPress={handleRefer}
+              disabled={referBusy}
+              style={({ pressed, hovered }: any) => ({
+                flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+                marginHorizontal: spacing.md, marginRight: spacing.lg,
+                paddingVertical: spacing.xs + 1, paddingHorizontal: spacing.md,
+                borderRadius: radius.md,
+                backgroundColor: hovered ? colors.glass : 'transparent',
+                opacity: pressed ? 0.7 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name="gift-outline" size={15} color={colors.accent} />
+              <Text variant="caption" color={colors.accent} style={{ flex: 1 }} numberOfLines={1}>Refer friends + earn</Text>
+              <Ionicons name="copy-outline" size={13} color={colors.textMuted} />
+            </Pressable>
+          )}
         </View>
     </View>
   );
