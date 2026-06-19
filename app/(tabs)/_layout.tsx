@@ -32,14 +32,13 @@ export default function TabLayout() {
     if (!sdk || !user?.id) return;
     let cancelled = false;
     (async () => {
+      // Force the username picker until the user has EXPLICITLY chosen one.
+      // New signups get an auto-assigned email-prefix username (valid), so the
+      // old "only if invalid" check skipped the picker and they never got to
+      // choose/validate. Now everyone confirms their handle once.
       const picked = await isUsernamePicked();
-      const currentUsername = (user.username || '').toLowerCase();
-      const needsUsername = !picked && (
-        !currentUsername ||
-        !/^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/.test(currentUsername)
-      );
       if (cancelled) return;
-      if (needsUsername) {
+      if (!picked) {
         router.replace('/auth/pick-username' as any);
       }
     })();
