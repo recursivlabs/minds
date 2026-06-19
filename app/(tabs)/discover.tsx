@@ -1183,17 +1183,17 @@ export default function DiscoverScreen() {
         </ScrollView>
       );
     }
-    if ((posts || []).length === 0) {
+    if ((posts || []).length === 0 && (profiles || []).length === 0 && (communities || []).length === 0 && (agents || []).length === 0) {
       return (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
           <View style={{ width: 72, height: 72, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="newspaper-outline" size={34} color={colors.accent} />
+            <Ionicons name="rocket-outline" size={34} color={colors.accent} />
           </View>
-          <Text variant="h2" color={colors.text} align="center">Your front page is loading</Text>
+          <Text variant="h2" color={colors.text} align="center">Nothing here yet</Text>
           <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 340, lineHeight: 24 }}>
-            Set up your personal AI agent and it'll curate the day's stories, people, and communities right here.
+            Be the first — create a post to start the conversation. As people join and post, this becomes your front page.
           </Text>
-          <Button onPress={() => router.push('/agent' as any)} size="sm">Set up agent</Button>
+          <Button onPress={() => router.push('/(tabs)/create')} size="sm">Create a post</Button>
         </View>
       );
     }
