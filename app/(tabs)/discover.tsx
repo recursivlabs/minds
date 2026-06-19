@@ -936,144 +936,118 @@ function DiscoverSection({ title, action, onAction, children, gutter }: { title:
   );
 }
 
-function FollowPersonCard({ person, onFollow, onPress, width }: { person: any; onFollow: () => void; onPress: () => void; width: number }) {
-  const colors = useColors();
-  const [followed, setFollowed] = React.useState(!!(person.isFollowing || person.is_following));
-  const followers = profileFollowerCount(person);
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ hovered }: any) => ({
-        width, padding: spacing.lg, borderRadius: radius.xl,
-        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
-        borderWidth: 0.5, borderColor: colors.borderSubtle,
-        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
-      })}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <Avatar uri={person.image || person.avatar} name={person.name} size="lg" />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="bodyMedium" numberOfLines={1}>{person.name || person.username || 'Someone'}</Text>
-          {person.username ? <Text variant="caption" color={colors.textMuted} numberOfLines={1}>@{person.username}</Text> : null}
-        </View>
-      </View>
-      {person.bio ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.sm, lineHeight: 18, minHeight: 36 }}>{person.bio}</Text>
-      ) : <View style={{ minHeight: 36, marginTop: spacing.sm }} />}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
-        <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
-          {followers > 0 ? `${formatCount(followers)} followers` : 'New here'}
-        </Text>
-        <Pressable
-          onPress={(e: any) => { e?.stopPropagation?.(); setFollowed((v) => !v); onFollow(); }}
-          hitSlop={6}
-          style={{
-            paddingHorizontal: spacing.lg, paddingVertical: spacing.xs + 2, borderRadius: radius.full,
-            backgroundColor: followed ? 'transparent' : colors.accent,
-            borderWidth: followed ? 1 : 0, borderColor: colors.borderSubtle,
-            ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-          }}
-        >
-          <Text variant="caption" color={followed ? colors.text : colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>{followed ? 'Following' : 'Follow'}</Text>
-        </Pressable>
-      </View>
-    </Pressable>
-  );
+// Best still for a post thumbnail: first image-type media, else any post image
+// field. Flags video so we can badge it / show a play placeholder when there's
+// no still — so "small thumbnails of media actually render media".
+function postThumb(post: any): { url: string | null; hasVideo: boolean } {
+  const raw = post.media;
+  const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  let imgUrl: string | null = null;
+  let hasVideo = false;
+  for (const m of arr) {
+    const url = typeof m === 'string' ? m : m?.url;
+    const type = typeof m === 'string' ? '' : (m?.type || '');
+    if (!url) continue;
+    if (type.startsWith('video') || /\.m3u8|\/video\//i.test(url)) hasVideo = true;
+    else if (!imgUrl) imgUrl = url;
+  }
+  return { url: imgUrl || post.image || post.previewImage || post.thumbnail || null, hasVideo };
 }
 
-function JoinCommunityCard({ community, onPress, width }: { community: any; onPress: () => void; width: number }) {
+// The star of the page: a content card with a real media thumbnail, headline,
+// and engagement signal (votes + replies) — the stuff that actually pulls you in.
+function PostDiscoverCard({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
   const colors = useColors();
-  const members = community.memberCount || community.member_count || 0;
-  const posts = community.postCount || community.post_count || 0;
-  const banner = community.banner || community.bannerUrl || community.cover;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ hovered }: any) => ({
-        width, borderRadius: radius.xl, overflow: 'hidden',
-        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
-        borderWidth: 0.5, borderColor: colors.borderSubtle,
-        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
-      })}
-    >
-      <View style={{ height: 52, backgroundColor: colors.accentMuted }}>
-        {banner ? <CoverImage uri={banner} height={52} /> : null}
-      </View>
-      <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, marginTop: -24 }}>
-        <View style={{ borderRadius: radius.full, borderWidth: 3, borderColor: colors.surface, alignSelf: 'flex-start' }}>
-          <Avatar uri={community.image || community.avatar} name={community.name} size="lg" />
-        </View>
-        <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.sm }}>{community.name}</Text>
-        {community.description ? (
-          <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: 2, lineHeight: 17, minHeight: 34 }}>{community.description}</Text>
-        ) : <View style={{ minHeight: 34 }} />}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md }}>
-          <Ionicons name="people" size={13} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{formatCount(members)}{posts > 0 ? `  ·  ${formatCount(posts)} posts` : ' members'}</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function ChatAgentCard({ agent, onPress, width }: { agent: any; onPress: () => void; width: number }) {
-  const colors = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ hovered }: any) => ({
-        width, padding: spacing.lg, borderRadius: radius.xl, alignItems: 'center', gap: spacing.xs,
-        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
-        borderWidth: 0.5, borderColor: colors.borderSubtle,
-        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
-      })}
-    >
-      <View style={{ position: 'relative', marginBottom: spacing.xs }}>
-        <Avatar uri={agent.image || agent.avatar} name={agent.name} size="lg" />
-        <View style={{ position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface }}>
-          <Ionicons name="sparkles" size={9} color={colors.textOnAccent} />
-        </View>
-      </View>
-      <Text variant="bodyMedium" numberOfLines={1} align="center">{agent.name || 'Agent'}</Text>
-      <Text variant="caption" color={colors.textMuted} numberOfLines={1} align="center">{agent.model || agent.modelName || 'AI agent'}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.xs + 1, borderRadius: radius.full, backgroundColor: colors.accentMuted, marginTop: spacing.xs }}>
-        <Ionicons name="chatbubble-ellipses-outline" size={13} color={colors.accent} />
-        <Text variant="caption" color={colors.accent}>Chat</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function TrendingPostRow({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
-  const colors = useColors();
-  const image = post.image || post.previewImage || (Array.isArray(post.media) ? post.media[0]?.url : null);
+  const { url, hasVideo } = postThumb(post);
   const title = (post.title || post.content || '').trim();
-  const score = post.score ?? post.voteScore ?? post.netVotes ?? post.net_votes;
+  const score = post.score ?? post.voteScore ?? 0;
+  const comments = post.reply_count ?? post.replyCount ?? post.comments_count ?? 0;
+  const author = post.author?.name || post.author?.username || postSource(post);
+  const hasMedia = !!url || hasVideo;
   return (
     <Pressable
       onPress={onPress}
       style={({ hovered }: any) => ({
-        width, flexDirection: 'row', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg,
-        backgroundColor: hovered ? colors.surfaceHover : 'transparent',
+        width, borderRadius: radius.lg, overflow: 'hidden',
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5, borderColor: colors.borderSubtle,
         ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
       })}
     >
-      {image ? (
-        <View style={{ width: 64, height: 64, borderRadius: radius.md, overflow: 'hidden' }}>
-          <CoverImage uri={image} height={64} />
+      {url ? (
+        <View style={{ height: 124, position: 'relative' }}>
+          <CoverImage uri={url} height={124} />
+          {hasVideo ? (
+            <View style={{ position: 'absolute', bottom: spacing.xs, right: spacing.xs, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play" size={12} color="#fff" style={{ marginLeft: 1 }} />
+            </View>
+          ) : null}
         </View>
-      ) : (
-        <View style={{ width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="document-text-outline" size={22} color={colors.accent} />
+      ) : hasVideo ? (
+        <View style={{ height: 124, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="play-circle" size={34} color={colors.accent} />
         </View>
-      )}
-      <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-        <Text variant="bodyMedium" numberOfLines={2} style={{ lineHeight: 20 }}>{title || 'Untitled'}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
-          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flexShrink: 1 }}>{postSource(post)}</Text>
-          {typeof score === 'number' && score !== 0 ? <Text variant="caption" color={colors.accent} style={{ flexShrink: 0 }}>↑ {score}</Text> : null}
+      ) : null}
+      <View style={{ padding: spacing.md, gap: spacing.xs }}>
+        <Text variant="bodyMedium" numberOfLines={hasMedia ? 2 : 4} style={{ lineHeight: 19 }}>{title || 'Untitled'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
+          {score ? <Text variant="caption" color={colors.accent}>↑ {score}</Text> : null}
+          {comments ? <Text variant="caption" color={colors.textMuted}>· {comments}</Text> : null}
         </View>
       </View>
+    </Pressable>
+  );
+}
+
+// ONE card design shared by people, communities, and agents — compact so a ton
+// fits at a glance. Avatar + name + bio + optional count + a single CTA.
+function EntityCard({ image, name, bio, count, countIcon, ctaLabel, toggledLabel, toggleable, initialActive, onCta, onPress, width }: {
+  image?: string; name: string; bio?: string; count?: number; countIcon?: keyof typeof Ionicons.glyphMap;
+  ctaLabel: string; toggledLabel?: string; toggleable?: boolean; initialActive?: boolean;
+  onCta: () => void; onPress: () => void; width: number;
+}) {
+  const colors = useColors();
+  const [active, setActive] = React.useState(!!initialActive);
+  const label = toggleable ? (active ? (toggledLabel || ctaLabel) : ctaLabel) : ctaLabel;
+  const isActive = !!toggleable && active;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width, padding: spacing.md, borderRadius: radius.lg, gap: spacing.sm,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5, borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Avatar uri={image} name={name} size="md" />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
+          {count != null ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              {countIcon ? <Ionicons name={countIcon} size={11} color={colors.textMuted} /> : null}
+              <Text variant="caption" color={colors.textMuted}>{formatCount(count)}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 16, minHeight: 32 }}>{bio}</Text>
+      ) : <View style={{ minHeight: 32 }} />}
+      <Pressable
+        onPress={(e: any) => { e?.stopPropagation?.(); if (toggleable) setActive((v) => !v); onCta(); }}
+        hitSlop={6}
+        style={{
+          paddingVertical: spacing.xs + 2, borderRadius: radius.full, alignItems: 'center',
+          backgroundColor: isActive ? 'transparent' : colors.accent,
+          borderWidth: isActive ? 1 : 0, borderColor: colors.borderSubtle,
+          ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+        }}
+      >
+        <Text variant="caption" color={isActive ? colors.text : colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>{label}</Text>
+      </Pressable>
     </Pressable>
   );
 }
@@ -1245,35 +1219,59 @@ export default function DiscoverScreen() {
 
     const toPost = (p: any) => router.push(`/(tabs)/post/${p.id}` as any);
 
-    // Grid column widths computed from the MEASURED width so nothing bleeds.
+    // Grid widths from the MEASURED width so nothing bleeds. Posts lead and get
+    // bigger cards; the unified people/community/agent cards are smaller so a
+    // ton fits at a glance.
     const innerW = Math.max(0, layout.width - gutter * 2);
     const cardGap = spacing.md;
-    const peopleCols = layout.isUltra ? 3 : layout.isWide ? 2 : 1;
-    const personW = (innerW - cardGap * (peopleCols - 1)) / peopleCols;
-    const commCols = layout.isUltra ? 3 : 2;
-    const commW = (innerW - cardGap * (commCols - 1)) / commCols;
-    const agentCols = layout.isUltra ? 4 : layout.isWide ? 3 : 2;
-    const agentW = (innerW - cardGap * (agentCols - 1)) / agentCols;
-    const postCols = layout.isWide ? 2 : 1;
+    const postCols = layout.isUltra ? 3 : layout.isWide ? 2 : 1;
     const postW = (innerW - cardGap * (postCols - 1)) / postCols;
+    const entCols = layout.isUltra ? 4 : layout.isWide ? 3 : 2;
+    const entW = (innerW - cardGap * (entCols - 1)) / entCols;
+
+    // Lead with the most visually compelling content: posts with media + the
+    // strongest engagement first, so the top of the page actually pulls you in.
+    const rankedPosts = [...(posts || [])].sort((a: any, b: any) => {
+      const am = (postThumb(a).url || postThumb(a).hasVideo) ? 1 : 0;
+      const bm = (postThumb(b).url || postThumb(b).hasVideo) ? 1 : 0;
+      const as = (am * 6) + (a.score ?? 0) + (a.reply_count ?? a.replyCount ?? 0);
+      const bs = (bm * 6) + (b.score ?? 0) + (b.reply_count ?? b.replyCount ?? 0);
+      return bs - as;
+    });
 
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
-        {/* Trending topics — discovery hooks straight into search */}
+        {/* Trending topics — thin discovery strip into search */}
         {trendingTopics.length > 0 ? (
           <View style={{ marginTop: spacing.sm }}>
             <TrendingTopicsRow topics={trendingTopics} onPick={goToTopic} gutter={gutter} />
           </View>
         ) : null}
 
-        {/* People to follow — the #1 connectivity action, leads the page */}
+        {/* POSTS — the front page leads with content */}
+        {rankedPosts.length > 0 && (
+          <DiscoverSection title="Trending now" action="See all" gutter={gutter} onAction={() => { setActiveTab('posts'); router.setParams({ tab: 'posts' }); }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
+              {rankedPosts.slice(0, postCols * 4).map((p: any) => (
+                <PostDiscoverCard key={p.id} post={p} width={postW} onPress={() => toPost(p)} />
+              ))}
+            </View>
+          </DiscoverSection>
+        )}
+
+        {/* People to follow */}
         {(profilesLoading || peopleToFollow.length > 0) && (
           <DiscoverSection title="People to follow" action="See all" gutter={gutter} onAction={() => { setActiveTab('people'); router.setParams({ tab: 'people' }); }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
-              {peopleToFollow.slice(0, peopleCols * 2).map((person: any) => (
-                <FollowPersonCard key={person.id} person={person} width={personW}
-                  onFollow={() => handleFollow(person.id)}
-                  onPress={() => router.push(`/(tabs)/user/${person.username || person.id}` as any)} />
+              {peopleToFollow.slice(0, entCols * 2).map((p: any) => (
+                <EntityCard
+                  key={p.id} width={entW}
+                  image={p.image || p.avatar} name={p.name || p.username || 'Someone'} bio={p.bio}
+                  count={profileFollowerCount(p)} countIcon="people-outline"
+                  ctaLabel="Follow" toggledLabel="Following" toggleable initialActive={!!(p.isFollowing || p.is_following)}
+                  onCta={() => handleFollow(p.id)}
+                  onPress={() => router.push(`/(tabs)/user/${p.username || p.id}` as any)}
+                />
               ))}
             </View>
           </DiscoverSection>
@@ -1283,9 +1281,15 @@ export default function DiscoverScreen() {
         {(commLoading || activeCommunities.length > 0) && (
           <DiscoverSection title="Communities to join" action="See all" gutter={gutter} onAction={() => { setActiveTab('communities'); router.setParams({ tab: 'communities' }); }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
-              {activeCommunities.slice(0, commCols * 2).map((c: any) => (
-                <JoinCommunityCard key={c.id} community={c} width={commW}
-                  onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)} />
+              {activeCommunities.slice(0, entCols * 2).map((c: any) => (
+                <EntityCard
+                  key={c.id} width={entW}
+                  image={c.image || c.avatar} name={c.name} bio={c.description}
+                  count={c.memberCount || c.member_count || 0} countIcon="people"
+                  ctaLabel="View"
+                  onCta={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
+                  onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
+                />
               ))}
             </View>
           </DiscoverSection>
@@ -1295,38 +1299,18 @@ export default function DiscoverScreen() {
         {(agentsLoading || topAgents.length > 0) && (
           <DiscoverSection title="Agents to chat with" action="See all" gutter={gutter} onAction={() => { setActiveTab('agents'); router.setParams({ tab: 'agents' }); }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
-              {topAgents.slice(0, agentCols * 2).map((a: any) => (
-                <ChatAgentCard key={a.id} agent={a} width={agentW}
-                  onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)} />
+              {topAgents.slice(0, entCols * 2).map((a: any) => (
+                <EntityCard
+                  key={a.id} width={entW}
+                  image={a.image || a.avatar} name={a.name || 'Agent'} bio={a.bio || a.description || a.model || 'AI agent'}
+                  ctaLabel="Chat"
+                  onCta={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
+                  onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
+                />
               ))}
             </View>
           </DiscoverSection>
         )}
-
-        {/* Trending content — discovery */}
-        {(posts || []).length > 0 && (
-          <DiscoverSection title="Trending now" action="See all" gutter={gutter} onAction={() => { setActiveTab('posts'); router.setParams({ tab: 'posts' }); }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: cardGap, paddingHorizontal: gutter }}>
-              {(posts || []).slice(0, postCols === 1 ? 8 : 12).map((p: any) => (
-                <TrendingPostRow key={p.id} post={p} width={postW} onPress={() => toPost(p)} />
-              ))}
-            </View>
-          </DiscoverSection>
-        )}
-
-        <View style={{ marginTop: spacing['2xl'] }}>
-          <EndOfBrief
-            onAsk={async () => {
-              if (!sdk) return;
-              try {
-                const personal = await resolvePersonalAgent(sdk);
-                if (!personal) { router.push('/agent' as any); return; }
-                const dm = await sdk.chat.dm({ user_id: personal.id, organization_id: ORG_ID || undefined } as any);
-                if (dm.data?.id) router.push(`/(tabs)/chat?id=${dm.data.id}` as any);
-              } catch {}
-            }}
-          />
-        </View>
       </ScrollView>
     );
   };
