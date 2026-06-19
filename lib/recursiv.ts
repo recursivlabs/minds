@@ -3,7 +3,10 @@ import { Recursiv } from '@recursiv/sdk';
 export const BASE_URL =
   process.env.EXPO_PUBLIC_RECURSIV_API_URL ||
   process.env.EXPO_PUBLIC_API_URL ||
-  'https://api.recursiv.io/api/v1';
+  // Minds-network API host: api.minds.recursiv.io → (strip api.) minds.recursiv.io
+  // → slug `minds` → the Minds network. This is what puts the app on its own
+  // network (the API resolves tenancy from this Host).
+  'https://api.minds.recursiv.io/api/v1';
 
 export const BASE_ORIGIN = BASE_URL.replace(/\/api\/v1$/, '');
 
