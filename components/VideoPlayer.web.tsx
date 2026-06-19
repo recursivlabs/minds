@@ -88,11 +88,27 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           setState('ready');
-          // Do NOT pin hls.nextLevel to the top rendition here: assigning a
-          // concrete level index switches hls.js to manual mode and disables
-          // adaptive bitrate for the life of the instance — every web video
-          // streamed max bitrate regardless of connection, buffering on slow
-          // links and burning CDN egress.
+          // Crisp open. hls.js cold-starts at the LOWEST rendition (and
+          // capLevelToPlayerSize can floor it to level 0 before the <video> has
+          // measured its size), so the first ~3-4s play blurry before ABR climbs.
+          // Seed the OPENING segment at a feed-appropriate rendition (~720p),
+          // then immediately hand back to auto so we do NOT pin quality for the
+          // life of the instance (which would disable ABR + burn egress — the
+          // reason the previous code avoided touching levels at all).
+          const levels = (hls?.levels || []) as Array<{ height?: number }>;
+          if (hls && levels.length > 1) {
+            let target = levels.length - 1; // default: top rendition
+            const within720 = levels
+              .map((l, i) => ({ i, h: l.height || 0 }))
+              .filter((x) => x.h > 0 && x.h <= 720);
+            if (within720.length) target = within720[within720.length - 1].i;
+            hls.nextLevel = target; // first segment loads sharp
+            const resume = () => {
+              if (hls) hls.nextLevel = -1; // back to adaptive after the opener
+              hls?.off(Hls.Events.FRAG_BUFFERED, resume);
+            };
+            hls.on(Hls.Events.FRAG_BUFFERED, resume);
+          }
         });
         hls.on(Hls.Events.ERROR, (_e, data) => {
           if (!data.fatal) return;
