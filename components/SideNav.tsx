@@ -54,6 +54,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
   const { communities, fetchedOnce: communitiesFetched } = useCommunities(5);
+  // Messages + Communities are fixed, independently-scrollable sections so a
+  // long DM list can't bury Communities. Each is collapsible.
+  const [messagesOpen, setMessagesOpen] = React.useState(true);
+  const [communitiesOpen, setCommunitiesOpen] = React.useState(true);
   // Unread DM dots are STICKY: a dot is only ever cleared by OPENING the thread,
   // never by a server refresh. Two things ADD a dot — a live WS message, or the
   // server's read-cursor count on load/refresh (back-fills threads that went
@@ -551,82 +555,60 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
 
         {/* Inbox section — flex:1, the ONLY scrollable region, so the user
             profile below stays pinned to the bottom. */}
-        {!collapsed && (
-          <View style={{ flex: 1, minHeight: 0 as any, paddingHorizontal: spacing.lg }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
-                <Text
-                  variant="caption"
-                  color={colors.textMuted}
-                  style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}
-                >
-                  Messages
-                </Text>
-                {/* Subtle gateway to the full chat page (X-style on web). */}
-                <Pressable
-                  onPress={() => router.push('/(tabs)/chat' as any)}
-                  hitSlop={8}
-                  style={({ hovered }: any) => ({
-                    borderRadius: radius.sm,
-                    paddingHorizontal: spacing.xs,
-                    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-                  })}
-                >
-                  {({ hovered }: any) => (
-                    <Text variant="caption" color={hovered ? colors.text : colors.textMuted} style={{ fontSize: 11 }}>
-                      See all
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-              <ScrollView
-                style={{ flex: 1 }}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
+        {!collapsed && (() => {
+          // Collapsible section header: chevron + label toggles open/closed;
+          // a separate "See all" navigates without toggling.
+          const SectionHeader = ({ label, open, onToggle, onSeeAll }: { label: string; open: boolean; onToggle: () => void; onSeeAll: () => void }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+              <Pressable
+                onPress={onToggle}
+                hitSlop={6}
+                style={({ hovered }: any) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) })}
               >
-                {recentDMs.length === 0 ? (
-                  <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>
-                    No recent activity
-                  </Text>
-                ) : (
-                  recentDMs.map(renderInboxRow)
+                <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={12} color={colors.textMuted} />
+                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  {label}
+                </Text>
+              </Pressable>
+              <Pressable onPress={onSeeAll} hitSlop={8} style={() => ({ borderRadius: radius.sm, paddingHorizontal: spacing.xs, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) })}>
+                {({ hovered }: any) => (
+                  <Text variant="caption" color={hovered ? colors.text : colors.textMuted} style={{ fontSize: 11 }}>See all</Text>
                 )}
-
-                {/* Communities: nav, not inbox (Reddit model) — your joined
-                    communities as a distinct section, places you GO. */}
-                {recentCommunities.length > 0 && (
-                  <>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xl, marginBottom: spacing.md }}>
-                      <Text
-                        variant="caption"
-                        color={colors.textMuted}
-                        style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}
-                      >
-                        Communities
-                      </Text>
-                      {/* Gateway to YOUR joined communities (like "See all" for
-                          Messages → chat) — NOT Discover, which is every community. */}
-                      <Pressable
-                        onPress={() => router.push('/(tabs)/communities' as any)}
-                        hitSlop={8}
-                        style={() => ({
-                          borderRadius: radius.sm,
-                          paddingHorizontal: spacing.xs,
-                          ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-                        })}
-                      >
-                        {({ hovered }: any) => (
-                          <Text variant="caption" color={hovered ? colors.text : colors.textMuted} style={{ fontSize: 11 }}>
-                            See all
-                          </Text>
-                        )}
-                      </Pressable>
-                    </View>
-                    {recentCommunities.map(renderInboxRow)}
-                  </>
-                )}
-              </ScrollView>
+              </Pressable>
             </View>
-          )}
+          );
+          return (
+            <View style={{ flex: 1, minHeight: 0 as any, paddingHorizontal: spacing.lg, gap: spacing.md }}>
+              {/* MESSAGES — fixed top section, scrolls within itself */}
+              <View style={{ flex: messagesOpen ? 1 : 0, minHeight: 0 as any }}>
+                <SectionHeader label="Messages" open={messagesOpen} onToggle={() => setMessagesOpen(o => !o)} onSeeAll={() => router.push('/(tabs)/chat' as any)} />
+                {messagesOpen && (
+                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {recentDMs.length === 0 ? (
+                      <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>No recent activity</Text>
+                    ) : (
+                      recentDMs.map(renderInboxRow)
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+
+              {/* COMMUNITIES — fixed lower section, never buried by DMs */}
+              <View style={{ flex: communitiesOpen ? 1 : 0, minHeight: 0 as any, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle, paddingTop: spacing.md }}>
+                <SectionHeader label="Communities" open={communitiesOpen} onToggle={() => setCommunitiesOpen(o => !o)} onSeeAll={() => router.push('/(tabs)/communities' as any)} />
+                {communitiesOpen && (
+                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {recentCommunities.length === 0 ? (
+                      <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>No communities yet</Text>
+                    ) : (
+                      recentCommunities.map(renderInboxRow)
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Bottom section — fixed, pinned to the bottom (the inbox above
             takes the remaining space and scrolls internally). */}

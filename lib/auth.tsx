@@ -268,7 +268,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyOtp = React.useCallback(async (email: string, otp: string) => {
     const result = await anonSdk.auth.verifyOtpAndCreateKey(
       { email, otp },
-      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
+      // rateLimitPerMinute: lift the session key off the 60/min default — a
+      // realtime app (feed + notifications + chat polling + ws-token reconnects)
+      // blows 60/min and falls into a 429 dead state. 1000 is the per-key max;
+      // the per-user tier cap (currently 100/min) is the next ceiling — raising
+      // that is a platform-side follow-up.
+      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID, rateLimitPerMinute: 1000 } as any,
     );
 
     await persistSession(result.apiKey, {
@@ -284,7 +289,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = React.useCallback(async (name: string, email: string, password: string) => {
     const result = await anonSdk.auth.signUpAndCreateKey(
       { name, email, password },
-      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
+      // rateLimitPerMinute: lift the session key off the 60/min default — a
+      // realtime app (feed + notifications + chat polling + ws-token reconnects)
+      // blows 60/min and falls into a 429 dead state. 1000 is the per-key max;
+      // the per-user tier cap (currently 100/min) is the next ceiling — raising
+      // that is a platform-side follow-up.
+      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID, rateLimitPerMinute: 1000 } as any,
     );
 
     await persistSession(result.apiKey, {
@@ -300,7 +310,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = React.useCallback(async (email: string, password: string) => {
     const result = await anonSdk.auth.signInAndCreateKey(
       { email, password },
-      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID },
+      // rateLimitPerMinute: lift the session key off the 60/min default — a
+      // realtime app (feed + notifications + chat polling + ws-token reconnects)
+      // blows 60/min and falls into a 429 dead state. 1000 is the per-key max;
+      // the per-user tier cap (currently 100/min) is the next ceiling — raising
+      // that is a platform-side follow-up.
+      { name: `minds-${Date.now()}`, scopes: [...API_KEY_SCOPES], projectId: PROJECT_ID, rateLimitPerMinute: 1000 } as any,
     );
 
     await persistSession(result.apiKey, {
