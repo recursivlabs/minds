@@ -46,7 +46,7 @@ const MAX_IMAGES = 10; // matches the server media_urls cap
 // single large-radius frame clipping the whole block.
 const GRID_GAP = 2;
 const GRID_RADIUS = radius.xl; // ~16px outer frame radius, matching X
-const GRID_HEIGHT = 290; // fixed frame height for 2/3/4-up layouts
+const GRID_HEIGHT = 200; // fixed frame height — compact so media never overtakes the text area
 
 /**
  * Small circular remove control overlaid on a media tile (X-style): a
@@ -983,8 +983,7 @@ export default function CreateScreen() {
                 //   4 → clean 2×2 grid
                 <View
                   style={{
-                    height: mediaUris.length === 1 ? undefined : GRID_HEIGHT,
-                    aspectRatio: mediaUris.length === 1 ? 16 / 9 : undefined,
+                    height: GRID_HEIGHT,
                     flexDirection: 'row',
                     gap: GRID_GAP,
                     borderRadius: GRID_RADIUS,
@@ -1221,7 +1220,7 @@ export default function CreateScreen() {
           }}
         >
           <ToolbarIconButton
-            icon="attach"
+            icon="add"
             active={!!mediaUri}
             onPress={handlePickImage}
             colors={colors}
@@ -1271,30 +1270,6 @@ export default function CreateScreen() {
             </View>
           )}
 
-          {/* Prominent Post button mirrored at the bottom for thumb reach on
-              mobile — disabled (grey) when empty, gold when ready. */}
-          <Pressable
-            onPress={handleSubmit}
-            disabled={!canSubmit || submitting || charsRemaining < 0}
-            style={({ pressed }: any) => ({
-              paddingHorizontal: spacing.xl,
-              height: 38,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: radius.full,
-              backgroundColor: (canSubmit && charsRemaining >= 0) ? colors.accent : colors.surfaceHover,
-              opacity: submitting ? 0.6 : pressed ? 0.85 : 1,
-              ...(Platform.OS === 'web' && canSubmit && charsRemaining >= 0 ? ({ cursor: 'pointer' } as any) : {}),
-            })}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.textInverse} size="small" />
-            ) : (
-              <Text variant="bodyMedium" color={(canSubmit && charsRemaining >= 0) ? colors.textInverse : colors.textMuted}>
-                {submitLabel}
-              </Text>
-            )}
-          </Pressable>
         </View>
       )}
       <ScheduleModal
