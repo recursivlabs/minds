@@ -330,7 +330,7 @@ const CATS: { key: CatKey; label: string; icon: React.ComponentProps<typeof Ioni
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { sdk, user } = useAuth();
+  const { sdk, user, signOut } = useAuth();
   const { mode: themeMode, setMode: setThemeMode, colors } = useTheme();
 
   const [loading, setLoading] = React.useState(true);
@@ -598,11 +598,11 @@ export default function SettingsScreen() {
                 </SectionBlock>
               )}
             </Section>
-            <Section title="Danger zone">
-              <SectionBlock first>
-                {!deleteConfirm ? (
-                  <Button onPress={() => setDeleteConfirm(true)} variant="secondary" size="sm" accentColor={colors.error}>Delete account</Button>
-                ) : (
+            <Section title="Account actions">
+              <SettingRow first icon="log-out-outline" label="Log out" onPress={() => { signOut(); }} />
+              <SettingRow icon="trash-outline" label="Delete account" destructive onPress={() => setDeleteConfirm(true)} />
+              {deleteConfirm && (
+                <SectionBlock>
                   <View style={{ gap: spacing.md }}>
                     <Text variant="body" color={colors.error}>This cannot be undone. Enter your password to confirm.</Text>
                     <Input secureTextEntry value={deletePw} onChangeText={setDeletePw} placeholder="Your password" />
@@ -611,8 +611,8 @@ export default function SettingsScreen() {
                       <Button onPress={deleteAccount} loading={saving === 'delete'} size="sm" accentColor={colors.error} disabled={!deletePw}>Confirm Delete</Button>
                     </View>
                   </View>
-                )}
-              </SectionBlock>
+                </SectionBlock>
+              )}
             </Section>
           </>
         );

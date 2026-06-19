@@ -157,22 +157,23 @@ export default function WalletScreen() {
             </Pressable>
           ) : !wallet?.configured ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.accentMuted }}>
-              <Ionicons name="time-outline" size={13} color={colors.accent} />
-              <Text variant="caption" color={colors.accent}>Wallet activating — balance available soon</Text>
+              <Ionicons name="construct-outline" size={13} color={colors.accent} />
+              <Text variant="caption" color={colors.accent}>Under construction</Text>
             </View>
           ) : null}
 
-          {/* Hero balance */}
-          <Card padding="2xl" style={{ alignItems: 'center', gap: spacing.xs }}>
+          {/* Hero — MINDS, the network token. Sleek, not bulky. */}
+          <Card padding="xl" style={{ alignItems: 'center', gap: spacing.xs }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Ionicons name="ellipse" size={10} color={colors.accent} />
-              <Text variant="label" color={colors.textMuted}>NETWORK BALANCE</Text>
+              <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="flash" size={12} color={colors.textOnAccent} />
+              </View>
+              <Text variant="label" color={colors.textMuted}>MINDS BALANCE</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginTop: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginTop: spacing.xs }}>
               <Text variant="hero" color={colors.text}>{wallet?.balance ?? '0'}</Text>
-              <Text variant="h3" color={colors.textSecondary}>ETH</Text>
+              <Text variant="h3" color={colors.accent}>MINDS</Text>
             </View>
-            {/* SDK exposes no USD value — intentionally not shown. */}
 
             {wallet?.address && (
               <Pressable
@@ -200,24 +201,9 @@ export default function WalletScreen() {
             <ActionButton icon="arrow-up" label="Send" onPress={() => setSendOpen(true)} colors={colors} />
           </View>
 
-          {/* MINDS token (no balance endpoint yet) */}
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-              <View style={{ width: 40, height: 40, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="flash" size={20} color={colors.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyMedium" color={colors.text}>MINDS</Text>
-                <Text variant="caption" color={colors.textMuted}>The network token, on Base</Text>
-              </View>
-              <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.accentMuted }}>
-                <Text variant="caption" color={colors.accent}>Coming soon</Text>
-              </View>
-            </View>
-            <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22, marginTop: spacing.lg }}>
-              Earn MINDS by contributing quality content, spend to boost your posts, and tip the creators you support.
-            </Text>
-          </Card>
+          <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22, paddingHorizontal: spacing.xs }}>
+            Earn MINDS for great posts, spend it to boost your reach, and tip the creators you love. ⚡
+          </Text>
         </ScrollView>
       )}
 

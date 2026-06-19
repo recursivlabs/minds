@@ -74,7 +74,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   // this original (if any) so they can undo it. In-memory only — after
   // a reload, the server-side `viewer_reposted_id` flag (TBD) will
   // restore this. For now the toggle works within the session.
-  const [myRepostId, setMyRepostId] = React.useState<string | null>(null);
+  // Seed from the server's per-viewer flag so "reposted" + toggle-to-undo
+  // survives a feed refresh — otherwise the local state reset and you could
+  // repost the same post repeatedly instead of undoing it.
+  const [myRepostId, setMyRepostId] = React.useState<string | null>(
+    (post as any).reposted_by_viewer_id ?? (post as any).repostedByViewerId ?? null
+  );
   // Repost count (X/Bluesky parity). Sourced from the original post's
   // reposts_count and adjusted optimistically as the viewer reposts/undoes.
   const _repostSource = post.reposted_from || post.repostedFrom || post;
@@ -567,7 +572,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <NSFWOverlay>
           <View>
             {renderMarkdownContent()}
-            <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
+            <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} />
           </View>
         </NSFWOverlay>
       ) : (
@@ -582,7 +587,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               link; LinkPreview falls back to URL extraction from content
               for user posts that paste the URL inline. */}
           {renderMarkdownContent()}
-          <MediaViewer media={post.media} thumbnail={post.image || post.thumbnail} />
+          <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} />
           <LinkPreview url={externalUrl} content={content} />
         </View>
       )}

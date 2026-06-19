@@ -31,16 +31,16 @@ type Layout = {
   mosaicCols: number;    // standard-tile columns under the hero
 };
 
-function useLayout(): Layout {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 768;
-  const isUltra = width >= 1180;
-  // Cap the reading measure so headlines don't sprawl on a 1400px+ monitor.
-  const maxMeasure = isUltra ? 1120 : isWide ? 760 : width;
-  const contentWidth = Math.min(width, maxMeasure);
-  const gutter = isWide ? spacing['2xl'] : spacing.xl;
+// Compute the layout profile from the MEASURED content-area width (NOT the
+// window). Discover renders in the flex:1 column beside the sidebar, so sizing
+// off useWindowDimensions() overshot the container and bled behind the nav.
+function computeLayout(width: number): Layout {
+  const w = width || 360;
+  const isWide = w >= 700;
+  const isUltra = w >= 1040;
+  const gutter = isWide ? spacing['2xl'] : spacing.lg;
   const mosaicCols = isUltra ? 3 : isWide ? 2 : 1;
-  return { width, isWide, isUltra, contentWidth, gutter, mosaicCols };
+  return { width: w, isWide, isUltra, contentWidth: w, gutter, mosaicCols };
 }
 
 // A cross-platform cover image. The previous hero only painted on web
@@ -904,12 +904,190 @@ function HorizontalCarousel({ children, loading, gutter = spacing.xl }: { childr
   );
 }
 
+function formatCount(n: number): string {
+  if (!n || n < 0) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(n);
+}
+
+// ── Connectivity-first discover modules ──────────────────────────────────────
+// Discover's job is to GROW THE GRAPH — follow people, join communities, chat
+// with agents — and surface trending content. These are dense, face-forward
+// grids so a lot is scannable at a glance, with a one-tap connect on every card.
+
+function DiscoverSection({ title, action, onAction, children, gutter }: { title: string; action?: string; onAction?: () => void; children: React.ReactNode; gutter: number }) {
+  const colors = useColors();
+  return (
+    <View style={{ marginTop: spacing['2xl'] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: gutter, marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <View style={{ width: 3, height: 17, borderRadius: 2, backgroundColor: colors.accent }} />
+          <Text variant="h3">{title}</Text>
+        </View>
+        {action && onAction ? (
+          <Pressable onPress={onAction} hitSlop={8} style={Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : undefined}>
+            <Text variant="caption" color={colors.accent}>{action} →</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function FollowPersonCard({ person, onFollow, onPress, width }: { person: any; onFollow: () => void; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const [followed, setFollowed] = React.useState(!!(person.isFollowing || person.is_following));
+  const followers = profileFollowerCount(person);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width, padding: spacing.lg, borderRadius: radius.xl,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5, borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <Avatar uri={person.image || person.avatar} name={person.name} size="lg" />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="bodyMedium" numberOfLines={1}>{person.name || person.username || 'Someone'}</Text>
+          {person.username ? <Text variant="caption" color={colors.textMuted} numberOfLines={1}>@{person.username}</Text> : null}
+        </View>
+      </View>
+      {person.bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.sm, lineHeight: 18, minHeight: 36 }}>{person.bio}</Text>
+      ) : <View style={{ minHeight: 36, marginTop: spacing.sm }} />}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
+        <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
+          {followers > 0 ? `${formatCount(followers)} followers` : 'New here'}
+        </Text>
+        <Pressable
+          onPress={(e: any) => { e?.stopPropagation?.(); setFollowed((v) => !v); onFollow(); }}
+          hitSlop={6}
+          style={{
+            paddingHorizontal: spacing.lg, paddingVertical: spacing.xs + 2, borderRadius: radius.full,
+            backgroundColor: followed ? 'transparent' : colors.accent,
+            borderWidth: followed ? 1 : 0, borderColor: colors.borderSubtle,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+          }}
+        >
+          <Text variant="caption" color={followed ? colors.text : colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>{followed ? 'Following' : 'Follow'}</Text>
+        </Pressable>
+      </View>
+    </Pressable>
+  );
+}
+
+function JoinCommunityCard({ community, onPress, width }: { community: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const members = community.memberCount || community.member_count || 0;
+  const posts = community.postCount || community.post_count || 0;
+  const banner = community.banner || community.bannerUrl || community.cover;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width, borderRadius: radius.xl, overflow: 'hidden',
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5, borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ height: 52, backgroundColor: colors.accentMuted }}>
+        {banner ? <CoverImage uri={banner} height={52} /> : null}
+      </View>
+      <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, marginTop: -24 }}>
+        <View style={{ borderRadius: radius.full, borderWidth: 3, borderColor: colors.surface, alignSelf: 'flex-start' }}>
+          <Avatar uri={community.image || community.avatar} name={community.name} size="lg" />
+        </View>
+        <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.sm }}>{community.name}</Text>
+        {community.description ? (
+          <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: 2, lineHeight: 17, minHeight: 34 }}>{community.description}</Text>
+        ) : <View style={{ minHeight: 34 }} />}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md }}>
+          <Ionicons name="people" size={13} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{formatCount(members)}{posts > 0 ? `  ·  ${formatCount(posts)} posts` : ' members'}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function ChatAgentCard({ agent, onPress, width }: { agent: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width, padding: spacing.lg, borderRadius: radius.xl, alignItems: 'center', gap: spacing.xs,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5, borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ position: 'relative', marginBottom: spacing.xs }}>
+        <Avatar uri={agent.image || agent.avatar} name={agent.name} size="lg" />
+        <View style={{ position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface }}>
+          <Ionicons name="sparkles" size={9} color={colors.textOnAccent} />
+        </View>
+      </View>
+      <Text variant="bodyMedium" numberOfLines={1} align="center">{agent.name || 'Agent'}</Text>
+      <Text variant="caption" color={colors.textMuted} numberOfLines={1} align="center">{agent.model || agent.modelName || 'AI agent'}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.xs + 1, borderRadius: radius.full, backgroundColor: colors.accentMuted, marginTop: spacing.xs }}>
+        <Ionicons name="chatbubble-ellipses-outline" size={13} color={colors.accent} />
+        <Text variant="caption" color={colors.accent}>Chat</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function TrendingPostRow({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const image = post.image || post.previewImage || (Array.isArray(post.media) ? post.media[0]?.url : null);
+  const title = (post.title || post.content || '').trim();
+  const score = post.score ?? post.voteScore ?? post.netVotes ?? post.net_votes;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width, flexDirection: 'row', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg,
+        backgroundColor: hovered ? colors.surfaceHover : 'transparent',
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      {image ? (
+        <View style={{ width: 64, height: 64, borderRadius: radius.md, overflow: 'hidden' }}>
+          <CoverImage uri={image} height={64} />
+        </View>
+      ) : (
+        <View style={{ width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="document-text-outline" size={22} color={colors.accent} />
+        </View>
+      )}
+      <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+        <Text variant="bodyMedium" numberOfLines={2} style={{ lineHeight: 20 }}>{title || 'Untitled'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flexShrink: 1 }}>{postSource(post)}</Text>
+          {typeof score === 'number' && score !== 0 ? <Text variant="caption" color={colors.accent} style={{ flexShrink: 0 }}>↑ {score}</Text> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function DiscoverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; mode?: string; userId?: string; q?: string }>();
   const { sdk } = useAuth();
   const colors = useColors();
-  const layout = useLayout();
+  const { width: winW } = useWindowDimensions();
+  const [canvasW, setCanvasW] = React.useState(0);
+  // Measured content-area width (set by onLayout below); fall back to an
+  // estimate (window minus the sidebar) until the first measurement lands.
+  const layout = React.useMemo(() => computeLayout(canvasW || Math.min(Math.max(winW - 256, 320), 1040)), [canvasW, winW]);
   const [activeTab, setActiveTab] = React.useState<DiscoverTab>(
     (params.tab as DiscoverTab) || 'posts'
   );
@@ -1067,106 +1245,76 @@ export default function DiscoverScreen() {
 
     const toPost = (p: any) => router.push(`/(tabs)/post/${p.id}` as any);
 
+    // Grid column widths computed from the MEASURED width so nothing bleeds.
+    const innerW = Math.max(0, layout.width - gutter * 2);
+    const cardGap = spacing.md;
+    const peopleCols = layout.isUltra ? 3 : layout.isWide ? 2 : 1;
+    const personW = (innerW - cardGap * (peopleCols - 1)) / peopleCols;
+    const commCols = layout.isUltra ? 3 : 2;
+    const commW = (innerW - cardGap * (commCols - 1)) / commCols;
+    const agentCols = layout.isUltra ? 4 : layout.isWide ? 3 : 2;
+    const agentW = (innerW - cardGap * (agentCols - 1)) / agentCols;
+    const postCols = layout.isWide ? 2 : 1;
+    const postW = (innerW - cardGap * (postCols - 1)) / postCols;
+
     return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: spacing['4xl'] }}>
-        {/* Centered measure: the whole page lines up on one column even on a wide monitor. */}
-        <View style={{ width: contentWidth }}>
-          <TrendingTopicsRow topics={trendingTopics} onPick={goToTopic} gutter={gutter} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
+        {/* Trending topics — discovery hooks straight into search */}
+        {trendingTopics.length > 0 ? (
+          <View style={{ marginTop: spacing.sm }}>
+            <TrendingTopicsRow topics={trendingTopics} onPick={goToTopic} gutter={gutter} />
+          </View>
+        ) : null}
 
-          {/* Lead hero */}
-          {hero ? (
-            <View style={{ paddingHorizontal: gutter, paddingTop: spacing.sm }}>
-              <DiscoverHero post={hero} layout={layout} onPress={() => toPost(hero)} />
+        {/* People to follow — the #1 connectivity action, leads the page */}
+        {(profilesLoading || peopleToFollow.length > 0) && (
+          <DiscoverSection title="People to follow" action="See all" gutter={gutter} onAction={() => { setActiveTab('people'); router.setParams({ tab: 'people' }); }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
+              {peopleToFollow.slice(0, peopleCols * 2).map((person: any) => (
+                <FollowPersonCard key={person.id} person={person} width={personW}
+                  onFollow={() => handleFollow(person.id)}
+                  onPress={() => router.push(`/(tabs)/user/${person.username || person.id}` as any)} />
+              ))}
             </View>
-          ) : null}
+          </DiscoverSection>
+        )}
 
-          {/* Secondary stories — responsive mosaic */}
-          {mosaicPosts.length > 0 ? (
-            <>
-              <SectionHeader title="Top stories" subtitle="Hand-picked by your agent" gutter={gutter} icon="flash-outline" />
-              <MosaicGrid posts={mosaicPosts} cols={mosaicCols} gutter={gutter} onPick={toPost} />
-            </>
-          ) : null}
+        {/* Communities to join */}
+        {(commLoading || activeCommunities.length > 0) && (
+          <DiscoverSection title="Communities to join" action="See all" gutter={gutter} onAction={() => { setActiveTab('communities'); router.setParams({ tab: 'communities' }); }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
+              {activeCommunities.slice(0, commCols * 2).map((c: any) => (
+                <JoinCommunityCard key={c.id} community={c} width={commW}
+                  onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)} />
+              ))}
+            </View>
+          </DiscoverSection>
+        )}
 
-          {/* People */}
-          {(profilesLoading || peopleToFollow.length > 0) && (
-            <>
-              <SectionHeader
-                title="People to follow"
-                subtitle="Voices worth a spot on your feed"
-                icon="person-outline"
-                gutter={gutter}
-                onSeeAll={() => { setActiveTab('people'); router.setParams({ tab: 'people' }); }}
-              />
-              <HorizontalCarousel loading={profilesLoading && peopleToFollow.length === 0} gutter={gutter}>
-                {peopleToFollow.map((person: any) => (
-                  <PersonTile
-                    key={person.id}
-                    person={person}
-                    onFollow={() => handleFollow(person.id)}
-                    onPress={() => router.push(`/(tabs)/user/${person.username || person.id}` as any)}
-                  />
-                ))}
-              </HorizontalCarousel>
-            </>
-          )}
+        {/* Agents to chat with */}
+        {(agentsLoading || topAgents.length > 0) && (
+          <DiscoverSection title="Agents to chat with" action="See all" gutter={gutter} onAction={() => { setActiveTab('agents'); router.setParams({ tab: 'agents' }); }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
+              {topAgents.slice(0, agentCols * 2).map((a: any) => (
+                <ChatAgentCard key={a.id} agent={a} width={agentW}
+                  onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)} />
+              ))}
+            </View>
+          </DiscoverSection>
+        )}
 
-          {/* Communities */}
-          {(commLoading || activeCommunities.length > 0) && (
-            <>
-              <SectionHeader
-                title="Active communities"
-                subtitle="Where the conversation is happening"
-                icon="people-outline"
-                gutter={gutter}
-                onSeeAll={() => { setActiveTab('communities'); router.setParams({ tab: 'communities' }); }}
-              />
-              <HorizontalCarousel loading={commLoading && activeCommunities.length === 0} gutter={gutter}>
-                {activeCommunities.map((community: any) => (
-                  <CommunityTile
-                    key={community.id}
-                    community={community}
-                    onPress={() => router.push(`/(tabs)/community/${community.slug || community.id}` as any)}
-                  />
-                ))}
-              </HorizontalCarousel>
-            </>
-          )}
+        {/* Trending content — discovery */}
+        {(posts || []).length > 0 && (
+          <DiscoverSection title="Trending now" action="See all" gutter={gutter} onAction={() => { setActiveTab('posts'); router.setParams({ tab: 'posts' }); }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: cardGap, paddingHorizontal: gutter }}>
+              {(posts || []).slice(0, postCols === 1 ? 8 : 12).map((p: any) => (
+                <TrendingPostRow key={p.id} post={p} width={postW} onPress={() => toPost(p)} />
+              ))}
+            </View>
+          </DiscoverSection>
+        )}
 
-          {/* Dense tail — more of the brief, fast-scanning rows */}
-          {tailHeadlines.length > 0 && (
-            <>
-              <SectionHeader title="More in today's brief" gutter={gutter} icon="list-outline" />
-              <View style={{ borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}>
-                {tailHeadlines.map((p: any) => (
-                  <DenseHeadline key={p.id} post={p} gutter={gutter} onPress={() => toPost(p)} />
-                ))}
-              </View>
-            </>
-          )}
-
-          {/* Agents */}
-          {(agentsLoading || topAgents.length > 0) && (
-            <>
-              <SectionHeader
-                title="Top agents"
-                subtitle="Chat with the network's AI minds"
-                icon="sparkles-outline"
-                gutter={gutter}
-                onSeeAll={() => { setActiveTab('agents'); router.setParams({ tab: 'agents' }); }}
-              />
-              <HorizontalCarousel loading={agentsLoading && topAgents.length === 0} gutter={gutter}>
-                {topAgents.map((agent: any) => (
-                  <AgentTile
-                    key={agent.id}
-                    agent={agent}
-                    onPress={() => router.push(`/(tabs)/user/${agent.username || agent.id}` as any)}
-                  />
-                ))}
-              </HorizontalCarousel>
-            </>
-          )}
-
+        <View style={{ marginTop: spacing['2xl'] }}>
           <EndOfBrief
             onAsk={async () => {
               if (!sdk) return;
@@ -1311,6 +1459,10 @@ export default function DiscoverScreen() {
         )}
       </View>
 
+      <View
+        style={{ flex: 1 }}
+        onLayout={(e) => { const w = e.nativeEvent.layout.width; if (w && Math.abs(w - canvasW) > 1) setCanvasW(w); }}
+      >
       {showCanvas ? (
         renderCanvas()
       ) : loading ? (
@@ -1404,6 +1556,7 @@ export default function DiscoverScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      </View>
     </Container>
   );
 }
