@@ -359,12 +359,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthedSdk(null);
     setSignalsSdk(null);
     setProjectId(null);
-    // All auth state + storage is cleared above, so a soft navigation renders
-    // the logged-out landing immediately — no feed flash, no manual refresh —
-    // on web and native alike. (Web previously hard-reloaded, which left the
-    // old feed visible during the reload; native did nothing at all, leaving
-    // the user stranded on the authed shell.)
-    router.replace('/');
+    // Storage + auth state are cleared above. On web a SOFT nav left the authed
+    // tab shell half-mounted (you'd be stuck "half logged out" until a manual
+    // refresh), so force a hard reload to '/' — it boots fresh with no session
+    // and lands straight on the logged-out auth screen. Native re-renders fine
+    // off the state reset via router.replace.
+    if (typeof window !== 'undefined' && window.location) {
+      window.location.replace('/');
+    } else {
+      router.replace('/');
+    }
   }, []);
 
   const value = React.useMemo(

@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, Pressable, Platform, ScrollView, useWindowDimensions, Share } from 'react-native';
+import { View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -27,6 +28,7 @@ type NavItem = { name: string; label: string; icon: string; activeIcon: string }
 const NAV_ITEMS: NavItem[] = [
   { name: 'index', label: 'Feed', icon: 'newspaper-outline', activeIcon: 'newspaper' },
   { name: 'discover', label: 'Discover', icon: 'search-outline', activeIcon: 'search' },
+  { name: 'communities', label: 'Communities', icon: 'people-outline', activeIcon: 'people' },
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
   { name: 'wallet', label: 'Wallet', icon: 'wallet-outline', activeIcon: 'wallet' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
@@ -60,15 +62,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     try {
       const link = await getReferralLink(sdk);
       if (!link) { showToast('Could not create your invite link', 'error'); return; }
-      if (Platform.OS === 'web') {
-        const nav = navigator as any;
-        if (nav?.share) { try { await nav.share({ title: 'Join me on Minds', url: link }); return; } catch {} }
-        try { await nav.clipboard.writeText(link); showToast('Invite link copied — paste it anywhere', 'success'); }
-        catch { showToast(link, 'success'); }
+      let copied = false;
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).clipboard) {
+        try { await (navigator as any).clipboard.writeText(link); copied = true; } catch {}
       } else {
-        await Share.share({ message: `Join me on Minds\n${link}` });
+        try { await Clipboard.setStringAsync(link); copied = true; } catch {}
       }
-    } catch { showToast('Could not share your invite', 'error'); }
+      showToast(copied ? 'Referral link copied!' : link, copied ? 'success' : 'info');
+    } catch { showToast('Could not copy your invite link', 'error'); }
     finally { setReferBusy(false); }
   };
   const { colors } = useTheme();
@@ -598,9 +599,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             </View>
           );
           return (
-            <View style={{ flex: 1, minHeight: 0 as any, paddingHorizontal: spacing.lg, gap: spacing.md }}>
-              {/* MESSAGES — fixed top section, scrolls within itself */}
-              <View style={{ flex: messagesOpen ? 1 : 0, minHeight: 0 as any }}>
+            <View style={{ flex: 1, minHeight: 0 as any, paddingHorizontal: spacing.lg }}>
+              {/* MESSAGES — the sidebar inbox is just DMs now; Communities moved
+                  to a top-level nav item so this stays uncrowded. */}
+              <View style={{ flex: 1, minHeight: 0 as any }}>
                 <SectionHeader label="Messages" open={messagesOpen} onToggle={() => setMessagesOpen(o => !o)} onSeeAll={() => router.push('/(tabs)/chat' as any)} />
                 {messagesOpen && (
                   <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
@@ -608,20 +610,6 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                       <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>No recent activity</Text>
                     ) : (
                       recentDMs.map(renderInboxRow)
-                    )}
-                  </ScrollView>
-                )}
-              </View>
-
-              {/* COMMUNITIES — fixed lower section, never buried by DMs */}
-              <View style={{ flex: communitiesOpen ? 1 : 0, minHeight: 0 as any, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle, paddingTop: spacing.md }}>
-                <SectionHeader label="Communities" open={communitiesOpen} onToggle={() => setCommunitiesOpen(o => !o)} onSeeAll={() => router.push('/(tabs)/communities' as any)} />
-                {communitiesOpen && (
-                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                    {recentCommunities.length === 0 ? (
-                      <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>No communities yet</Text>
-                    ) : (
-                      recentCommunities.map(renderInboxRow)
                     )}
                   </ScrollView>
                 )}
