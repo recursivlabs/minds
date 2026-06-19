@@ -207,40 +207,80 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
     setLightboxVisible(true);
   };
 
+  // Split videos (full-width players) from images (an X-style multi-image grid,
+  // so 2+ images tile into columns instead of stacking down one column).
+  const videoItems = displayItems.map((it, idx) => ({ it, idx })).filter(x => x.it.type === 'video');
+  const imageItems = displayItems.map((it, idx) => ({ it, idx })).filter(x => x.it.type !== 'video');
+  const GAP = 2;
+  const GRID_H = Platform.OS === 'web' ? 360 : 240;
+  const FILL = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0 };
+
+  const Tile = ({ entry, style, plus }: { entry: { it: MediaItem; idx: number }; style?: any; plus?: number }) => (
+    <Pressable
+      onPress={() => openLightbox(entry.idx)}
+      style={[{ overflow: 'hidden', backgroundColor: colors.surface }, style, Platform.OS === 'web' ? { cursor: 'pointer' } as any : null]}
+    >
+      <Image source={{ uri: entry.it.url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+      {plus ? (
+        <View style={[FILL, { backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={{ color: '#fff', fontSize: 24, fontFamily: 'Roboto-Medium' }}>+{plus}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+
+  const imageGrid = () => {
+    const n = imageItems.length;
+    if (n === 0) return null;
+    // Single image keeps its natural aspect ratio (no crop).
+    if (n === 1) {
+      const e = imageItems[0];
+      return <PostImage uri={e.it.url} onPress={() => openLightbox(e.idx)} initialWidth={e.it.width} initialHeight={e.it.height} />;
+    }
+    const frame = { borderRadius: radius.lg, overflow: 'hidden' as const, height: GRID_H };
+    if (n === 2) {
+      return (
+        <View style={[frame, { flexDirection: 'row', gap: GAP }]}>
+          <Tile entry={imageItems[0]} style={{ flex: 1, height: '100%' }} />
+          <Tile entry={imageItems[1]} style={{ flex: 1, height: '100%' }} />
+        </View>
+      );
+    }
+    if (n === 3) {
+      return (
+        <View style={[frame, { flexDirection: 'row', gap: GAP }]}>
+          <Tile entry={imageItems[0]} style={{ flex: 1, height: '100%' }} />
+          <View style={{ flex: 1, gap: GAP }}>
+            <Tile entry={imageItems[1]} style={{ flex: 1, width: '100%' }} />
+            <Tile entry={imageItems[2]} style={{ flex: 1, width: '100%' }} />
+          </View>
+        </View>
+      );
+    }
+    // 4+ → 2×2, with a "+N" overlay on the last tile when there are extras.
+    return (
+      <View style={[frame, { gap: GAP }]}>
+        <View style={{ flex: 1, flexDirection: 'row', gap: GAP }}>
+          <Tile entry={imageItems[0]} style={{ flex: 1, height: '100%' }} />
+          <Tile entry={imageItems[1]} style={{ flex: 1, height: '100%' }} />
+        </View>
+        <View style={{ flex: 1, flexDirection: 'row', gap: GAP }}>
+          <Tile entry={imageItems[2]} style={{ flex: 1, height: '100%' }} />
+          <Tile entry={imageItems[3]} style={{ flex: 1, height: '100%' }} plus={n > 4 ? n - 4 : undefined} />
+        </View>
+      </View>
+    );
+  };
+
   return (
     <>
       <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-        {displayItems.map((item, i) => {
-          if (item.type === 'video') {
-            return (
-              <View key={i} style={{ position: 'relative' }}>
-                <VideoMedia url={item.url} height={Platform.OS === 'web' ? 560 : 240} />
-              </View>
-            );
-          }
-
-          // Image
-          const badge = displayItems.length > 1 ? (
-            <View style={{
-              position: 'absolute', top: spacing.sm, right: spacing.sm,
-              backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm,
-              paddingHorizontal: spacing.sm, paddingVertical: 2,
-            }}>
-              <Text variant="caption" color="#fff" style={{ fontSize: 11 }}>{i + 1}/{displayItems.length}</Text>
-            </View>
-          ) : null;
-
-          return (
-            <PostImage
-              key={i}
-              uri={item.url}
-              onPress={() => openLightbox(i)}
-              badge={badge}
-              initialWidth={item.width}
-              initialHeight={item.height}
-            />
-          );
-        })}
+        {videoItems.map(({ it, idx }) => (
+          <View key={`v${idx}`} style={{ position: 'relative' }}>
+            <VideoMedia url={it.url} height={Platform.OS === 'web' ? 560 : 240} />
+          </View>
+        ))}
+        {imageGrid()}
       </View>
 
       {/* Lightbox modal */}

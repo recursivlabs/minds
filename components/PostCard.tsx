@@ -63,6 +63,8 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [editSaving, setEditSaving] = React.useState(false);
   const [currentContent, setCurrentContent] = React.useState(post.content || post.body || '');
   const [isDeleted, setIsDeleted] = React.useState(false);
+  // Long feed posts show a preview + "Show more" that expands inline.
+  const [expanded, setExpanded] = React.useState(false);
   // Bookmark state is keyed by the original (non-repost) post id so a repost
   // and the original share a single saved-state.
   const bookmarkedId = (post.reposted_from || post.repostedFrom)?.id || post.id;
@@ -313,28 +315,45 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
   const renderMarkdownContent = () => {
     if (!content) return null;
+    // Feed cards preview long posts; "Show more" expands the body inline
+    // (the detail view already shows it in full) rather than a bare cut-off.
+    const truncated = compact && !expanded && content.length > 300;
+    const shown = truncated ? content.slice(0, 300).trimEnd() + '…' : content;
+    const seeMore = truncated ? (
+      <Pressable
+        onPress={(e: any) => { e?.stopPropagation?.(); setExpanded(true); }}
+        hitSlop={6}
+        style={Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : undefined}
+      >
+        <Text variant="bodyMedium" color={colors.accent} style={{ marginTop: 2, marginBottom: media ? spacing.md : 0 }}>Show more</Text>
+      </Pressable>
+    ) : null;
 
     if (Platform.OS === 'web') {
-      const html = renderMarkdownToHtml(compact ? content.slice(0, 300) : content);
+      const html = renderMarkdownToHtml(shown);
       const WebDiv = 'div' as any;
       return (
-        <WebDiv
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML comes from renderMarkdownToHtml, which escapes all user input before formatting.
-          dangerouslySetInnerHTML={{ __html: html }}
-          style={{
-            color: colors.text,
-            fontSize: typography.body.fontSize,
-            lineHeight: `${typography.body.lineHeight}px`,
-            marginBottom: media ? spacing.md : 0,
-            wordBreak: 'break-word',
-          }}
-        />
+        <>
+          <WebDiv
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML comes from renderMarkdownToHtml, which escapes all user input before formatting.
+            dangerouslySetInnerHTML={{ __html: html }}
+            style={{
+              color: colors.text,
+              fontSize: typography.body.fontSize,
+              lineHeight: `${typography.body.lineHeight}px`,
+              marginBottom: (media && !truncated) ? spacing.md : 0,
+              wordBreak: 'break-word',
+            }}
+          />
+          {seeMore}
+        </>
       );
     }
 
-    const segments = parseMarkdownSegments(compact ? content.slice(0, 300) : content);
+    const segments = parseMarkdownSegments(shown);
     return (
-      <Text variant="body" style={{ marginBottom: media ? spacing.md : 0 }}>
+      <>
+      <Text variant="body" style={{ marginBottom: (media && !truncated) ? spacing.md : 0 }}>
         {segments.map((seg, i) => {
           switch (seg.type) {
             case 'bold':
@@ -384,10 +403,9 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               return <Text key={i} variant="body">{seg.text}</Text>;
           }
         })}
-        {compact && content.length > 300 ? (
-          <Text variant="body" color={colors.textMuted}>...</Text>
-        ) : null}
       </Text>
+      {seeMore}
+      </>
     );
   };
 
