@@ -27,7 +27,9 @@ const KEYS = {
 //    org-scoped). Customers become project_members of the Minds app, not
 //    organization_members of the owning Minds org. Bumping forces existing
 //    customers to re-auth so their stored key gets reissued with the new binding.
-const AUTH_VERSION = '6';
+// 7: added wallet:read/wallet:write so the in-app wallet stops 403-ing
+//    ("Couldn't load your wallet"). Existing keys lack the scope; re-auth reissues.
+const AUTH_VERSION = '7';
 
 const API_KEY_SCOPES = [
   'posts:read', 'posts:write',
@@ -43,6 +45,7 @@ const API_KEY_SCOPES = [
   'settings:read', 'settings:write',
   'billing:read', 'billing:write',
   'notifications:read', 'notifications:write',
+  'wallet:read', 'wallet:write',
   'uploads:write',
 ] as const;
 

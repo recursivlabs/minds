@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, Pressable } from 'react-native';
+import { View, FlatList, Pressable, Platform } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,24 +8,9 @@ import { Text, Avatar, Skeleton } from '../../components';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
-import { loadLastCuratedAt } from '../../lib/onboarding';
-import { getPreference } from '../../lib/preferences';
-import { getItemSync, setItem } from '../../lib/storage';
 import { invalidate } from '../../lib/cache';
 import { spacing } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
-
-// The "Your agent updated your feed" alert is client-synthesised, so there's
-// no server record to mark read. We persist the curate timestamp the user
-// last acknowledged; any agent alert at or before it renders as read. This
-// makes the read state survive a refresh instead of perpetually re-appearing.
-const AGENT_NOTIF_READ_KEY = 'minds:agentNotifReadAt';
-function getAgentNotifReadAt(): number {
-  return Number(getItemSync(AGENT_NOTIF_READ_KEY) || 0);
-}
-function setAgentNotifReadAt(ts: number) {
-  setItem(AGENT_NOTIF_READ_KEY, String(ts));
-}
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -47,39 +32,7 @@ export default function NotificationsScreen() {
       if (!sdk) { setLoading(false); return; }
       try {
         const res = await sdk.notifications.list({ limit: 30, organization_id: ORG_ID || undefined });
-        let items = res.data || [];
-
-        // Agent-sourced alerts: synthesise an "agent activity" entry
-        // whenever the local last-curated timestamp is fresh enough to
-        // be worth surfacing (≤ 7 days). This is purely client-side
-        // for now — when the platform ships agent-emitted notifications
-        // server-side, swap this out for a real subscription. Skipped
-        // entirely when the user has flipped off AI in Settings.
-        if (getPreference('aiEnabled')) {
-          const lastCurated = await loadLastCuratedAt();
-          if (lastCurated && Date.now() - lastCurated < 7 * 86_400_000) {
-            items = [
-              ({
-                id: `agent-curated-${lastCurated}`,
-                _agentSourced: true,
-                _curatedAt: lastCurated,
-                title: 'Your agent updated your feed',
-                body: 'Pull to refresh your For You for the latest takes.',
-                targetType: 'agent',
-                target_type: 'agent',
-                actionUrl: '/(tabs)',
-                action_url: '/(tabs)',
-                createdAt: new Date(lastCurated).toISOString(),
-                created_at: new Date(lastCurated).toISOString(),
-                // Read state is persisted client-side so it survives refresh.
-                status: lastCurated <= getAgentNotifReadAt() ? 'read' : 'unread',
-              } as any),
-              ...items,
-            ];
-          }
-        }
-
-        setNotifications(items);
+        setNotifications(res.data || []);
       } catch {}
       finally { setLoading(false); }
   }, [sdk]);
@@ -157,11 +110,7 @@ export default function NotificationsScreen() {
 
   const handlePress = (notif: any) => {
     // Mark as read
-    if (notif._agentSourced) {
-      // Persist so it stays read across refreshes (no server record to PATCH).
-      if (notif._curatedAt) setAgentNotifReadAt(notif._curatedAt);
-      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
-    } else if (notif.id && notif.status === 'unread' && sdk) {
+    if (notif.id && notif.status === 'unread' && sdk) {
       sdk.notifications.markAsRead(notif.id)
         .then(() => invalidate('notifications')) // nudge the tab badge now, not in 60s
         .catch(() => {});
@@ -190,10 +139,6 @@ export default function NotificationsScreen() {
   };
 
   const markAllRead = async () => {
-    // Acknowledge the client-synthesised agent alert too, so it doesn't
-    // bounce back to unread on the next fetch.
-    const agentTs = notifications.find(n => n._agentSourced)?._curatedAt;
-    if (agentTs) setAgentNotifReadAt(agentTs);
     setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
     if (!sdk) return;
     try {
@@ -213,7 +158,6 @@ export default function NotificationsScreen() {
     if (t.includes('like') || t.includes('reaction') || t.includes('vote')) return 'heart';
     if (t.includes('community')) return 'people';
     if (t.includes('message') || t.includes('chat') || t.includes('dm')) return 'mail';
-    if (t.includes('agent') || t.includes('curator')) return 'sparkles';
     return 'notifications';
   };
 
@@ -241,17 +185,44 @@ export default function NotificationsScreen() {
           ))}
         </View>
       ) : notifications.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing['2xl'] }}>
-          <Ionicons name="notifications-outline" size={40} color={colors.accent} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, paddingHorizontal: spacing.xl }}>
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="notifications-outline" size={34} color={colors.accent} />
+          </View>
           <Text variant="h2" color={colors.text} align="center">
-            Notifications
+            Nothing here yet
           </Text>
-          <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 300, lineHeight: 24 }}>
-            When people interact with your posts, you'll see it here.
+          <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 320, lineHeight: 24 }}>
+            Create a post or reply to others to start receiving notifications. Likes, replies, follows, and mentions all show up here.
           </Text>
-          <Text variant="caption" color={colors.textMuted}>
-            Likes, replies, follows, and mentions
-          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
+            <Pressable
+              onPress={() => router.push('/(tabs)/create')}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+                paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.lg,
+                borderRadius: 999, backgroundColor: colors.accent,
+                opacity: pressed ? 0.85 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name="create-outline" size={17} color={colors.textOnAccent} />
+              <Text variant="bodyMedium" color={colors.textOnAccent}>Create a post</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/(tabs)/discover')}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+                paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.lg,
+                borderRadius: 999, borderWidth: 1, borderColor: colors.borderSubtle,
+                opacity: pressed ? 0.7 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name="compass-outline" size={17} color={colors.text} />
+              <Text variant="bodyMedium" color={colors.text}>Find people</Text>
+            </Pressable>
+          </View>
         </View>
       ) : (
         <FlatList
@@ -262,7 +233,7 @@ export default function NotificationsScreen() {
             // Visual hierarchy: high-signal alerts (mentions, replies,
             // agent-sourced, DMs) get full padding + emphasis; low-signal
             // (likes/reactions) collapse to a slimmer row.
-            const highSignal = item._agentSourced || t.includes('mention') || t.includes('reply') || t.includes('comment') || t.includes('message') || t.includes('dm');
+            const highSignal = t.includes('mention') || t.includes('reply') || t.includes('comment') || t.includes('message') || t.includes('dm');
 
             // Swipe-left → dismiss. Optimistic UI: remove from list
             // immediately, mark-as-read on the server in the background
@@ -279,9 +250,7 @@ export default function NotificationsScreen() {
             );
             const handleDismiss = () => {
               setNotifications(prev => prev.filter(n => n.id !== item.id));
-              if (item._agentSourced) {
-                if (item._curatedAt) setAgentNotifReadAt(item._curatedAt);
-              } else if (sdk && item.id && item.status === 'unread') {
+              if (sdk && item.id && item.status === 'unread') {
                 sdk.notifications.markAsRead(item.id).catch(() => {});
               }
             };

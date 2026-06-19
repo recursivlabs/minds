@@ -42,24 +42,24 @@ const MODES: { key: Mode; label: string }[] = [
 
 const MAX_IMAGES = 10; // matches the server media_urls cap
 
-// X-style media grid geometry.
-const GRID_GAP = 3;
-const GRID_HEIGHT = 320; // fixed frame height for 2/3/4-up layouts
+// X-style media grid geometry. X uses a 2px hairline gap between tiles and a
+// single large-radius frame clipping the whole block.
+const GRID_GAP = 2;
+const GRID_RADIUS = radius.xl; // ~16px outer frame radius, matching X
+const GRID_HEIGHT = 290; // fixed frame height for 2/3/4-up layouts
 
 /**
- * Small circular remove control overlaid on a media tile (X-style).
- * `small` shrinks it for multi-image grids.
+ * Small circular remove control overlaid on a media tile (X-style): a
+ * semi-transparent dark disc with a white ×, top-right of the tile.
  */
 function RemoveMediaButton({
   onPress,
-  colors,
   small,
 }: {
   onPress: () => void;
-  colors: ReturnType<typeof useColors>;
   small?: boolean;
 }) {
-  const dim = small ? 26 : 30;
+  const dim = small ? 28 : 30;
   return (
     <Pressable
       onPress={onPress}
@@ -73,14 +73,24 @@ function RemoveMediaButton({
         borderRadius: radius.full,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        opacity: pressed ? 0.8 : 1,
-        ...(Platform.OS === 'web' ? ({ cursor: 'pointer', backdropFilter: 'blur(4px)' } as any) : {}),
+        backgroundColor: 'rgba(0,0,0,0.72)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.18)',
+        opacity: pressed ? 0.7 : 1,
+        ...(Platform.OS === 'web' ? ({ cursor: 'pointer', backdropFilter: 'blur(6px)' } as any) : {}),
       })}
     >
-      <Ionicons name="close" size={small ? 15 : 18} color="#ffffff" />
+      <Ionicons name="close" size={small ? 16 : 18} color="#ffffff" />
     </Pressable>
   );
+}
+
+/** Format seconds → m:ss for the video duration pill. */
+function fmtDuration(secs?: number | null): string | null {
+  if (secs == null || !isFinite(secs) || secs <= 0) return null;
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -200,6 +210,8 @@ export default function CreateScreen() {
   const [tagInput, setTagInput] = React.useState('');
   const [mediaUris, setMediaUris] = React.useState<string[]>([]);
   const [mediaIsVideo, setMediaIsVideo] = React.useState(false);
+  // Duration of the selected video, in seconds, for the X-style duration pill.
+  const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
   const mediaUri = mediaUris[0] ?? null; // first item — used for video + blog cover
   const [videoPct, setVideoPct] = React.useState<number | null>(null);
   const { mentionQuery, showMentions, insertMention } = useMentions(content, setContent);
@@ -207,6 +219,7 @@ export default function CreateScreen() {
     params.communityId ? { id: params.communityId, name: params.communityName || 'Community' } : null
   );
   const [showCommunityPicker, setShowCommunityPicker] = React.useState(false);
+  const [communitySearch, setCommunitySearch] = React.useState('');
   const { communities } = useCommunities(30);
 
   // Keep selectedCommunity in sync with incoming params. Expo Router reuses
@@ -332,9 +345,12 @@ export default function CreateScreen() {
           if (vid) {
             setMediaUris([vid.uri]);
             setMediaIsVideo(true);
+            // expo-image-picker reports duration in milliseconds.
+            setVideoDuration(vid.duration ? vid.duration / 1000 : null);
           } else {
             setMediaUris(assets.map((a: any) => a.uri).slice(0, allowMulti ? MAX_IMAGES : 1));
             setMediaIsVideo(false);
+            setVideoDuration(null);
           }
         }
       } else if (Platform.OS === 'web') {
@@ -347,11 +363,21 @@ export default function CreateScreen() {
           if (!files.length) return;
           const vid = files.find((f) => (f.type || '').startsWith('video/'));
           if (vid) {
-            setMediaUris([URL.createObjectURL(vid)]);
+            const url = URL.createObjectURL(vid);
+            setMediaUris([url]);
             setMediaIsVideo(true);
+            setVideoDuration(null);
+            // Pull duration off the video metadata for the duration pill.
+            try {
+              const probe = document.createElement('video');
+              probe.preload = 'metadata';
+              probe.onloadedmetadata = () => setVideoDuration(probe.duration || null);
+              probe.src = url;
+            } catch {}
           } else {
             setMediaUris(files.slice(0, MAX_IMAGES).map((f) => URL.createObjectURL(f)));
             setMediaIsVideo(false);
+            setVideoDuration(null);
           }
         };
         input.click();
@@ -435,6 +461,7 @@ export default function CreateScreen() {
         setContent('');
         setMediaUris([]);
         setMediaIsVideo(false);
+        setVideoDuration(null);
         setVideoPct(null);
         setIsNsfw(false);
         clearDraft();
@@ -651,20 +678,24 @@ export default function CreateScreen() {
               matching legacy Minds + modern social conventions. */}
           <View style={{ marginBottom: spacing.md, position: 'relative' }}>
             <Pressable
-              onPress={() => setShowCommunityPicker(!showCommunityPicker)}
-              style={{
+              onPress={() => { setCommunitySearch(''); setShowCommunityPicker(!showCommunityPicker); }}
+              style={({ pressed }) => ({
                 flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-                paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+                paddingLeft: spacing.md, paddingRight: spacing.sm, paddingVertical: spacing.sm,
                 backgroundColor: selectedCommunity ? colors.accentSubtle : colors.surface,
                 borderRadius: radius.full, alignSelf: 'flex-start',
                 borderWidth: 0.5, borderColor: selectedCommunity ? `${colors.accent}40` : colors.glassBorder,
-              }}
+                opacity: pressed ? 0.75 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
             >
-              <Ionicons name={selectedCommunity ? 'people' : 'globe-outline'} size={14} color={selectedCommunity ? colors.accent : colors.textMuted} />
-              <Text variant="caption" color={selectedCommunity ? colors.accent : colors.textMuted} style={{ fontSize: 13 }}>
-                {selectedCommunity ? selectedCommunity.name : 'Public · pick a community (optional)'}
+              <Ionicons name={selectedCommunity ? 'people' : 'globe-outline'} size={15} color={selectedCommunity ? colors.accent : colors.textSecondary} />
+              <Text variant="caption" color={selectedCommunity ? colors.accent : colors.text} style={{ fontSize: 13, fontFamily: 'Roboto-Medium' }}>
+                {selectedCommunity ? selectedCommunity.name : 'Global'}
               </Text>
-              <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
+              <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="chevron-down" size={12} color={colors.textSecondary} />
+              </View>
             </Pressable>
 
             <Modal
@@ -699,19 +730,65 @@ export default function CreateScreen() {
                     ...(Platform.OS === 'web' ? { boxShadow: '0 24px 64px rgba(0,0,0,0.8)' } as any : {}),
                   }}
                 >
-                  <View style={{ padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }}>
-                    <Text variant="label" color={colors.textSecondary}>Choose a community</Text>
-                  </View>
-                  <ScrollView style={{ maxHeight: 400 }}>
-                    {(communities || []).length === 0 ? (
-                      <View style={{ padding: spacing.xl, alignItems: 'center', gap: spacing.sm }}>
-                        <Text variant="body" color={colors.textMuted} align="center">No communities yet</Text>
-                        <Pressable onPress={() => { setShowCommunityPicker(false); setMode('community' as any); }}>
-                          <Text variant="caption" color={colors.accent}>Create one</Text>
+                  <View style={{ padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle, gap: spacing.sm }}>
+                    <Text variant="label" color={colors.textSecondary}>Post to</Text>
+                    {/* Search — people can be in a lot of communities. */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 0.5, borderColor: colors.glassBorder, paddingHorizontal: spacing.md }}>
+                      <Ionicons name="search" size={15} color={colors.textMuted} />
+                      <TextInput
+                        value={communitySearch}
+                        onChangeText={setCommunitySearch}
+                        placeholder="Search your communities"
+                        placeholderTextColor={colors.textMuted}
+                        autoCapitalize="none"
+                        style={{ flex: 1, paddingVertical: spacing.sm, color: colors.text, fontFamily: 'Roboto-Regular', fontSize: 14, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+                      />
+                      {communitySearch.length > 0 && (
+                        <Pressable onPress={() => setCommunitySearch('')} hitSlop={8}>
+                          <Ionicons name="close-circle" size={16} color={colors.textMuted} />
                         </Pressable>
+                      )}
+                    </View>
+                  </View>
+                  <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+                    {/* Global (default) — always available to switch back to. */}
+                    <Pressable
+                      onPress={() => { setSelectedCommunity(null); setShowCommunityPicker(false); }}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                        paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+                        backgroundColor: !selectedCommunity ? colors.accentSubtle : pressed ? colors.surfaceHover : 'transparent',
+                        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+                      })}
+                    >
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="globe-outline" size={18} color={!selectedCommunity ? colors.accent : colors.textSecondary} />
                       </View>
-                    ) : (
-                      (communities || []).map((c: any) => (
+                      <View style={{ flex: 1 }}>
+                        <Text variant="body" color={!selectedCommunity ? colors.accent : colors.text}>Global</Text>
+                        <Text variant="caption" color={colors.textMuted}>Everyone on Minds</Text>
+                      </View>
+                      {!selectedCommunity && <Ionicons name="checkmark" size={16} color={colors.accent} />}
+                    </Pressable>
+
+                    {(() => {
+                      const q = communitySearch.trim().toLowerCase();
+                      const list = (communities || []).filter((c: any) => !q || (c.name || '').toLowerCase().includes(q));
+                      if ((communities || []).length === 0) {
+                        return (
+                          <View style={{ padding: spacing.xl, alignItems: 'center', gap: spacing.sm }}>
+                            <Text variant="body" color={colors.textMuted} align="center">You haven't joined any communities yet</Text>
+                          </View>
+                        );
+                      }
+                      if (list.length === 0) {
+                        return (
+                          <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                            <Text variant="body" color={colors.textMuted} align="center">No matches for "{communitySearch}"</Text>
+                          </View>
+                        );
+                      }
+                      return list.map((c: any) => (
                         <Pressable
                           key={c.id}
                           onPress={() => { setSelectedCommunity(c); setShowCommunityPicker(false); }}
@@ -729,9 +806,22 @@ export default function CreateScreen() {
                           </View>
                           {selectedCommunity?.id === c.id && <Ionicons name="checkmark" size={16} color={colors.accent} />}
                         </Pressable>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </ScrollView>
+                  {/* Discover more communities. */}
+                  <Pressable
+                    onPress={() => { setShowCommunityPicker(false); router.push('/(tabs)/communities' as any); }}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+                      paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderSubtle,
+                      backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+                      ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                    })}
+                  >
+                    <Ionicons name="compass-outline" size={16} color={colors.accent} />
+                    <Text variant="bodyMedium" color={colors.accent}>Discover communities</Text>
+                  </Pressable>
                 </Pressable>
               </Pressable>
             </Modal>
@@ -822,47 +912,98 @@ export default function CreateScreen() {
           {mediaUris.length > 0 && (
             <View style={{ marginTop: spacing.lg }}>
               {mediaIsVideo ? (
-                // Video: rounded thumbnail wrapper with the player + a play
-                // affordance overlay and a removal control, X-style.
+                // Video: one rounded frame (matching the image grid) holding the
+                // player, a centered round play glyph, a duration pill bottom-left,
+                // and the × remove control top-right — X-style.
                 <View
                   style={{
                     position: 'relative',
-                    borderRadius: radius.xl,
+                    height: GRID_HEIGHT,
+                    borderRadius: GRID_RADIUS,
                     overflow: 'hidden',
-                    backgroundColor: colors.surfaceHover,
+                    backgroundColor: '#000',
+                    borderWidth: 0.5,
+                    borderColor: colors.borderSubtle,
                   }}
                 >
-                  <VideoPlayer uri={mediaUris[0]} autoplay={false} height={360} />
-                  <RemoveMediaButton onPress={() => { setMediaUris([]); setMediaIsVideo(false); }} colors={colors} />
+                  <VideoPlayer uri={mediaUris[0]} autoplay={false} height={GRID_HEIGHT} />
+                  {/* Centered play glyph. pointerEvents none so it doesn't
+                      steal taps from the player's own mute toggle. */}
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: radius.full,
+                        backgroundColor: 'rgba(0,0,0,0.55)',
+                        borderWidth: 1.5,
+                        borderColor: 'rgba(255,255,255,0.85)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(4px)' } as any) : {}),
+                      }}
+                    >
+                      <Ionicons name="play" size={26} color="#ffffff" style={{ marginLeft: 3 }} />
+                    </View>
+                  </View>
+                  {fmtDuration(videoDuration) && (
+                    <View
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        bottom: spacing.sm,
+                        left: spacing.sm,
+                        paddingHorizontal: spacing.sm,
+                        paddingVertical: 3,
+                        borderRadius: radius.sm,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                      }}
+                    >
+                      <Text variant="caption" style={{ color: '#ffffff', fontSize: 12, fontVariant: ['tabular-nums'] as any }}>
+                        {fmtDuration(videoDuration)}
+                      </Text>
+                    </View>
+                  )}
+                  <RemoveMediaButton onPress={() => { setMediaUris([]); setMediaIsVideo(false); setVideoDuration(null); }} />
                 </View>
               ) : (
                 // Image grid — X-style, clipped into one rounded frame so the
                 // whole block reads as a single cohesive card.
-                //   1 → full-bleed wide tile
-                //   2 → side-by-side squares
-                //   3 → one tall tile left, two stacked right
-                //   4 → 2×2 grid
+                //   1 → one large ~16:9 tile
+                //   2 → two equal side-by-side tiles (full height)
+                //   3 → one large left, two stacked right
+                //   4 → clean 2×2 grid
                 <View
                   style={{
                     height: mediaUris.length === 1 ? undefined : GRID_HEIGHT,
-                    aspectRatio: mediaUris.length === 1 ? 16 / 10 : undefined,
+                    aspectRatio: mediaUris.length === 1 ? 16 / 9 : undefined,
                     flexDirection: 'row',
                     gap: GRID_GAP,
-                    borderRadius: radius.xl,
+                    borderRadius: GRID_RADIUS,
                     overflow: 'hidden',
+                    borderWidth: 0.5,
+                    borderColor: colors.borderSubtle,
                   }}
                 >
                   {(() => {
                     const remove = (i: number) =>
                       setMediaUris((prev) => prev.filter((_, idx) => idx !== i));
                     const tile = (uri: string, i: number) => (
-                      <View key={`${uri}-${i}`} style={{ flex: 1, position: 'relative' }}>
+                      <View key={`${uri}-${i}`} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                         <Image
                           source={{ uri }}
                           style={{ width: '100%', height: '100%', backgroundColor: colors.surfaceHover }}
                           resizeMode="cover"
                         />
-                        <RemoveMediaButton small onPress={() => remove(i)} colors={colors} />
+                        <RemoveMediaButton small onPress={() => remove(i)} />
                       </View>
                     );
                     const items = mediaUris.slice(0, 4);
@@ -1080,7 +1221,7 @@ export default function CreateScreen() {
           }}
         >
           <ToolbarIconButton
-            icon={mediaIsVideo ? 'videocam' : 'image-outline'}
+            icon="attach"
             active={!!mediaUri}
             onPress={handlePickImage}
             colors={colors}
@@ -1156,27 +1297,190 @@ export default function CreateScreen() {
           </Pressable>
         </View>
       )}
-      {showSchedule && (
-        <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: 0.5, borderTopColor: colors.borderSubtle }}>
-          <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>Schedule post for later</Text>
-          <TextInput
-            placeholder="YYYY-MM-DD HH:MM"
-            placeholderTextColor={colors.textMuted}
-            value={scheduleDate}
-            onChangeText={setScheduleDate}
-            style={{
-              backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder,
-              borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 10,
-              color: colors.text, ...typography.body,
-              ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
-            }}
-          />
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
-            <Button onPress={() => { setScheduleDate(''); setShowSchedule(false); }} variant="ghost" size="sm">Clear</Button>
-            <Button onPress={() => setShowSchedule(false)} size="sm">Set</Button>
-          </View>
-        </View>
-      )}
+      <ScheduleModal
+        visible={showSchedule}
+        value={scheduleDate}
+        onChange={setScheduleDate}
+        onClose={() => setShowSchedule(false)}
+        colors={colors}
+      />
     </Container>
+  );
+}
+
+/**
+ * Modern schedule picker presented in a rounded sheet/card, X-style.
+ * Web uses a styled native `datetime-local` input (calendar + clock UI);
+ * native presents clean date + time text fields. Either way it writes a
+ * `YYYY-MM-DD HH:MM` string to `scheduleDate` — the same value the
+ * post-create call already consumes — so scheduling logic is untouched.
+ */
+function ScheduleModal({
+  visible,
+  value,
+  onChange,
+  onClose,
+  colors,
+}: {
+  visible: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  onClose: () => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  // Draft so Clear/Set/Cancel don't mutate the committed value until confirmed.
+  const [draft, setDraft] = React.useState(value);
+  React.useEffect(() => { if (visible) setDraft(value); }, [visible]);
+
+  // Bridge between the committed `YYYY-MM-DD HH:MM` string and the web
+  // datetime-local format (`YYYY-MM-DDTHH:MM`).
+  const toLocalInput = (v: string) => (v ? v.replace(' ', 'T').slice(0, 16) : '');
+  const fromLocalInput = (v: string) => (v ? v.replace('T', ' ').slice(0, 16) : '');
+
+  // Native split fields.
+  const [datePart, timePart] = (() => {
+    const [d = '', t = ''] = (draft || '').split(' ');
+    return [d, t];
+  })();
+  const setDatePart = (d: string) => setDraft(`${d}${timePart ? ` ${timePart}` : ''}`.trim());
+  const setTimePart = (t: string) => setDraft(`${datePart}${t ? ` ${t}` : ''}`.trim());
+
+  const prettyPreview = draft
+    ? draft
+    : 'No time set';
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        onPress={onClose}
+        style={{
+          flex: 1,
+          backgroundColor: colors.scrimStrong,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: spacing.xl,
+        }}
+      >
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={{
+            width: '100%',
+            maxWidth: 420,
+            backgroundColor: colors.surfaceRaised,
+            borderRadius: radius.xl,
+            borderWidth: 1,
+            borderColor: colors.border,
+            overflow: 'hidden',
+            ...(Platform.OS === 'web' ? ({ boxShadow: '0 24px 64px rgba(0,0,0,0.8)' } as any) : {}),
+          }}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+              paddingHorizontal: spacing.xl,
+              paddingVertical: spacing.lg,
+              borderBottomWidth: 0.5,
+              borderBottomColor: colors.borderSubtle,
+            }}
+          >
+            <View
+              style={{
+                width: 34, height: 34, borderRadius: radius.full,
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: colors.accentMuted,
+              }}
+            >
+              <Ionicons name="time-outline" size={18} color={colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="bodyMedium" color={colors.text}>Schedule post</Text>
+              <Text variant="caption" color={colors.textMuted}>{prettyPreview}</Text>
+            </View>
+          </View>
+
+          {/* Picker body */}
+          <View style={{ padding: spacing.xl, gap: spacing.md }}>
+            {Platform.OS === 'web' ? (
+              <View
+                style={{
+                  backgroundColor: colors.surface,
+                  borderWidth: 0.5,
+                  borderColor: colors.glassBorder,
+                  borderRadius: radius.lg,
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.md,
+                }}
+              >
+                {React.createElement('input' as any, {
+                  type: 'datetime-local',
+                  value: toLocalInput(draft),
+                  onChange: (e: any) => setDraft(fromLocalInput(e.target.value)),
+                  style: {
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    color: colors.text,
+                    fontFamily: 'Roboto-Regular',
+                    fontSize: 16,
+                    colorScheme: 'dark',
+                  },
+                })}
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1.4 }}>
+                  <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.xs }}>Date</Text>
+                  <TextInput
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.textMuted}
+                    value={datePart}
+                    onChangeText={setDatePart}
+                    style={{
+                      backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder,
+                      borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 12,
+                      color: colors.text, ...typography.body,
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.xs }}>Time</Text>
+                  <TextInput
+                    placeholder="HH:MM"
+                    placeholderTextColor={colors.textMuted}
+                    value={timePart}
+                    onChangeText={setTimePart}
+                    style={{
+                      backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.glassBorder,
+                      borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 12,
+                      color: colors.text, ...typography.body,
+                    }}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Actions */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+              paddingHorizontal: spacing.xl,
+              paddingBottom: spacing.xl,
+            }}
+          >
+            <Button onPress={() => { setDraft(''); onChange(''); onClose(); }} variant="ghost" size="sm">Clear</Button>
+            <View style={{ flex: 1 }} />
+            <Button onPress={onClose} variant="ghost" size="sm">Cancel</Button>
+            <Button onPress={() => { onChange(draft.trim()); onClose(); }} size="sm">Set time</Button>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }

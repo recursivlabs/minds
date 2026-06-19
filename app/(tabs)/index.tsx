@@ -463,34 +463,7 @@ export default function FeedScreen() {
   );
 
   const feedTabsRow = (
-    <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
-      <View style={{ flex: 1 }}>
-        <FeedTabs active={activeTab} onChange={setActiveTab} unread={freshCounts} />
-      </View>
-      {activeTab === 'foryou' && (
-        <Pressable
-          onPress={refresh}
-          disabled={refreshing}
-          hitSlop={8}
-          style={({ pressed }) => ({
-            paddingHorizontal: spacing.xl,
-            minWidth: 56,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderBottomWidth: 1,
-            borderBottomColor: colors.borderSubtle,
-            opacity: pressed ? 0.7 : 1,
-          })}
-          accessibilityLabel="Curate fresh posts"
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color={colors.accent} />
-          ) : (
-            <Ionicons name="refresh-outline" size={18} color={colors.textMuted} />
-          )}
-        </Pressable>
-      )}
-    </View>
+    <FeedTabs active={activeTab} onChange={setActiveTab} unread={freshCounts} />
   );
 
   return (

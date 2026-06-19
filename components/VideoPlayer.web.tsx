@@ -34,6 +34,7 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
     const guid = extractVideoGuid(uri);
     let hls: Hls | null = null;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    const holdTimers: ReturnType<typeof setTimeout>[] = [];
     let cancelled = false;
 
     const pollUntilReady = () => {
@@ -80,34 +81,33 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
         return;
       }
       if (Hls.isSupported()) {
-        // capLevelToPlayerSize keeps ABR active but bounded by the rendered
-        // element — feed videos render ≤560px tall, so streaming 1080p+ to
-        // them is wasted bandwidth and Bunny egress.
-        hls = new Hls({ enableWorker: true, abrEwmaDefaultEstimate: 6_000_000, startLevel: -1, capLevelToPlayerSize: true });
+        // capLevelToPlayerSize is intentionally OFF. It bounds ABR to the
+        // rendered element size, but before the <video> has measured itself it
+        // floors to the LOWEST rendition — and even after our first-segment seed,
+        // ABR resumes and re-floors, so the opening 3-4s play blurry. A high
+        // default bandwidth estimate makes hls.js pick a sharp level immediately;
+        // we accept a little extra egress for a crisp open (re-add size capping
+        // later via maxAutoLevel if Bunny egress becomes a problem).
+        hls = new Hls({ enableWorker: true, abrEwmaDefaultEstimate: 12_000_000, startLevel: -1 });
         hls.loadSource(uri);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           setState('ready');
-          // Crisp open. hls.js cold-starts at the LOWEST rendition (and
-          // capLevelToPlayerSize can floor it to level 0 before the <video> has
-          // measured its size), so the first ~3-4s play blurry before ABR climbs.
-          // Seed the OPENING segment at a feed-appropriate rendition (~720p),
-          // then immediately hand back to auto so we do NOT pin quality for the
-          // life of the instance (which would disable ABR + burn egress — the
-          // reason the previous code avoided touching levels at all).
+          // Hold the opening at a sharp rendition (lowest level ≥720p, else the
+          // top) for the first few segments so it never starts blurry, THEN hand
+          // back to adaptive — setting startLevel + a short hold, not a permanent
+          // pin, so ABR still adapts to real bandwidth afterward.
           const levels = (hls?.levels || []) as Array<{ height?: number }>;
           if (hls && levels.length > 1) {
             let target = levels.length - 1; // default: top rendition
-            const within720 = levels
-              .map((l, i) => ({ i, h: l.height || 0 }))
-              .filter((x) => x.h > 0 && x.h <= 720);
-            if (within720.length) target = within720[within720.length - 1].i;
-            hls.nextLevel = target; // first segment loads sharp
-            const resume = () => {
-              if (hls) hls.nextLevel = -1; // back to adaptive after the opener
-              hls?.off(Hls.Events.FRAG_BUFFERED, resume);
-            };
-            hls.on(Hls.Events.FRAG_BUFFERED, resume);
+            const hd = levels.map((l, i) => ({ i, h: l.height || 0 })).filter((x) => x.h >= 720);
+            if (hd.length) target = hd[0].i; // lowest rendition that is still ≥720p
+            hls.startLevel = target;
+            hls.nextLevel = target;
+            // Keep the sharp level for ~4s (covers the window the user complained
+            // about), then resume auto ABR.
+            const t = setTimeout(() => { if (hls) hls.nextLevel = -1; }, 4000);
+            holdTimers.push(t);
           }
         });
         hls.on(Hls.Events.ERROR, (_e, data) => {
@@ -125,6 +125,7 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
     return () => {
       cancelled = true;
       if (pollTimer) clearTimeout(pollTimer);
+      holdTimers.forEach(clearTimeout);
       if (hls) hls.destroy();
     };
   }, [uri]);

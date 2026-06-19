@@ -16,9 +16,11 @@ export function NSFWOverlay({ children }: Props) {
   return (
     // minHeight guarantees a short text post still gives the mask enough
     // vertical room to show the full "Sensitive content" label + View button
-    // without clipping — otherwise a one-line post renders a cramped, broken-
-    // looking overlay. Drops once revealed so real content isn't padded.
-    <View style={{ position: 'relative', overflow: 'hidden', borderRadius: radius.md, minHeight: revealed ? undefined : 150 }}>
+    // without clipping. We KEEP it after reveal too: a very short post would
+    // otherwise collapse so small that the absolutely-positioned re-mask chip
+    // overlaps the content and becomes unclickable. The masked height is the
+    // post's minimum height in both states.
+    <View style={{ position: 'relative', overflow: 'hidden', borderRadius: radius.md, minHeight: 150 }}>
       {children}
 
       {!revealed ? (

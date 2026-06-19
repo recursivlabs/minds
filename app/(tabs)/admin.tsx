@@ -178,17 +178,16 @@ function DashboardTab({ sdk }: { sdk: any }) {
         // Real counts from the admin stats endpoint (scoped server-side), plus
         // the signups time series for the chart. The old version counted org
         // *members* (teammates ≈ 1) — wrong surface for an app dashboard.
-        const [statsRes, signupsRes, agentsRes] = await Promise.all([
+        const [statsRes, signupsRes] = await Promise.all([
           sdk.admin.getStats().catch(() => null),
           sdk.admin.getSignupsByDay(14).catch(() => null),
-          sdk.agents.listDiscoverable({ limit: 100 }).catch(() => ({ data: [] })),
         ]);
         const s = statsRes?.data || statsRes || {};
         setStats({
           users: s.active_users ?? s.total_users ?? 0,
           posts: s.total_posts ?? 0,
           communities: s.total_communities ?? 0,
-          agents: (agentsRes.data || []).length,
+          banned: s.banned_users ?? 0,
           messages: s.total_messages ?? 0,
           today: s.today_signups ?? 0,
         });
@@ -249,7 +248,7 @@ function DashboardTab({ sdk }: { sdk: any }) {
         <IconStat icon="document-text-outline" label="Posts" value={fmt(stats?.posts)} />
         <IconStat icon="people-outline" label="Communities" value={fmt(stats?.communities)} />
         <IconStat icon="chatbubbles-outline" label="Messages" value={fmt(stats?.messages)} />
-        <IconStat icon="sparkles-outline" label="Agents" value={fmt(stats?.agents)} />
+        <IconStat icon="ban-outline" label="Banned" value={fmt(stats?.banned)} />
       </View>
 
       {/* Signups chart */}
