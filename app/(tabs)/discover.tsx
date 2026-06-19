@@ -641,6 +641,15 @@ export default function DiscoverScreen() {
     (params.tab as DiscoverTab) || 'posts'
   );
   const [searchQuery, setSearchQuery] = React.useState(params.q || '');
+  // Sync the ?q= route param into the search box on EVERY navigation. The
+  // global search (command palette) lands here via /discover?q=…, but useState
+  // only seeds on mount — expo-router keeps this tab alive, so searching while
+  // Discover was already mounted left searchQuery empty and dropped you on the
+  // browse homepage instead of the results. This makes the query always apply.
+  React.useEffect(() => {
+    if (typeof params.q === 'string' && params.q !== searchQuery) setSearchQuery(params.q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.q]);
   const [activeTopic, setActiveTopic] = React.useState<string>('all');
   const topicChips = React.useMemo(() => TOPIC_CHIPS, []);
 
