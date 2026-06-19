@@ -344,9 +344,6 @@ export default function UserProfileScreen() {
               <Pressable onPress={() => { setShowSettingsMenu(false); router.push('/(tabs)/billing'); }} style={{ padding: spacing.md }}>
                 <Text variant="body">Billing</Text>
               </Pressable>
-              <Pressable onPress={() => { setShowSettingsMenu(false); router.push('/(tabs)/invites'); }} style={{ padding: spacing.md }}>
-                <Text variant="body">Invites</Text>
-              </Pressable>
               <Pressable
                 onPress={async () => {
                   setShowSettingsMenu(false);

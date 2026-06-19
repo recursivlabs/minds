@@ -162,14 +162,20 @@ export default function FeedScreen() {
 
   const freshCounts = React.useMemo(() => {
     if (!lastVisitAt) return undefined;
+    // The fresh-content dot only makes sense on For You (a curated stream of
+    // posts you haven't seen). On Following it lit up from your OWN new post,
+    // which is nonsensical — so never show it there, and never count your own
+    // posts toward it on any tab.
+    if ((sortMap[activeTab] === 'personal' ? 'foryou' : activeTab) !== 'foryou') return undefined;
     const since = lastVisitAt;
     const count = (posts || []).filter((p: any) => {
       const ts = new Date(p.createdAt || p.created_at || 0).getTime();
-      return ts > since;
+      const authorId = p.author?.id || p.authorId || p.user_id;
+      return ts > since && authorId !== user?.id;
     }).length;
     if (count === 0) return undefined;
-    return { [sortMap[activeTab] === 'personal' ? 'foryou' : activeTab]: count } as any;
-  }, [posts, lastVisitAt, activeTab]);
+    return { foryou: count } as any;
+  }, [posts, lastVisitAt, activeTab, user?.id]);
 
   // Tap the Feed tab while already on Feed → scroll the list to the top.
   // Standard X / Twitter / Instagram behavior.

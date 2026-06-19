@@ -617,44 +617,65 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
 
           {/* User profile — route directly to the canonical /user/<username>
               URL so we never bounce through the /profile redirect page. */}
-          <Pressable
-            onPress={() => {
-              const slug = user?.username || user?.id;
-              if (slug) router.push(`/(tabs)/user/${slug}` as any);
-              else router.push('/(tabs)/profile');
-            }}
-            style={({ pressed, hovered }: any) => ({
-              flexDirection: 'row' as const,
-              alignItems: 'center' as const,
-              gap: spacing.md,
-              paddingVertical: spacing.sm + 2,
-              paddingHorizontal: collapsed ? 0 : spacing.md,
-              marginHorizontal: collapsed ? 0 : spacing.md,
-              marginRight: collapsed ? 0 : spacing.lg,
-              borderRadius: radius.md,
-              backgroundColor: (isActive('profile') || (user?.username && pathname?.includes(`/user/${user.username}`)))
-                ? colors.accentSubtle
-                : hovered ? colors.glass : 'transparent',
-              opacity: pressed ? 0.7 : 1,
-              justifyContent: collapsed ? 'center' as const : 'flex-start' as const,
-              marginTop: spacing.xs,
-              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
-            })}
-          >
-            <Avatar uri={user?.image} name={user?.name} size="xs" />
-            {!collapsed && (
-              <View style={{ flex: 1 }}>
-                <Text variant="caption" numberOfLines={1} style={{ fontWeight: '400' }}>
-                  {user?.name || user?.username || 'Profile'}
-                </Text>
-                {user?.username && (
-                  <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 11 }}>
-                    @{user.username}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginHorizontal: collapsed ? 0 : spacing.md,
+            marginRight: collapsed ? 0 : spacing.lg,
+            marginTop: spacing.xs,
+          }}>
+            <Pressable
+              onPress={() => {
+                const slug = user?.username || user?.id;
+                if (slug) router.push(`/(tabs)/user/${slug}` as any);
+                else router.push('/(tabs)/profile');
+              }}
+              style={({ pressed, hovered }: any) => ({
+                flex: 1,
+                flexDirection: 'row' as const,
+                alignItems: 'center' as const,
+                gap: spacing.md,
+                paddingVertical: spacing.sm + 2,
+                paddingHorizontal: collapsed ? 0 : spacing.md,
+                borderRadius: radius.md,
+                backgroundColor: (isActive('profile') || (user?.username && pathname?.includes(`/user/${user.username}`)))
+                  ? colors.accentSubtle
+                  : hovered ? colors.glass : 'transparent',
+                opacity: pressed ? 0.7 : 1,
+                justifyContent: collapsed ? 'center' as const : 'flex-start' as const,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
+              })}
+            >
+              <Avatar uri={user?.image} name={user?.name} size="xs" />
+              {!collapsed && (
+                <View style={{ flex: 1 }}>
+                  <Text variant="caption" numberOfLines={1} style={{ fontWeight: '400' }}>
+                    {user?.name || user?.username || 'Profile'}
                   </Text>
-                )}
-              </View>
+                  {user?.username && (
+                    <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 11 }}>
+                      @{user.username}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </Pressable>
+            {/* Always-accessible Settings — no more hunting through the profile menu. */}
+            {!collapsed && (
+              <Pressable
+                onPress={() => router.push('/(tabs)/settings' as any)}
+                hitSlop={8}
+                style={({ hovered }: any) => ({
+                  padding: spacing.sm,
+                  borderRadius: radius.full,
+                  backgroundColor: hovered ? colors.glass : 'transparent',
+                  ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                })}
+              >
+                <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
+              </Pressable>
             )}
-          </Pressable>
+          </View>
         </View>
     </View>
   );
