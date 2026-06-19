@@ -707,18 +707,19 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               onPress={handleRefer}
               disabled={referBusy}
               style={({ pressed, hovered }: any) => ({
-                flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-                marginHorizontal: spacing.md, marginRight: spacing.lg,
-                paddingVertical: spacing.xs + 1, paddingHorizontal: spacing.md,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+                marginHorizontal: spacing.md, marginRight: spacing.lg, marginTop: spacing.xs,
+                paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
                 borderRadius: radius.md,
-                backgroundColor: hovered ? colors.glass : 'transparent',
+                borderWidth: 1, borderColor: `${colors.accent}55`,
+                backgroundColor: hovered ? colors.accentSubtle : 'transparent',
                 opacity: pressed ? 0.7 : 1,
                 ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
               })}
             >
-              <Ionicons name="gift-outline" size={15} color={colors.accent} />
-              <Text variant="caption" color={colors.accent} style={{ flex: 1 }} numberOfLines={1}>Refer friends + earn</Text>
-              <Ionicons name="copy-outline" size={13} color={colors.textMuted} />
+              <Ionicons name="gift-outline" size={14} color={colors.accent} />
+              <Text variant="caption" color={colors.accent} numberOfLines={1} style={{ fontFamily: 'Roboto-Medium' }}>Refer friends + earn</Text>
+              <Ionicons name="copy-outline" size={13} color={colors.accent} style={{ marginLeft: 2 }} />
             </Pressable>
           )}
         </View>

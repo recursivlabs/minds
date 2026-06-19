@@ -423,34 +423,22 @@ export default function FeedScreen() {
               <FeedSkeletons count={4} />
             ) : (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['6xl'], gap: spacing['2xl'] }}>
-                {activeTab === 'foryou' && refreshing ? (
-                  <ActivityIndicator color={colors.accent} size="large" />
-                ) : (
-                  <Ionicons name={activeTab === 'following' ? 'people-outline' : 'newspaper-outline'} size={40} color={colors.accent} />
-                )}
+                <Ionicons name={activeTab === 'foryou' || activeTab === 'following' ? 'people-outline' : 'newspaper-outline'} size={40} color={colors.accent} />
                 <Text variant="h2" color={colors.text} align="center">
-                  {activeTab === 'following'
-                    ? 'Following'
-                    : refreshing
-                      ? 'Your agent is working on it…'
-                      : 'Your agent is warming up'}
+                  {activeTab === 'foryou' ? 'Build your feed' : activeTab === 'following' ? 'Nothing here yet' : 'No posts yet'}
                 </Text>
                 <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
-                  {activeTab === 'following'
-                    ? 'Follow people to see their posts here.'
-                    : activeTab === 'foryou'
-                      ? (refreshing ? 'This usually takes 5-15 seconds.' : 'Tap below and your agent will curate fresh links from the open web.')
-                      : 'No posts yet. Be the first.'}
+                  {activeTab === 'foryou'
+                    ? 'Follow people and explore communities to fill your feed with great posts.'
+                    : activeTab === 'following'
+                      ? 'Follow people to see their posts here.'
+                      : 'Be the first to post.'}
                 </Text>
                 <View style={{ alignSelf: 'center' }}>
-                  {activeTab === 'foryou' ? (
-                    <Button onPress={refresh} disabled={refreshing} size="sm">
-                      {refreshing ? 'Curating…' : 'Curate now'}
-                    </Button>
+                  {activeTab === 'foryou' || activeTab === 'following' ? (
+                    <Button onPress={() => router.push('/(tabs)/discover')} size="sm">Discover people</Button>
                   ) : (
-                    <Button onPress={() => router.push(activeTab === 'following' ? '/(tabs)/explore' : '/(tabs)/create')} size="sm">
-                      {activeTab === 'following' ? 'Discover people' : 'Write a post'}
-                    </Button>
+                    <Button onPress={() => router.push('/(tabs)/create')} size="sm">Write a post</Button>
                   )}
                 </View>
               </View>
@@ -489,18 +477,21 @@ export default function FeedScreen() {
         </>
       )}
 
-      <Pressable
-        onPress={() => router.push('/(tabs)/create')}
-        style={({ pressed }) => ({
-          position: 'absolute', bottom: spacing.xl, right: spacing.xl,
-          width: 56, height: 56, borderRadius: 28,
-          backgroundColor: pressed ? colors.accentHover : colors.accent,
-          alignItems: 'center', justifyContent: 'center',
-          elevation: 4, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 8,
-        })}
-      >
-        <Ionicons name="add" size={28} color={colors.textOnAccent} />
-      </Pressable>
+      {/* Floating compose button — mobile only; on web the sidebar has Create. */}
+      {Platform.OS !== 'web' && (
+        <Pressable
+          onPress={() => router.push('/(tabs)/create')}
+          style={({ pressed }) => ({
+            position: 'absolute', bottom: spacing.xl, right: spacing.xl,
+            width: 56, height: 56, borderRadius: 28,
+            backgroundColor: pressed ? colors.accentHover : colors.accent,
+            alignItems: 'center', justifyContent: 'center',
+            elevation: 4, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 8,
+          })}
+        >
+          <Ionicons name="add" size={28} color={colors.textOnAccent} />
+        </Pressable>
+      )}
     </Container>
   );
 }
