@@ -1099,8 +1099,10 @@ export default function DiscoverScreen() {
   // agent's hand-picked reading list); fall back to score-ranked
   // network posts when AI is off so the page isn't empty for users
   // with the master switch flipped.
-  const aiEnabled = getPreference('aiEnabled');
-  const { posts, loading: postsLoading, loadMore: loadMorePosts, hasMore: hasMorePosts } = usePosts(aiEnabled ? 'personal' : 'score', 30);
+  // Discover is a real front page of network content — always the ranked
+  // network feed, never the per-user AI-curated 'personal' stream (empty for
+  // anyone without agent curation, which made Discover look broken/empty).
+  const { posts, loading: postsLoading, loadMore: loadMorePosts, hasMore: hasMorePosts } = usePosts('score', 30);
   const { communities, loading: commLoading } = useCommunities(50);
   const { agents, loading: agentsLoading } = useAgents(50);
   const { profiles, loading: profilesLoading } = useProfiles(50);

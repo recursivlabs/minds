@@ -209,6 +209,9 @@ export default function CreateScreen() {
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState('');
   const [mediaUris, setMediaUris] = React.useState<string[]>([]);
+  // Natural aspect ratio of a SINGLE selected image, captured on load, so the
+  // preview shows the whole image (X-style) instead of a cropped fixed box.
+  const [media1Aspect, setMedia1Aspect] = React.useState<number | null>(null);
   const [mediaIsVideo, setMediaIsVideo] = React.useState(false);
   // Duration of the selected video, in seconds, for the X-style duration pill.
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
@@ -598,15 +601,23 @@ export default function CreateScreen() {
         }}
       >
         <Pressable onPress={() => {
+          // In a builder mode (community/blog/agent/app), this is the persistent
+          // Create tab — going "back" stranded you in that mode. Instead, return
+          // to the default Post composer in-place.
+          if (mode !== 'post') {
+            setMode('post');
+            try { router.setParams({ mode: undefined } as any); } catch {}
+            return;
+          }
           // Save draft if there's content
-          if (mode === 'post' && content.trim()) {
+          if (content.trim()) {
             saveDraft(content, selectedCommunity?.id, selectedCommunity?.name);
           }
           // Delete draft if we had one loaded and user is canceling
           if (draftRef.current && !content.trim()) deleteDraft(draftRef.current);
           router.back();
         }} hitSlop={12}>
-          <Text variant="body" color={colors.textSecondary}>Cancel</Text>
+          <Text variant="body" color={colors.textSecondary}>{mode === 'post' ? 'Cancel' : '‹ New post'}</Text>
         </Pressable>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -983,7 +994,9 @@ export default function CreateScreen() {
                 //   4 → clean 2×2 grid
                 <View
                   style={{
-                    height: GRID_HEIGHT,
+                    // Single image renders at its NATURAL aspect (not a cropped
+                    // fixed box); 2+ use the fixed-height X-style grid.
+                    height: mediaUris.length === 1 ? undefined : GRID_HEIGHT,
                     flexDirection: 'row',
                     gap: GRID_GAP,
                     borderRadius: GRID_RADIUS,
@@ -1008,7 +1021,22 @@ export default function CreateScreen() {
                     const items = mediaUris.slice(0, 4);
                     const n = items.length;
 
-                    if (n === 1) return tile(items[0], 0);
+                    if (n === 1) {
+                      return (
+                        <View style={{ width: '100%', position: 'relative', overflow: 'hidden' }}>
+                          <Image
+                            source={{ uri: items[0] }}
+                            style={{ width: '100%', aspectRatio: media1Aspect || 1.5, maxHeight: 440, backgroundColor: colors.surfaceHover }}
+                            resizeMode="cover"
+                            onLoad={(e: any) => {
+                              const src = e?.source || e?.nativeEvent?.source;
+                              if (src?.width && src?.height) setMedia1Aspect(src.width / src.height);
+                            }}
+                          />
+                          <RemoveMediaButton small onPress={() => remove(0)} />
+                        </View>
+                      );
+                    }
                     if (n === 2) return items.map((u, i) => tile(u, i));
                     if (n === 3) {
                       return (
