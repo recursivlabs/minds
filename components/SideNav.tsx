@@ -578,18 +578,11 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         {!collapsed && (() => {
           // Collapsible section header: chevron + label toggles open/closed;
           // a separate "See all" navigates without toggling.
-          const SectionHeader = ({ label, open, onToggle, onSeeAll }: { label: string; open: boolean; onToggle: () => void; onSeeAll: () => void }) => (
+          const SectionHeader = ({ label, onSeeAll }: { label: string; onSeeAll: () => void }) => (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-              <Pressable
-                onPress={onToggle}
-                hitSlop={6}
-                style={({ hovered }: any) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) })}
-              >
-                <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={12} color={colors.textMuted} />
-                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                  {label}
-                </Text>
-              </Pressable>
+              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11, fontWeight: '400', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                {label}
+              </Text>
               <Pressable onPress={onSeeAll} hitSlop={8} style={() => ({ borderRadius: radius.sm, paddingHorizontal: spacing.xs, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) })}>
                 {({ hovered }: any) => (
                   <Text variant="caption" color={hovered ? colors.text : colors.textMuted} style={{ fontSize: 11 }}>See all</Text>
@@ -602,16 +595,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               {/* MESSAGES — the sidebar inbox is just DMs now; Communities moved
                   to a top-level nav item so this stays uncrowded. */}
               <View style={{ flex: 1, minHeight: 0 as any }}>
-                <SectionHeader label="Messages" open={messagesOpen} onToggle={() => setMessagesOpen(o => !o)} onSeeAll={() => router.push('/(tabs)/chat' as any)} />
-                {messagesOpen && (
-                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                    {recentDMs.length === 0 ? (
-                      <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>No recent activity</Text>
-                    ) : (
-                      recentDMs.map(renderInboxRow)
-                    )}
-                  </ScrollView>
-                )}
+                <SectionHeader label="Messages" onSeeAll={() => router.push('/(tabs)/chat' as any)} />
+                <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  {recentDMs.length === 0 ? (
+                    <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>No recent activity</Text>
+                  ) : (
+                    recentDMs.map(renderInboxRow)
+                  )}
+                </ScrollView>
               </View>
             </View>
           );

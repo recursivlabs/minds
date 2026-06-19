@@ -218,13 +218,20 @@ export default function FeedScreen() {
         await sdk.realtime.connect();
         const sock = (sdk as any).realtime?.socket;
         if (!sock) return;
-        const onFeedUpdate = () => setNewPostsAvailable(n => Math.min(n + 1, 99));
+        const onFeedUpdate = (data: any) => {
+          // Never count your OWN posts — you already see them the moment you
+          // post. Only OTHERS' new posts make the pill a real "fresh content
+          // arrived while you're here" signal (X-style).
+          const authorId = data?.authorId || data?.author_id || data?.author?.id;
+          if (authorId && user?.id && authorId === user.id) return;
+          setNewPostsAvailable(n => Math.min(n + 1, 99));
+        };
         sock.on('feed_update', onFeedUpdate);
         cleanup = () => sock.off?.('feed_update', onFeedUpdate);
       } catch {}
     })();
     return () => { cleanup?.(); };
-  }, [sdk]);
+  }, [sdk, user?.id]);
   // Reset the counter when switching tabs (each tab is its own stream).
   React.useEffect(() => { setNewPostsAvailable(0); }, [activeTab]);
   const loadNewPosts = React.useCallback(() => {
