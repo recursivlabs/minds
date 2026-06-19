@@ -138,30 +138,30 @@ export default function WalletScreen() {
           <Skeleton height={56} />
           <Skeleton height={80} />
         </View>
-      ) : loadError ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-          <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
-          <Text variant="body" color={colors.textSecondary} align="center">Couldn't load your wallet.</Text>
-          <Pressable
-            onPress={loadWallet}
-            style={({ pressed }) => ({ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full, backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 })}
-          >
-            <Text variant="bodyMedium" color={colors.textOnAccent}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : !wallet?.configured ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-          <View style={{ width: 72, height: 72, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="wallet-outline" size={34} color={colors.accent} />
-          </View>
-          <Text variant="h2" color={colors.text} align="center">Your wallet is on the way</Text>
-          <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 320, lineHeight: 24 }}>
-            A new token economy is coming to Minds. Earn, spend, and support the creators you believe in.
-          </Text>
-          <Text variant="caption" color={colors.textMuted}>Wallet setup is being configured</Text>
-        </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl }}>
+          {/* Connection status is a small, non-invasive chip — the wallet design
+              always renders, whether or not the wallet is reachable/active. */}
+          {loadError ? (
+            <Pressable
+              onPress={loadWallet}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start',
+                paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full,
+                backgroundColor: colors.errorMuted, opacity: pressed ? 0.7 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name="cloud-offline-outline" size={13} color={colors.error} />
+              <Text variant="caption" color={colors.error}>Couldn't reach your wallet · Tap to retry</Text>
+            </Pressable>
+          ) : !wallet?.configured ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.accentMuted }}>
+              <Ionicons name="time-outline" size={13} color={colors.accent} />
+              <Text variant="caption" color={colors.accent}>Wallet activating — balance available soon</Text>
+            </View>
+          ) : null}
+
           {/* Hero balance */}
           <Card padding="2xl" style={{ alignItems: 'center', gap: spacing.xs }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
@@ -169,12 +169,12 @@ export default function WalletScreen() {
               <Text variant="label" color={colors.textMuted}>NETWORK BALANCE</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginTop: spacing.sm }}>
-              <Text variant="hero" color={colors.text}>{wallet.balance ?? '0'}</Text>
+              <Text variant="hero" color={colors.text}>{wallet?.balance ?? '0'}</Text>
               <Text variant="h3" color={colors.textSecondary}>ETH</Text>
             </View>
             {/* SDK exposes no USD value — intentionally not shown. */}
 
-            {wallet.address && (
+            {wallet?.address && (
               <Pressable
                 onPress={handleCopyAddress}
                 style={({ pressed }) => ({
