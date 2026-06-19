@@ -32,7 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'create', label: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
   { name: 'wallet', label: 'Wallet', icon: 'wallet-outline', activeIcon: 'wallet' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
-  { name: 'admin', label: 'Admin', icon: 'shield-outline', activeIcon: 'shield' },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [];
@@ -668,6 +667,22 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                 </View>
               )}
             </Pressable>
+            {/* Admin shield — compact icon for platform admins instead of a
+                whole nav row. */}
+            {!collapsed && (user as any)?.role === 'admin' && (
+              <Pressable
+                onPress={() => router.push('/(tabs)/admin' as any)}
+                hitSlop={8}
+                style={({ hovered }: any) => ({
+                  padding: spacing.sm,
+                  borderRadius: radius.full,
+                  backgroundColor: hovered ? colors.glass : 'transparent',
+                  ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                })}
+              >
+                <Ionicons name="shield-outline" size={18} color={colors.textMuted} />
+              </Pressable>
+            )}
             {/* Always-accessible Settings — no more hunting through the profile menu. */}
             {!collapsed && (
               <Pressable
