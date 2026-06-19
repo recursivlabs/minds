@@ -1,9 +1,9 @@
 import * as React from 'react';
-import { View, ScrollView, Pressable, Switch, Platform, Linking } from 'react-native';
+import { View, ScrollView, Pressable, Platform, Linking } from 'react-native';
 import { showToast } from '../../components/Toast';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Button, Input, Card, Skeleton, Divider } from '../../components';
+import { Text, Button, Input, Card, Avatar, Skeleton } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
@@ -14,31 +14,72 @@ import { useTheme } from '../../lib/theme';
 import { useColors } from '../../lib/theme';
 import { openSupportConversation } from '../../lib/support';
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// A labeled group of settings. The header is a muted uppercase caption sitting
+// just above a Card; the Card uses horizontal-only padding so each SettingRow
+// owns its own vertical rhythm and the hairline separators run edge-to-edge.
+function Section({
+  title, children, footer,
+}: {
+  title: string;
+  children: React.ReactNode;
+  footer?: string;
+}) {
   const colors = useColors();
   return (
     <View style={{ gap: spacing.sm }}>
       <Text
-        variant="label"
+        variant="caption"
         color={colors.textMuted}
-        style={{ fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', marginLeft: spacing.xs }}
+        style={{
+          fontSize: 11,
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          fontFamily: 'Roboto-Medium',
+          marginLeft: spacing.md,
+        }}
       >
         {title}
       </Text>
-      <Card>{children}</Card>
+      <Card padding="lg" style={{ paddingVertical: 0 }}>{children}</Card>
+      {footer ? (
+        <Text variant="caption" color={colors.textMuted} style={{ marginLeft: spacing.md, marginTop: 2, lineHeight: 17 }}>
+          {footer}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-// One consistent row shape for the whole settings surface: label (+ optional
-// sublabel) on the left, and on the right either a control (Switch/Toggle), a
-// value string, and/or a chevron when the row navigates. Rows stack inside a
-// Card with hairline separators, so everything scans the same way (iOS-style).
+// Loose content (forms, pickers, session lists) that doesn't fit the strict
+// row grammar still needs the section's edge-to-edge padding model. This wraps
+// it in a single padded block with a top hairline so it lines up with rows.
+function SectionBlock({ children, first }: { children: React.ReactNode; first?: boolean }) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        paddingVertical: spacing.lg,
+        borderTopWidth: first ? 0 : 0.5,
+        borderTopColor: colors.borderSubtle,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+// One consistent row shape for the whole settings surface: an optional leading
+// icon in a tinted square, a label (+ optional sublabel), and on the right
+// either a control (Toggle), a value string, and/or a chevron when the row
+// navigates. Rows stack inside a Card with hairline separators so everything
+// scans the same way (iOS / X settings style).
 function SettingRow({
-  label, sublabel, right, value, onPress, first, destructive,
+  label, sublabel, icon, iconColor, right, value, onPress, first, destructive,
 }: {
   label: string;
   sublabel?: string;
+  icon?: React.ComponentProps<typeof Ionicons>['name'];
+  iconColor?: string;
   right?: React.ReactNode;
   value?: string;
   onPress?: () => void;
@@ -46,6 +87,7 @@ function SettingRow({
   destructive?: boolean;
 }) {
   const colors = useColors();
+  const tint = destructive ? colors.error : (iconColor || colors.accent);
   const body = (
     <View
       style={{
@@ -53,10 +95,25 @@ function SettingRow({
         alignItems: 'center',
         gap: spacing.md,
         paddingVertical: spacing.md,
+        minHeight: 52,
         borderTopWidth: first ? 0 : 0.5,
         borderTopColor: colors.borderSubtle,
       }}
     >
+      {icon ? (
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: radius.sm,
+            backgroundColor: destructive ? colors.errorMuted : colors.accentMuted,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name={icon} size={17} color={tint} />
+        </View>
+      ) : null}
       <View style={{ flex: 1 }}>
         <Text variant="body" color={destructive ? colors.error : colors.text}>{label}</Text>
         {sublabel ? (
@@ -68,7 +125,17 @@ function SettingRow({
     </View>
   );
   if (onPress) {
-    return <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>{body}</Pressable>;
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => ({
+          opacity: pressed ? 0.6 : 1,
+          ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+        })}
+      >
+        {body}
+      </Pressable>
+    );
   }
   return body;
 }
@@ -187,7 +254,7 @@ function TwoFactorSetup() {
 
   if (step === 'setup' && setupUri) {
     return (
-      <View style={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.md, paddingVertical: spacing.lg }}>
         <Text variant="label" color={colors.textMuted}>Set up authenticator app</Text>
         <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22 }}>
           Scan this code with your authenticator app (Google Authenticator, Authy, etc.):
@@ -216,10 +283,22 @@ function TwoFactorSetup() {
   }
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs }}>
-      <View>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, minHeight: 52 }}>
+      <View
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: radius.sm,
+          backgroundColor: colors.accentMuted,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name="shield-checkmark-outline" size={17} color={colors.accent} />
+      </View>
+      <View style={{ flex: 1 }}>
         <Text variant="body">Two-factor authentication</Text>
-        <Text variant="caption" color={enabled ? colors.success : colors.textMuted}>
+        <Text variant="caption" color={enabled ? colors.success : colors.textMuted} style={{ marginTop: 2 }}>
           {enabled ? 'Enabled' : 'Not enabled'}
         </Text>
       </View>
@@ -366,7 +445,8 @@ export default function SettingsScreen() {
     return (
       <Container safeTop maxWidth={720}>
         <View style={{ paddingTop: spacing['3xl'], gap: spacing.xl }}>
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} height={80} />)}
+          <Skeleton height={88} />
+          {[1, 2, 3].map(i => <Skeleton key={i} height={80} />)}
         </View>
       </Container>
     );
@@ -379,102 +459,139 @@ export default function SettingsScreen() {
       <ScreenHeader title="Settings" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: spacing['5xl'] }}>
-        <View style={{ width: '100%', maxWidth: 720, padding: spacing.xl, gap: spacing.xl }}>
+        <View style={{ width: '100%', maxWidth: 720, padding: spacing.xl, gap: spacing['2xl'] }}>
         {statusMsg && (
-          <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' }}>
+          <View style={{ backgroundColor: colors.successMuted, padding: spacing.md, borderRadius: radius.md, alignItems: 'center', borderWidth: 0.5, borderColor: colors.borderSubtle }}>
             <Text variant="body" color={colors.success}>{statusMsg}</Text>
           </View>
         )}
+
+        {/* Account header — avatar + name + handle, tappable straight to the
+           profile so the most-used jump is one tap from the top. */}
+        <Pressable
+          onPress={() => router.push({ pathname: '/(tabs)/user/[username]', params: { username: user?.username || user?.id || '' } } as any)}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.7 : 1,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+          })}
+        >
+          <Card variant="raised" padding="lg" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+            <Avatar uri={user?.image} name={user?.name} size="lg" />
+            <View style={{ flex: 1 }}>
+              <Text variant="h3" numberOfLines={1}>{user?.name || user?.username || 'Your profile'}</Text>
+              {user?.username ? (
+                <Text variant="body" color={colors.textMuted} numberOfLines={1} style={{ marginTop: 2 }}>@{user.username}</Text>
+              ) : null}
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </Card>
+        </Pressable>
+
         <Section title="Account">
-          <SettingRow first label="Email" value={user?.email || 'Not set'} />
-          <SettingRow label="Change password" onPress={() => setShowPwForm(s => !s)} />
+          <SettingRow first icon="mail-outline" label="Email" value={user?.email || 'Not set'} />
+          <SettingRow icon="key-outline" label="Change password" onPress={() => setShowPwForm(s => !s)} />
           {showPwForm && (
-            <View style={{ gap: spacing.sm, paddingBottom: spacing.md }}>
-              <Input secureTextEntry value={pw.current} onChangeText={t => setPw(p => ({ ...p, current: t }))} placeholder="Current password" />
-              <Input secureTextEntry value={pw.next} onChangeText={t => setPw(p => ({ ...p, next: t }))} placeholder="New password" />
-              <Button onPress={changePassword} loading={saving === 'pw'} size="sm" disabled={!pw.current || !pw.next}>Change Password</Button>
-            </View>
+            <SectionBlock>
+              <View style={{ gap: spacing.sm }}>
+                <Input secureTextEntry value={pw.current} onChangeText={t => setPw(p => ({ ...p, current: t }))} placeholder="Current password" />
+                <Input secureTextEntry value={pw.next} onChangeText={t => setPw(p => ({ ...p, next: t }))} placeholder="New password" />
+                <Button onPress={changePassword} loading={saving === 'pw'} size="sm" disabled={!pw.current || !pw.next}>Change Password</Button>
+              </View>
+            </SectionBlock>
           )}
-          <SettingRow label="Change email" onPress={() => setShowEmailForm(s => !s)} />
+          <SettingRow icon="at-outline" label="Change email" onPress={() => setShowEmailForm(s => !s)} />
           {showEmailForm && (
-            <View style={{ gap: spacing.sm, paddingBottom: spacing.md }}>
-              <Input value={newEmail} onChangeText={setNewEmail} placeholder="new@email.com" keyboardType="email-address" autoCapitalize="none" />
-              <Input secureTextEntry value={emailPw} onChangeText={setEmailPw} placeholder="Confirm with your password" />
-              <Button onPress={changeEmail} loading={saving === 'email'} size="sm" disabled={!newEmail || !emailPw}>Change Email</Button>
-            </View>
+            <SectionBlock>
+              <View style={{ gap: spacing.sm }}>
+                <Input value={newEmail} onChangeText={setNewEmail} placeholder="new@email.com" keyboardType="email-address" autoCapitalize="none" />
+                <Input secureTextEntry value={emailPw} onChangeText={setEmailPw} placeholder="Confirm with your password" />
+                <Button onPress={changeEmail} loading={saving === 'email'} size="sm" disabled={!newEmail || !emailPw}>Change Email</Button>
+              </View>
+            </SectionBlock>
           )}
         </Section>
 
         <Section title="Security">
           <TwoFactorSetup />
-          <Divider marginVertical={spacing.lg} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-            <Text variant="label" color={colors.textMuted}>
-              Active Sessions{sessions.length > 0 ? ` (${sessions.length})` : ''}
-            </Text>
-            {sessions.filter((s: any) => !s.is_current).length > 0 && (
-              <Button onPress={revokeOtherSessions} loading={saving === 'sessions'} variant="ghost" size="sm" accentColor={colors.error}>
-                Revoke all others
-              </Button>
-            )}
-          </View>
-          {sessions.length === 0 ? (
-            <Text variant="caption" color={colors.textMuted}>No active sessions</Text>
-          ) : (() => {
-            // Current device first, then the rest; collapse the long tail so a
-            // pile of sessions doesn't swamp the screen.
-            const ordered = [...sessions].sort((a: any, b: any) => (b.is_current ? 1 : 0) - (a.is_current ? 1 : 0));
-            const visible = showAllSessions ? ordered : ordered.slice(0, 4);
-            return (
-              <>
-                {visible.map((s: any) => (
-                  <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                        <Text variant="bodyMedium">{friendlyUA(s.user_agent)}</Text>
-                        {s.is_current && <Text variant="caption" color={colors.accent}>This device</Text>}
-                      </View>
-                      <Text variant="caption" color={colors.textMuted}>
-                        {[s.ip_address, s.created_at ? `since ${new Date(s.created_at).toLocaleDateString()}` : ''].filter(Boolean).join('  ·  ')}
-                      </Text>
-                    </View>
-                    {!s.is_current && <Button onPress={() => revokeSession(s.id)} variant="ghost" size="sm">Revoke</Button>}
-                  </View>
-                ))}
-                {ordered.length > 4 && (
-                  <Pressable onPress={() => setShowAllSessions(v => !v)} style={{ paddingVertical: spacing.sm }}>
-                    <Text variant="caption" color={colors.accent}>
-                      {showAllSessions ? 'Show fewer' : `Show all ${ordered.length} sessions`}
-                    </Text>
-                  </Pressable>
-                )}
-              </>
-            );
-          })()}
-          <Divider marginVertical={spacing.lg} />
-          <Text variant="label" color={colors.textMuted} style={{ marginBottom: spacing.sm }}>Login History</Text>
-          {loginHistory.length === 0 ? (
-            <Text variant="caption" color={colors.textMuted}>No login history</Text>
-          ) : loginHistory.map((e: any, i: number) => (
-            <View key={e.id || i} style={{ paddingVertical: spacing.xs }}>
-              <Text variant="body">
-                {friendlyUA(e.user_agent)}{e.success === false ? '  ·  failed' : ''}
+
+          <SectionBlock>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+              <Text variant="caption" color={colors.textMuted} style={{ textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'Roboto-Medium' }}>
+                Active sessions{sessions.length > 0 ? ` · ${sessions.length}` : ''}
               </Text>
-              <Text variant="caption" color={colors.textMuted}>
-                {[e.ip_address, e.created_at ? new Date(e.created_at).toLocaleString() : ''].filter(Boolean).join('  ·  ')}
-              </Text>
+              {sessions.filter((s: any) => !s.is_current).length > 0 && (
+                <Button onPress={revokeOtherSessions} loading={saving === 'sessions'} variant="ghost" size="sm" accentColor={colors.error}>
+                  Revoke all others
+                </Button>
+              )}
             </View>
-          ))}
+            {sessions.length === 0 ? (
+              <Text variant="caption" color={colors.textMuted}>No active sessions</Text>
+            ) : (() => {
+              // Current device first, then the rest; collapse the long tail so a
+              // pile of sessions doesn't swamp the screen.
+              const ordered = [...sessions].sort((a: any, b: any) => (b.is_current ? 1 : 0) - (a.is_current ? 1 : 0));
+              const visible = showAllSessions ? ordered : ordered.slice(0, 4);
+              return (
+                <>
+                  {visible.map((s: any) => (
+                    <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                          <Text variant="bodyMedium">{friendlyUA(s.user_agent)}</Text>
+                          {s.is_current && <Text variant="caption" color={colors.accent}>This device</Text>}
+                        </View>
+                        <Text variant="caption" color={colors.textMuted}>
+                          {[s.ip_address, s.created_at ? `since ${new Date(s.created_at).toLocaleDateString()}` : ''].filter(Boolean).join('  ·  ')}
+                        </Text>
+                      </View>
+                      {!s.is_current && <Button onPress={() => revokeSession(s.id)} variant="ghost" size="sm">Revoke</Button>}
+                    </View>
+                  ))}
+                  {ordered.length > 4 && (
+                    <Pressable onPress={() => setShowAllSessions(v => !v)} style={{ paddingVertical: spacing.sm }}>
+                      <Text variant="caption" color={colors.accent}>
+                        {showAllSessions ? 'Show fewer' : `Show all ${ordered.length} sessions`}
+                      </Text>
+                    </Pressable>
+                  )}
+                </>
+              );
+            })()}
+          </SectionBlock>
+
+          <SectionBlock>
+            <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'Roboto-Medium' }}>
+              Login history
+            </Text>
+            {loginHistory.length === 0 ? (
+              <Text variant="caption" color={colors.textMuted}>No login history</Text>
+            ) : loginHistory.map((e: any, i: number) => (
+              <View key={e.id || i} style={{ paddingVertical: spacing.xs }}>
+                <Text variant="body">
+                  {friendlyUA(e.user_agent)}{e.success === false ? '  ·  failed' : ''}
+                </Text>
+                <Text variant="caption" color={colors.textMuted}>
+                  {[e.ip_address, e.created_at ? new Date(e.created_at).toLocaleString() : ''].filter(Boolean).join('  ·  ')}
+                </Text>
+              </View>
+            ))}
+          </SectionBlock>
         </Section>
 
         <Section title="Privacy">
-          <SettingRow first label="Public profile" right={<Toggle value={privacy.profilePublic} onValueChange={v => togglePrivacy('profilePublic', v)} />} />
-          <SettingRow label="Show email on profile" right={<Toggle value={privacy.showEmail} onValueChange={v => togglePrivacy('showEmail', v)} />} />
+          <SettingRow first icon="globe-outline" label="Public profile" right={<Toggle value={privacy.profilePublic} onValueChange={v => togglePrivacy('profilePublic', v)} />} />
+          <SettingRow icon="mail-unread-outline" label="Show email on profile" right={<Toggle value={privacy.showEmail} onValueChange={v => togglePrivacy('showEmail', v)} />} />
         </Section>
 
         <Section title="Appearance">
-          <View style={{ paddingVertical: spacing.xs, gap: spacing.sm }}>
-            <Text variant="body">Theme</Text>
+          <SectionBlock first>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
+              <View style={{ width: 30, height: 30, borderRadius: radius.sm, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="contrast-outline" size={17} color={colors.accent} />
+              </View>
+              <Text variant="body" style={{ flex: 1 }}>Theme</Text>
+            </View>
             <View style={{ flexDirection: 'row', backgroundColor: colors.glass, borderRadius: radius.md, padding: 2, borderWidth: 0.5, borderColor: colors.borderSubtle }}>
               {(['system', 'light', 'dark'] as const).map(opt => {
                 const active = themeMode === opt;
@@ -482,23 +599,33 @@ export default function SettingsScreen() {
                   <Pressable
                     key={opt}
                     onPress={() => setThemeMode(opt)}
-                    style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: active ? colors.surfaceRaised : 'transparent', alignItems: 'center' }}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      paddingVertical: spacing.sm,
+                      borderRadius: radius.sm,
+                      backgroundColor: active ? colors.surfaceRaised : 'transparent',
+                      alignItems: 'center',
+                      opacity: pressed ? 0.8 : 1,
+                      ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                    })}
                   >
                     <Text variant="bodyMedium" color={active ? colors.text : colors.textMuted} style={{ textTransform: 'capitalize' }}>{opt}</Text>
                   </Pressable>
                 );
               })}
             </View>
-          </View>
-          <SettingRow label="Language" value="English" />
+          </SectionBlock>
+          <SettingRow icon="language-outline" label="Language" value="English" />
         </Section>
 
-        <Section title="Feed">
-          <View style={{ paddingVertical: spacing.xs }}>
-            <Text variant="body" style={{ marginBottom: spacing.sm }}>Default feed</Text>
-            <Text variant="caption" color={colors.textMuted} style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-              Which feed opens when you launch the app. You can always switch tabs once you're in.
-            </Text>
+        <Section title="Feed" footer="Which feed opens when you launch the app. You can always switch tabs once you're in.">
+          <SectionBlock first>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
+              <View style={{ width: 30, height: 30, borderRadius: radius.sm, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="newspaper-outline" size={17} color={colors.accent} />
+              </View>
+              <Text variant="body" style={{ flex: 1 }}>Default feed</Text>
+            </View>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               {[
                 { key: 'foryou' as const, label: 'For You' },
@@ -517,6 +644,7 @@ export default function SettingsScreen() {
                       borderColor: isActive ? colors.accent : colors.borderSubtle,
                       backgroundColor: isActive ? colors.accentMuted : 'transparent',
                       opacity: pressed ? 0.7 : 1,
+                      ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
                     })}
                   >
                     <Text variant="bodyMedium" color={isActive ? colors.accent : colors.text}>{opt.label}</Text>
@@ -524,16 +652,18 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
-          </View>
+          </SectionBlock>
         </Section>
 
         <Section title="Content">
           <SettingRow
             first
+            icon="eye-off-outline"
             label="Show NSFW content"
             right={<Toggle value={getPreference('showNsfw')} onValueChange={v => { setPreference('showNsfw', v); setSettingsTick(t => t + 1); }} />}
           />
           <SettingRow
+            icon="play-circle-outline"
             label="Autoplay videos"
             right={<Toggle value={getPreference('autoplayVideo')} onValueChange={v => { setPreference('autoplayVideo', v); setSettingsTick(t => t + 1); }} />}
           />
@@ -544,11 +674,13 @@ export default function SettingsScreen() {
              dismissed the For You CTA can still find the setup flow. */}
           <SettingRow
             first
+            icon="sparkles-outline"
             label="Set up your personal AI agent"
             sublabel="Name, model, system prompt, secure context, and curation preferences. Change anything anytime."
             onPress={() => router.push('/agent' as any)}
           />
           <SettingRow
+            icon="hardware-chip-outline"
             label="Use my personal AI agent"
             sublabel="Off: clean Minds with no AI mediation. For You falls back to chronological; agent hidden from chat. You can still post, follow, comment, and DM."
             right={<Toggle value={getPreference('aiEnabled')} onValueChange={v => { setPreference('aiEnabled', v); }} />}
@@ -556,25 +688,27 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Notifications">
-          <SettingRow first label="Replies to my posts" right={<Toggle value={notifPrefs.replies} onValueChange={v => toggleNotif('replies', v)} />} />
-          <SettingRow label="New followers" right={<Toggle value={notifPrefs.follows} onValueChange={v => toggleNotif('follows', v)} />} />
-          <SettingRow label="Upvotes on my posts" right={<Toggle value={notifPrefs.votes} onValueChange={v => toggleNotif('votes', v)} />} />
-          <SettingRow label="Community activity" right={<Toggle value={notifPrefs.community} onValueChange={v => toggleNotif('community', v)} />} />
+          <SettingRow first icon="chatbubble-outline" label="Replies to my posts" right={<Toggle value={notifPrefs.replies} onValueChange={v => toggleNotif('replies', v)} />} />
+          <SettingRow icon="person-add-outline" label="New followers" right={<Toggle value={notifPrefs.follows} onValueChange={v => toggleNotif('follows', v)} />} />
+          <SettingRow icon="arrow-up-circle-outline" label="Upvotes on my posts" right={<Toggle value={notifPrefs.votes} onValueChange={v => toggleNotif('votes', v)} />} />
+          <SettingRow icon="people-outline" label="Community activity" right={<Toggle value={notifPrefs.community} onValueChange={v => toggleNotif('community', v)} />} />
         </Section>
 
         <Section title="Data">
-          <Button
-            onPress={() => {
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                window.localStorage.removeItem('minds:cache');
-                showMsg('Cache cleared. Reload to see effect.');
-              }
-            }}
-            variant="ghost"
-            size="sm"
-          >
-            Clear Cache
-          </Button>
+          <SectionBlock first>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Button
+                onPress={() => {
+                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    window.localStorage.removeItem('minds:cache');
+                    showMsg('Cache cleared. Reload to see effect.');
+                  }
+                }}
+                variant="secondary"
+                size="sm"
+              >
+                Clear Cache
+              </Button>
           <Button
             onPress={async () => {
               if (!sdk) return;
@@ -606,11 +740,14 @@ export default function SettingsScreen() {
           >
             Export My Data
           </Button>
+            </View>
+          </SectionBlock>
         </Section>
 
         <Section title="Help & feedback">
           <SettingRow
             first
+            icon="help-buoy-outline"
             label="Message Minds Support"
             sublabel="Get help from our support assistant, any time"
             onPress={async () => {
@@ -621,39 +758,37 @@ export default function SettingsScreen() {
               else showMsg('Support is unavailable right now', true);
             }}
           />
-          <SettingRow label="Feedback & feature requests" sublabel="Suggest ideas, report problems, and upvote what matters" onPress={() => router.push('/(tabs)/feedback' as any)} />
+          <SettingRow icon="bulb-outline" label="Feedback & feature requests" sublabel="Suggest ideas, report problems, and upvote what matters" onPress={() => router.push('/(tabs)/feedback' as any)} />
         </Section>
 
         <Section title="Legal">
-          <SettingRow first label="Terms of Service" onPress={() => Linking.openURL('https://minds.com/p/terms')} />
-          <SettingRow label="Privacy Policy" onPress={() => Linking.openURL('https://minds.com/p/privacy')} />
-          <SettingRow label="Community Guidelines" onPress={() => Linking.openURL('https://minds.com/p/community-guidelines')} />
+          <SettingRow first icon="document-text-outline" label="Terms of Service" onPress={() => Linking.openURL('https://minds.com/p/terms')} />
+          <SettingRow icon="lock-closed-outline" label="Privacy Policy" onPress={() => Linking.openURL('https://minds.com/p/privacy')} />
+          <SettingRow icon="people-circle-outline" label="Community Guidelines" onPress={() => Linking.openURL('https://minds.com/p/community-guidelines')} />
         </Section>
 
-        <Section title="Danger Zone">
-          {!deleteConfirm ? (
-            <Button onPress={() => setDeleteConfirm(true)} variant="secondary" size="sm" accentColor={colors.error}>Delete Account</Button>
-          ) : (
-            <View style={{ gap: spacing.md }}>
-              <Text variant="body" color={colors.error}>This cannot be undone. Enter your password to confirm.</Text>
-              <Input secureTextEntry value={deletePw} onChangeText={setDeletePw} placeholder="Your password" />
-              <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                <Button onPress={() => { setDeleteConfirm(false); setDeletePw(''); }} variant="ghost" size="sm">Cancel</Button>
-                <Button onPress={deleteAccount} loading={saving === 'delete'} size="sm" accentColor={colors.error} disabled={!deletePw}>Confirm Delete</Button>
+        <Section title="Danger zone">
+          <SectionBlock first>
+            {!deleteConfirm ? (
+              <Button onPress={() => setDeleteConfirm(true)} variant="secondary" size="sm" accentColor={colors.error}>Delete Account</Button>
+            ) : (
+              <View style={{ gap: spacing.md }}>
+                <Text variant="body" color={colors.error}>This cannot be undone. Enter your password to confirm.</Text>
+                <Input secureTextEntry value={deletePw} onChangeText={setDeletePw} placeholder="Your password" />
+                <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                  <Button onPress={() => { setDeleteConfirm(false); setDeletePw(''); }} variant="ghost" size="sm">Cancel</Button>
+                  <Button onPress={deleteAccount} loading={saving === 'delete'} size="sm" accentColor={colors.error} disabled={!deletePw}>Confirm Delete</Button>
+                </View>
               </View>
-            </View>
-          )}
+            )}
+          </SectionBlock>
         </Section>
 
-        <Section title="About">
-          <Text variant="body" color={colors.textSecondary}>Minds 2.0</Text>
-          <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-            Built on Recursiv · Powered by open source
-          </Text>
-          <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.xs }}>
-            Version 2.0.0
-          </Text>
-        </Section>
+        <View style={{ alignItems: 'center', gap: 2, paddingTop: spacing.sm, paddingBottom: spacing.lg }}>
+          <Text variant="bodyMedium" color={colors.textSecondary}>Minds 2.0</Text>
+          <Text variant="caption" color={colors.textMuted}>Built on Recursiv · Powered by open source</Text>
+          <Text variant="caption" color={colors.textMuted}>Version 2.0.0</Text>
+        </View>
         </View>
       </ScrollView>
     </Container>

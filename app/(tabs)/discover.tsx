@@ -37,24 +37,53 @@ function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; o
   );
 }
 
-// Topic chips that filter the Discover canvas. Short, opinionated set
-// chosen to match the curator's top categories. Adding more = more
-// noise; keeping under 8 keeps the row scannable.
-const TOPIC_CHIPS: { key: string; label: string; match: RegExp }[] = [
-  { key: 'all', label: 'All', match: /.*/ },
-  { key: 'ai', label: 'AI', match: /\b(ai|llm|gpt|claude|anthropic|openai|gemini|agent|model|inference)\b/i },
-  { key: 'crypto', label: 'Crypto', match: /\b(crypto|bitcoin|btc|eth|sol|defi|wallet|chain|blockchain|stablecoin)\b/i },
-  { key: 'tech', label: 'Tech', match: /\b(startup|founder|product|launch|release|app|software|github|api|sdk)\b/i },
-  { key: 'science', label: 'Science', match: /\b(research|study|scientist|biology|physics|paper|nature|arxiv|theory)\b/i },
-  { key: 'culture', label: 'Culture', match: /\b(film|music|book|art|essay|writer|culture|history|design)\b/i },
-  { key: 'world', label: 'World', match: /\b(china|russia|europe|asia|africa|government|election|war|policy)\b/i },
-];
+// ── Trending topics, derived live from the loaded posts ──
+// The old TOPIC_CHIPS were hardcoded regex buckets that pretended to
+// classify every post. They were a relic. Instead we now surface the
+// hashtags/tags that are ACTUALLY trending in the day's reading list —
+// counted from real post data — so the row is alive and changes with the
+// feed. Tapping a topic routes into the existing search path (no new
+// filtering machinery), keeping the canvas honest.
 
-function topicMatches(post: any, topicKey: string): boolean {
-  const chip = TOPIC_CHIPS.find((c) => c.key === topicKey);
-  if (!chip) return true;
-  const hay = `${post.title || ''} ${post.content || ''} ${post.tags?.join(' ') || ''}`;
-  return chip.match.test(hay);
+type TrendingTopic = { tag: string; count: number };
+
+function extractHashtags(text: string | null | undefined): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  const re = /#([\p{L}\p{N}_]{2,30})/gu;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) out.push(m[1].toLowerCase());
+  return out;
+}
+
+function computeTrendingTopics(posts: any[], limit = 10): TrendingTopic[] {
+  const counts = new Map<string, { display: string; count: number }>();
+  for (const p of posts || []) {
+    const tags: string[] = [];
+    // Explicit tags on the post take priority, then inline #hashtags.
+    if (Array.isArray(p?.tags)) {
+      for (const t of p.tags) {
+        const clean = String(t).replace(/^#/, '').trim();
+        if (clean.length >= 2) tags.push(clean);
+      }
+    }
+    tags.push(...extractHashtags(p?.content));
+    tags.push(...extractHashtags(p?.title));
+    const seen = new Set<string>();
+    for (const raw of tags) {
+      const key = raw.toLowerCase();
+      if (seen.has(key)) continue; // count each tag once per post
+      seen.add(key);
+      const prev = counts.get(key);
+      if (prev) prev.count += 1;
+      else counts.set(key, { display: raw, count: 1 });
+    }
+  }
+  return [...counts.values()]
+    .filter((t) => t.count >= 1)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((t) => ({ tag: t.display, count: t.count }));
 }
 
 function getDomain(url: string | null | undefined): string {
@@ -81,15 +110,13 @@ function postSource(post: any): string {
 }
 
 function postCategory(post: any): string {
-  // Cheap classifier: walks the topic chips in order and picks the
-  // first that matches. Fed back into the dense-row eyebrow so each
-  // headline reads "AI · TechCrunch" or "CRYPTO · Bloomberg" instead
-  // of just a hostname.
-  for (const chip of TOPIC_CHIPS) {
-    if (chip.key === 'all') continue;
-    if (topicMatches(post, chip.key)) return chip.label.toUpperCase();
-  }
-  return '';
+  // Eyebrow label for headlines. Uses the post's own first tag/hashtag
+  // (real data) so a row reads "AI · TechCrunch" instead of a guessed
+  // bucket. Empty when the post carries no tags.
+  const tag = Array.isArray(post?.tags) && post.tags.length
+    ? String(post.tags[0]).replace(/^#/, '')
+    : extractHashtags(post?.content)[0] || extractHashtags(post?.title)[0] || '';
+  return tag ? tag.toUpperCase() : '';
 }
 
 function postAITake(post: any): string {
@@ -212,38 +239,61 @@ function DenseHeadline({ post, onPress }: { post: any; onPress: () => void }) {
   );
 }
 
-function TopicChipRow({ chips, active, onChange }: { chips: typeof TOPIC_CHIPS; active: string; onChange: (k: string) => void }) {
+// Live trending-topics rail. Each chip is a real hashtag counted from
+// the loaded posts; tapping it searches that topic via the existing
+// search path. The leading "Trending" label + flame icon make it read
+// as a pulse on the network rather than a static filter set.
+function TrendingTopicsRow({ topics, onPick }: { topics: TrendingTopic[]; onPick: (tag: string) => void }) {
   const colors = useColors();
+  if (!topics.length) return null;
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.sm }}
-    >
-      {chips.map((c) => {
-        const isActive = active === c.key;
-        return (
+    <View>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.lg,
+          paddingBottom: spacing.xs,
+        }}
+      >
+        <Ionicons name="flame" size={13} color={colors.accent} />
+        <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.2, fontSize: 10 }}>
+          TRENDING NOW
+        </Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm }}
+      >
+        {topics.map((t) => (
           <Pressable
-            key={c.key}
-            onPress={() => onChange(c.key)}
+            key={t.tag}
+            onPress={() => onPick(t.tag)}
             style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.xs,
               paddingHorizontal: spacing.md,
               paddingVertical: 6,
               borderRadius: radius.full,
               borderWidth: 1,
-              borderColor: isActive ? colors.accent : colors.borderSubtle,
-              backgroundColor: isActive ? colors.accentMuted : 'transparent',
-              opacity: pressed ? 0.7 : 1,
+              borderColor: colors.borderSubtle,
+              backgroundColor: pressed ? colors.accentMuted : colors.surface,
               marginRight: spacing.sm,
             })}
           >
-            <Text variant="caption" color={isActive ? colors.accent : colors.textMuted} style={{ fontSize: 12 }}>
-              {c.label}
-            </Text>
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>#</Text>
+            <Text variant="caption" color={colors.text} style={{ fontSize: 12 }}>{t.tag}</Text>
+            {t.count > 1 ? (
+              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{t.count}</Text>
+            ) : null}
           </Pressable>
-        );
-      })}
-    </ScrollView>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -650,9 +700,6 @@ export default function DiscoverScreen() {
     if (typeof params.q === 'string' && params.q !== searchQuery) setSearchQuery(params.q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.q]);
-  const [activeTopic, setActiveTopic] = React.useState<string>('all');
-  const topicChips = React.useMemo(() => TOPIC_CHIPS, []);
-
   // Followers/following mode — kept as-is, takes over the screen
   const [followList, setFollowList] = React.useState<any[]>([]);
   const [followListLoading, setFollowListLoading] = React.useState(false);
@@ -719,7 +766,19 @@ export default function DiscoverScreen() {
     );
   };
 
+  // Tapping a trending topic routes into the existing search path. We
+  // land on the Posts tab and drop the query into the box, which the
+  // useSearchPosts hook + isSearching gating already handle.
+  const goToTopic = React.useCallback((tag: string) => {
+    setActiveTab('posts');
+    setSearchQuery(`#${tag}`);
+  }, []);
+
   const isSearching = searchQuery.trim().length > 0;
+
+  // Live trending topics from the loaded reading list. Recomputed only
+  // when the post set changes.
+  const trendingTopics = React.useMemo(() => computeTrendingTopics(posts || []), [posts]);
 
   // ── Discover canvas: hero + dense column ──
   // Drudge meets Reddit front page meets your AI's editorial brief.
@@ -752,26 +811,109 @@ export default function DiscoverScreen() {
         </View>
       );
     }
-    // Filtered set drives both hero pick and dense column. When the
-    // user selects a topic chip, both update together.
-    const filtered = activeTopic
-      ? (posts || []).filter((p: any) => topicMatches(p, activeTopic))
-      : (posts || []);
-    const hero = filtered.find((p: any) => p.image || p.previewImage) || filtered[0];
-    const dense = filtered.filter((p: any) => p.id !== hero?.id).slice(0, 29);
+    const hero = (posts || []).find((p: any) => p.image || p.previewImage) || (posts || [])[0];
+    const dense = (posts || []).filter((p: any) => p.id !== hero?.id).slice(0, 29);
+    // Split the dense column so curated carousels (people, communities,
+    // agents) break up the headline run and the page reads as a true
+    // front page instead of one long list.
+    const topHeadlines = dense.slice(0, 6);
+    const restHeadlines = dense.slice(6);
+
+    // Curated rails, ranked so the strongest items lead.
+    const peopleToFollow = [...(profiles || [])]
+      .sort((a: any, b: any) => profileFollowerCount(b) - profileFollowerCount(a))
+      .slice(0, 10);
+    const activeCommunities = [...(communities || [])]
+      .sort((a: any, b: any) =>
+        ((b.memberCount || b.member_count || 0) + (b.postCount || b.post_count || 0)) -
+        ((a.memberCount || a.member_count || 0) + (a.postCount || a.post_count || 0)))
+      .slice(0, 10);
+    const topAgents = (agents || []).slice(0, 10);
 
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['3xl'] }}>
-        <TopicChipRow active={activeTopic} onChange={setActiveTopic} chips={topicChips} />
+        <TrendingTopicsRow topics={trendingTopics} onPick={goToTopic} />
         {hero && <DiscoverHero post={hero} onPress={() => router.push(`/(tabs)/post/${hero.id}` as any)} />}
         <View style={{ height: 1, backgroundColor: colors.borderSubtle, marginTop: spacing.lg }} />
-        {dense.map((p: any) => (
+
+        {topHeadlines.map((p: any) => (
           <DenseHeadline
             key={p.id}
             post={p}
             onPress={() => router.push(`/(tabs)/post/${p.id}` as any)}
           />
         ))}
+
+        {(profilesLoading || peopleToFollow.length > 0) && (
+          <>
+            <SectionHeader
+              title="People to follow"
+              subtitle="Voices worth a spot on your feed"
+              onSeeAll={() => { setActiveTab('people'); router.setParams({ tab: 'people' }); }}
+            />
+            <HorizontalCarousel loading={profilesLoading && peopleToFollow.length === 0}>
+              {peopleToFollow.map((person: any) => (
+                <PersonTile
+                  key={person.id}
+                  person={person}
+                  onPress={() => router.push(`/(tabs)/user/${person.username || person.id}` as any)}
+                />
+              ))}
+            </HorizontalCarousel>
+          </>
+        )}
+
+        {(commLoading || activeCommunities.length > 0) && (
+          <>
+            <SectionHeader
+              title="Active communities"
+              subtitle="Where the conversation is happening"
+              onSeeAll={() => { setActiveTab('communities'); router.setParams({ tab: 'communities' }); }}
+            />
+            <HorizontalCarousel loading={commLoading && activeCommunities.length === 0}>
+              {activeCommunities.map((community: any) => (
+                <CommunityTile
+                  key={community.id}
+                  community={community}
+                  onPress={() => router.push(`/(tabs)/community/${community.slug || community.id}` as any)}
+                />
+              ))}
+            </HorizontalCarousel>
+          </>
+        )}
+
+        {restHeadlines.length > 0 && (
+          <>
+            <SectionHeader title="More in today's brief" />
+            {restHeadlines.map((p: any) => (
+              <DenseHeadline
+                key={p.id}
+                post={p}
+                onPress={() => router.push(`/(tabs)/post/${p.id}` as any)}
+              />
+            ))}
+          </>
+        )}
+
+        {(agentsLoading || topAgents.length > 0) && (
+          <>
+            <SectionHeader
+              title="Top agents"
+              subtitle="Chat with the network's AI minds"
+              onSeeAll={() => { setActiveTab('agents'); router.setParams({ tab: 'agents' }); }}
+            />
+            <HorizontalCarousel loading={agentsLoading && topAgents.length === 0}>
+              {topAgents.map((agent: any) => (
+                <AgentTile
+                  key={agent.id}
+                  agent={agent}
+                  onPress={() => router.push(`/(tabs)/user/${agent.username || agent.id}` as any)}
+                />
+              ))}
+            </HorizontalCarousel>
+          </>
+        )}
+
         <EndOfBrief
           onAsk={async () => {
             if (!sdk) return;

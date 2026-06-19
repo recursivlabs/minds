@@ -42,6 +42,123 @@ const MODES: { key: Mode; label: string }[] = [
 
 const MAX_IMAGES = 10; // matches the server media_urls cap
 
+// X-style media grid geometry.
+const GRID_GAP = 3;
+const GRID_HEIGHT = 320; // fixed frame height for 2/3/4-up layouts
+
+/**
+ * Small circular remove control overlaid on a media tile (X-style).
+ * `small` shrinks it for multi-image grids.
+ */
+function RemoveMediaButton({
+  onPress,
+  colors,
+  small,
+}: {
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+  small?: boolean;
+}) {
+  const dim = small ? 26 : 30;
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }: any) => ({
+        position: 'absolute',
+        top: spacing.sm,
+        right: spacing.sm,
+        width: dim,
+        height: dim,
+        borderRadius: radius.full,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        opacity: pressed ? 0.8 : 1,
+        ...(Platform.OS === 'web' ? ({ cursor: 'pointer', backdropFilter: 'blur(4px)' } as any) : {}),
+      })}
+    >
+      <Ionicons name="close" size={small ? 15 : 18} color="#ffffff" />
+    </Pressable>
+  );
+}
+
+/**
+ * Round, accent-tinted icon button for the composer toolbar. Goes gold-tinted
+ * when its feature is active (media attached, tags present, etc.).
+ */
+function ToolbarIconButton({
+  icon,
+  onPress,
+  colors,
+  active,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+  active?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }: any) => ({
+        width: 36,
+        height: 36,
+        borderRadius: radius.full,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: active ? colors.accentMuted : pressed ? colors.surfaceHover : 'transparent',
+        ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+      })}
+    >
+      <Ionicons name={icon} size={21} color={active ? colors.accent : colors.textSecondary} />
+    </Pressable>
+  );
+}
+
+/**
+ * X-style character counter. Below ~20% remaining it reveals the live count;
+ * otherwise just a tiny dot ring. Goes gold near the limit and red over it.
+ */
+function CharCounterRing({
+  used,
+  limit,
+  colors,
+}: {
+  used: number;
+  limit: number;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const remaining = limit - used;
+  const near = remaining <= 240;
+  const over = remaining < 0;
+  const color = over ? colors.error : remaining <= 60 ? colors.accent : colors.textMuted;
+  if (!near) {
+    // Just a small progress dot until you approach the limit.
+    return (
+      <View
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: radius.full,
+          borderWidth: 2,
+          borderColor: colors.borderSubtle,
+        }}
+      />
+    );
+  }
+  return (
+    <Text
+      variant="caption"
+      color={color}
+      style={{ fontSize: 13, fontVariant: ['tabular-nums'] as any }}
+    >
+      {remaining}
+    </Text>
+  );
+}
+
 export default function CreateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string; mode?: string }>();
@@ -665,17 +782,17 @@ export default function CreateScreen() {
             </>
           )}
 
-          <View style={{ flexDirection: 'row', gap: spacing.md, flex: 1 }}>
+          <View style={{ flexDirection: 'row', gap: spacing.lg, flex: 1 }}>
             {mode === 'post' && <Avatar uri={user?.image} name={user?.name} size="md" />}
             <View style={{
               flex: 1,
-              // Avatar 'md' is 40px tall, line-height is 24px — shift the
-              // first line ~8px down so placeholder/text reads centered with
+              // Avatar 'md' is 40px tall, line-height is 26px — shift the
+              // first line ~6px down so placeholder/text reads centered with
               // the avatar instead of glued to the top.
-              paddingTop: mode === 'post' ? 8 : 0,
+              paddingTop: mode === 'post' ? 6 : 0,
             }}>
               <TextInput
-                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's on your mind?"}
+                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's happening?"}
                 placeholderTextColor={colors.textMuted}
                 value={mode === 'blog' ? blogContent : content}
                 onChangeText={mode === 'blog' ? setBlogContent : setContent}
@@ -690,10 +807,11 @@ export default function CreateScreen() {
                 style={{
                   color: colors.text,
                   ...typography.body,
-                  fontSize: 17,
-                  lineHeight: 24,
+                  fontSize: 19,
+                  lineHeight: 26,
                   padding: 0,
                   flex: 1,
+                  minHeight: 96,
                   textAlignVertical: 'top',
                   ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
                 }}
@@ -704,43 +822,87 @@ export default function CreateScreen() {
           {mediaUris.length > 0 && (
             <View style={{ marginTop: spacing.lg }}>
               {mediaIsVideo ? (
-                <View style={{ position: 'relative' }}>
-                  <VideoPlayer uri={mediaUris[0]} autoplay={false} height={400} />
-                  <Pressable
-                    onPress={() => { setMediaUris([]); setMediaIsVideo(false); }}
-                    style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: spacing.sm }}
-                  >
-                    <Ionicons name="close" size={18} color="#ffffff" />
-                  </Pressable>
-                </View>
-              ) : mediaUris.length === 1 ? (
-                <View style={{ position: 'relative' }}>
-                  <Image
-                    source={{ uri: mediaUris[0] }}
-                    style={{ width: '100%', aspectRatio: 16 / 9, maxHeight: 300, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
-                    resizeMode="contain"
-                  />
-                  <Pressable
-                    onPress={() => setMediaUris([])}
-                    style={{ position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: spacing.sm }}
-                  >
-                    <Ionicons name="close" size={18} color="#ffffff" />
-                  </Pressable>
+                // Video: rounded thumbnail wrapper with the player + a play
+                // affordance overlay and a removal control, X-style.
+                <View
+                  style={{
+                    position: 'relative',
+                    borderRadius: radius.xl,
+                    overflow: 'hidden',
+                    backgroundColor: colors.surfaceHover,
+                  }}
+                >
+                  <VideoPlayer uri={mediaUris[0]} autoplay={false} height={360} />
+                  <RemoveMediaButton onPress={() => { setMediaUris([]); setMediaIsVideo(false); }} colors={colors} />
                 </View>
               ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                  {mediaUris.map((uri, i) => (
-                    <View key={`${uri}-${i}`} style={{ width: '31.5%', aspectRatio: 1, position: 'relative' }}>
-                      <Image source={{ uri }} style={{ width: '100%', height: '100%', borderRadius: radius.md, backgroundColor: colors.surfaceHover }} resizeMode="cover" />
-                      <Pressable
-                        onPress={() => setMediaUris((prev) => prev.filter((_, idx) => idx !== i))}
-                        style={{ position: 'absolute', top: 4, right: 4, backgroundColor: colors.mediaOverlay, borderRadius: radius.full, padding: 4 }}
-                      >
-                        <Ionicons name="close" size={14} color="#ffffff" />
-                      </Pressable>
-                    </View>
-                  ))}
+                // Image grid — X-style, clipped into one rounded frame so the
+                // whole block reads as a single cohesive card.
+                //   1 → full-bleed wide tile
+                //   2 → side-by-side squares
+                //   3 → one tall tile left, two stacked right
+                //   4 → 2×2 grid
+                <View
+                  style={{
+                    height: mediaUris.length === 1 ? undefined : GRID_HEIGHT,
+                    aspectRatio: mediaUris.length === 1 ? 16 / 10 : undefined,
+                    flexDirection: 'row',
+                    gap: GRID_GAP,
+                    borderRadius: radius.xl,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {(() => {
+                    const remove = (i: number) =>
+                      setMediaUris((prev) => prev.filter((_, idx) => idx !== i));
+                    const tile = (uri: string, i: number) => (
+                      <View key={`${uri}-${i}`} style={{ flex: 1, position: 'relative' }}>
+                        <Image
+                          source={{ uri }}
+                          style={{ width: '100%', height: '100%', backgroundColor: colors.surfaceHover }}
+                          resizeMode="cover"
+                        />
+                        <RemoveMediaButton small onPress={() => remove(i)} colors={colors} />
+                      </View>
+                    );
+                    const items = mediaUris.slice(0, 4);
+                    const n = items.length;
+
+                    if (n === 1) return tile(items[0], 0);
+                    if (n === 2) return items.map((u, i) => tile(u, i));
+                    if (n === 3) {
+                      return (
+                        <>
+                          {tile(items[0], 0)}
+                          <View style={{ flex: 1, gap: GRID_GAP }}>
+                            {tile(items[1], 1)}
+                            {tile(items[2], 2)}
+                          </View>
+                        </>
+                      );
+                    }
+                    // 4-up: two columns, each two stacked tiles.
+                    return (
+                      <>
+                        <View style={{ flex: 1, gap: GRID_GAP }}>
+                          {tile(items[0], 0)}
+                          {tile(items[2], 2)}
+                        </View>
+                        <View style={{ flex: 1, gap: GRID_GAP }}>
+                          {tile(items[1], 1)}
+                          {tile(items[3], 3)}
+                        </View>
+                      </>
+                    );
+                  })()}
                 </View>
+              )}
+              {/* +N more indicator when over 4 selected (X caps the visible
+                  grid at 4; the rest still upload). */}
+              {!mediaIsVideo && mediaUris.length > 4 && (
+                <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
+                  +{mediaUris.length - 4} more attached
+                </Text>
               )}
             </View>
           )}
@@ -902,60 +1064,96 @@ export default function CreateScreen() {
         </ScrollView>
       )}
 
-      {/* Bottom toolbar (post and blog mode) */}
+      {/* Bottom toolbar (post and blog mode) — X-style: a row of round,
+          accent-tinted icon buttons on the left, then a character counter +
+          prominent Post button on the right. */}
       {(mode === 'post' || mode === 'blog') && (
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: spacing.xl,
-            paddingHorizontal: spacing.xl,
+            gap: spacing.xs,
+            paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,
             borderTopWidth: 0.5,
             borderTopColor: colors.borderSubtle,
           }}
         >
-          <Pressable onPress={handlePickImage} hitSlop={8}>
-            <Ionicons name={mediaIsVideo ? 'videocam' : 'image-outline'} size={22} color={mediaUri ? colors.accent : colors.textMuted} />
-          </Pressable>
-          {videoPct !== null && (
-            <Text variant="caption" color={colors.textMuted}>{`Uploading ${videoPct}%`}</Text>
-          )}
-          <Pressable onPress={() => setShowTags(!showTags)} hitSlop={8}>
-            <Ionicons name="pricetag-outline" size={22} color={tags.length > 0 ? colors.accent : colors.textMuted} />
-          </Pressable>
+          <ToolbarIconButton
+            icon={mediaIsVideo ? 'videocam' : 'image-outline'}
+            active={!!mediaUri}
+            onPress={handlePickImage}
+            colors={colors}
+          />
+          <ToolbarIconButton
+            icon="pricetag-outline"
+            active={tags.length > 0}
+            onPress={() => setShowTags(!showTags)}
+            colors={colors}
+          />
+          <ToolbarIconButton
+            icon="time-outline"
+            active={!!scheduleDate}
+            onPress={() => setShowSchedule(!showSchedule)}
+            colors={colors}
+          />
           <Pressable
             onPress={() => setIsNsfw(!isNsfw)}
             style={{
-              flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-              paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
-              borderRadius: radius.sm,
+              flexDirection: 'row', alignItems: 'center',
+              paddingHorizontal: spacing.md, height: 36,
+              borderRadius: radius.full,
               backgroundColor: isNsfw ? colors.errorMuted : 'transparent',
               borderWidth: isNsfw ? 0 : 0.5,
               borderColor: colors.borderSubtle,
+              marginLeft: spacing.xs,
             }}
           >
-            <Text variant="caption" color={isNsfw ? colors.error : colors.textMuted} style={{ fontSize: 11 }}>NSFW</Text>
+            <Text variant="caption" color={isNsfw ? colors.error : colors.textMuted} style={{ fontSize: 12 }}>NSFW</Text>
           </Pressable>
-          <Pressable
-            onPress={() => setShowSchedule(!showSchedule)}
-            hitSlop={8}
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-              paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
-              borderRadius: radius.sm,
-              backgroundColor: scheduleDate ? colors.accentSubtle : 'transparent',
-              borderWidth: scheduleDate ? 0 : 0.5,
-              borderColor: colors.borderSubtle,
-            }}
-          >
-            <Ionicons name="time-outline" size={14} color={scheduleDate ? colors.accent : colors.textMuted} />
-            <Text variant="caption" color={scheduleDate ? colors.accent : colors.textMuted} style={{ fontSize: 11 }}>
-              {scheduleDate ? new Date(scheduleDate).toLocaleDateString() : 'Schedule'}
-            </Text>
-          </Pressable>
+
+          {videoPct !== null && (
+            <Text variant="caption" color={colors.accent} style={{ marginLeft: spacing.sm }}>{`Uploading ${videoPct}%`}</Text>
+          )}
+
           <View style={{ flex: 1 }} />
-          <Text variant="caption" color={colors.textMuted}>{(mode === 'blog' ? blogContent : content).length}</Text>
+
+          {/* Character counter — only surfaces once you start typing.
+              Stays muted, goes gold near the limit, red over it. */}
+          {(mode === 'blog' ? blogContent : content).length > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginRight: spacing.md }}>
+              <CharCounterRing
+                used={(mode === 'blog' ? blogContent : content).length}
+                limit={POST_CHAR_LIMIT}
+                colors={colors}
+              />
+            </View>
+          )}
+
+          {/* Prominent Post button mirrored at the bottom for thumb reach on
+              mobile — disabled (grey) when empty, gold when ready. */}
+          <Pressable
+            onPress={handleSubmit}
+            disabled={!canSubmit || submitting || charsRemaining < 0}
+            style={({ pressed }: any) => ({
+              paddingHorizontal: spacing.xl,
+              height: 38,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: radius.full,
+              backgroundColor: (canSubmit && charsRemaining >= 0) ? colors.accent : colors.surfaceHover,
+              opacity: submitting ? 0.6 : pressed ? 0.85 : 1,
+              ...(Platform.OS === 'web' && canSubmit && charsRemaining >= 0 ? ({ cursor: 'pointer' } as any) : {}),
+            })}
+          >
+            {submitting ? (
+              <ActivityIndicator color={colors.textInverse} size="small" />
+            ) : (
+              <Text variant="bodyMedium" color={(canSubmit && charsRemaining >= 0) ? colors.textInverse : colors.textMuted}>
+                {submitLabel}
+              </Text>
+            )}
+          </Pressable>
         </View>
       )}
       {showSchedule && (
