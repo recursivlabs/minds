@@ -160,15 +160,12 @@ export default function UserProfileScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await sdk.posts.list({ limit: 50, organization_id: ORG_ID || undefined });
-        const filtered = (res.data || []).filter(
-          (p: any) => {
-            const authorId = p.author?.id || p.userId || p.user_id;
-            const authorUsername = p.author?.username;
-            return authorId === profile.id || authorUsername === username;
-          }
-        );
-        if (!cancelled) setUserPosts(filtered);
+        // Query the author's posts server-side (authorId scope) instead of
+        // fetching org-wide recents + client-filtering — the latter returns ~0
+        // for any given profile on a populated network (the 50 most-recent org
+        // posts almost never include this specific author).
+        const res = await sdk.posts.list({ authorId: profile.id, limit: 50 });
+        if (!cancelled) setUserPosts(res.data || []);
       } catch {}
       finally { if (!cancelled) setPostsLoading(false); }
     })();

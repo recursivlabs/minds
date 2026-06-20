@@ -7,44 +7,50 @@ import { Container } from '../../components/Container';
 import { TabBar } from '../../components/TabBar';
 import { usePosts, useCommunities, useAgents, useProfiles, useSearchPosts } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth';
-import { getPreference } from '../../lib/preferences';
 import { logSignal } from '../../lib/signals';
 import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography, shadows } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
-import { profileFollowerCount } from '../../lib/models';
-import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
+import { profileFollowerCount, profilePostCount, postScore, postReplyCount, timestampOf } from '../../lib/models';
 
-// ── Responsive layout helpers ──
-// The editorial canvas adapts to viewport width: a single rich column on
-// phones, a multi-column magazine mosaic on tablets/desktop. We resolve a
-// "layout profile" once per render from useWindowDimensions() and thread the
-// content max-width + column count through the modules so everything lines up
-// on a shared centered measure (premium media sites never run edge-to-edge on
-// a wide monitor).
+// ──────────────────────────────────────────────────────────────────────────
+// Discover — the front door of Minds.
+//
+// Goal: intuitive + compelling. A search-forward top, a live trending-topics
+// rail, then a stack of CURATED sections that mine the now-rich network:
+//   1. Hot right now      — top posts by real vote score (featured + carousel)
+//   2. Voices to follow   — creators ranked by followers
+//   3. Communities        — ranked by members + activity
+//   4. Talk to an agent    — discoverable AI agents
+//   5. Rediscover          — buried gems: high engagement, older posts
+//
+// All ranking is a CLIENT-SIDE SORT over data the existing hooks already load
+// (usePosts('score'), useProfiles, useCommunities, useAgents). No SDK changes.
+// Every value comes from the shared model accessors so field-name drift can't
+// silently break a sort. See the rationale at the bottom of the PR for which
+// rankings would benefit from a dedicated server endpoint.
+// ──────────────────────────────────────────────────────────────────────────
+
+// ── Layout profile, resolved from the MEASURED content width (Discover renders
+// beside the sidebar on web, so sizing off the window overshoots). One rich
+// column on phones, wider carousels and a 2-up hero on tablet/desktop.
 type Layout = {
   width: number;
-  isWide: boolean;       // tablet and up — switch to multi-column mosaic
-  isUltra: boolean;      // very wide desktop — 3-up mosaic, wider hero
-  contentWidth: number;  // centered max measure for the whole canvas
-  gutter: number;        // horizontal page padding
-  mosaicCols: number;    // standard-tile columns under the hero
+  isWide: boolean;
+  isUltra: boolean;
+  gutter: number;
 };
 
-// Compute the layout profile from the MEASURED content-area width (NOT the
-// window). Discover renders in the flex:1 column beside the sidebar, so sizing
-// off useWindowDimensions() overshot the container and bled behind the nav.
 function computeLayout(width: number): Layout {
   const w = width || 360;
   const isWide = w >= 700;
   const isUltra = w >= 1040;
   const gutter = isWide ? spacing['2xl'] : spacing.lg;
-  const mosaicCols = isUltra ? 3 : isWide ? 2 : 1;
-  return { width: w, isWide, isUltra, contentWidth: w, gutter, mosaicCols };
+  return { width: w, isWide, isUltra, gutter };
 }
 
-// A cross-platform cover image. The previous hero only painted on web
-// (raw <img>); native fell back to an empty grey box. RN <Image> covers both.
+// Cross-platform cover image (RN <Image> covers web + native; the old raw <img>
+// hero painted nothing on native).
 function CoverImage({ uri, height, radius: r = 0 }: { uri: string; height: number; radius?: number }) {
   const colors = useColors();
   return (
@@ -55,6 +61,580 @@ function CoverImage({ uri, height, radius: r = 0 }: { uri: string; height: numbe
     />
   );
 }
+
+function formatCount(n: number): string {
+  if (!n || n < 0) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(n);
+}
+
+function timeAgoShort(dateStr?: string): string {
+  if (!dateStr) return '';
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  if (diff < 2592000) return `${Math.floor(diff / 604800)}w`;
+  if (diff < 31536000) return `${Math.floor(diff / 2592000)}mo`;
+  return `${Math.floor(diff / 31536000)}y`;
+}
+
+// ── Trending topics, derived live from the loaded posts ──
+type TrendingTopic = { tag: string; count: number };
+
+function extractHashtags(text: string | null | undefined): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  const re = /#([\p{L}\p{N}_]{2,30})/gu;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) out.push(m[1].toLowerCase());
+  return out;
+}
+
+function computeTrendingTopics(posts: any[], limit = 12): TrendingTopic[] {
+  const counts = new Map<string, { display: string; count: number }>();
+  for (const p of posts || []) {
+    const tags: string[] = [];
+    if (Array.isArray(p?.tags)) {
+      for (const t of p.tags) {
+        const clean = String(t).replace(/^#/, '').trim();
+        if (clean.length >= 2) tags.push(clean);
+      }
+    }
+    tags.push(...extractHashtags(p?.content));
+    tags.push(...extractHashtags(p?.title));
+    const seen = new Set<string>();
+    for (const raw of tags) {
+      const key = raw.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const prev = counts.get(key);
+      if (prev) prev.count += 1;
+      else counts.set(key, { display: raw, count: 1 });
+    }
+  }
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((t) => ({ tag: t.display, count: t.count }));
+}
+
+function getDomain(url: string | null | undefined): string {
+  if (!url) return '';
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+function extractUrl(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = text.match(/https?:\/\/\S+/);
+  return m ? m[0].replace(/[.,;:!?)\]]+$/, '') : null;
+}
+function postSource(post: any): string {
+  if (post.source_name) return String(post.source_name);
+  if (post.sourceName) return String(post.sourceName);
+  const url = post.external_url || post.externalUrl || extractUrl(post.content);
+  return getDomain(url) || 'Minds';
+}
+function postAuthorName(post: any): string {
+  return post.author?.name || post.author?.username || postSource(post);
+}
+function postTitle(post: any): string {
+  return (post.title || post.content || '').trim();
+}
+
+// Best still for a post thumbnail. Flags video so we can badge it.
+function postThumb(post: any): { url: string | null; hasVideo: boolean } {
+  const raw = post.media;
+  const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  let imgUrl: string | null = null;
+  let hasVideo = false;
+  for (const m of arr) {
+    const url = typeof m === 'string' ? m : m?.url;
+    const type = typeof m === 'string' ? '' : (m?.type || '');
+    if (!url) continue;
+    if (type.startsWith('video') || /\.m3u8|\/video\//i.test(url)) hasVideo = true;
+    else if (!imgUrl) imgUrl = url;
+  }
+  return { url: imgUrl || post.image || post.previewImage || post.thumbnail || null, hasVideo };
+}
+
+// ── Engagement score for ranking. Real vote score is the spine; replies add a
+// conversation bonus; media gives a small visual-appeal nudge so the page leads
+// with content that actually pulls you in. Pure client sort over loaded posts.
+function engagementScore(post: any): number {
+  const votes = postScore(post);
+  const replies = postReplyCount(post);
+  const hasMedia = postThumb(post).url || postThumb(post).hasVideo ? 1 : 0;
+  return votes + replies * 2 + hasMedia * 4;
+}
+
+// ── A "gem score" for Rediscover: posts that earned real engagement but aren't
+// fresh, so great older content resurfaces instead of decaying into the
+// archive. We reward score+replies and gate to anything older than ~3 days.
+function isRediscoverable(post: any): boolean {
+  const ts = timestampOf(post);
+  if (!ts) return false;
+  const ageDays = (Date.now() - new Date(ts).getTime()) / 86_400_000;
+  return ageDays >= 3 && (postScore(post) + postReplyCount(post)) >= 2;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Section scaffolding
+// ──────────────────────────────────────────────────────────────────────────
+
+function SectionHeader({ title, subtitle, icon, onSeeAll, gutter }: {
+  title: string; subtitle?: string; icon?: keyof typeof Ionicons.glyphMap; onSeeAll?: () => void; gutter: number;
+}) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        paddingHorizontal: gutter,
+        paddingTop: spacing['2xl'],
+        paddingBottom: spacing.md,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          {/* Gold tick — a small accent bar that gives every module a masthead feel. */}
+          <View style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: colors.accent }} />
+          {icon ? <Ionicons name={icon} size={16} color={colors.accent} /> : null}
+          <Text variant="h2">{title}</Text>
+        </View>
+        {subtitle ? (
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, marginLeft: spacing.sm + 4 }}>{subtitle}</Text>
+        ) : null}
+      </View>
+      {onSeeAll ? (
+        <Pressable
+          onPress={onSeeAll}
+          hitSlop={8}
+          style={Platform.OS === 'web' ? ({ cursor: 'pointer', flexDirection: 'row', alignItems: 'center', gap: 4 } as any) : { flexDirection: 'row', alignItems: 'center', gap: 4 }}
+        >
+          <Text variant="caption" color={colors.accent}>See all</Text>
+          <Ionicons name="arrow-forward" size={12} color={colors.accent} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function HorizontalRail({ children, gutter, snap }: { children: React.ReactNode; gutter: number; snap?: number }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      decelerationRate="fast"
+      snapToInterval={snap}
+      contentContainerStyle={{ paddingHorizontal: gutter, paddingBottom: spacing.xs, gap: spacing.md }}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
+function RailSkeleton({ gutter, width, height }: { gutter: number; width: number; height: number }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: gutter, gap: spacing.md }}
+    >
+      {[1, 2, 3, 4].map((i) => (
+        <Skeleton key={i} width={width} height={height} borderRadius={radius.lg} />
+      ))}
+    </ScrollView>
+  );
+}
+
+// ── Live trending-topics rail. Each chip is a real hashtag counted from the
+// loaded posts; tapping it routes into the existing search path. ──
+function TrendingTopicsRow({ topics, onPick, gutter }: { topics: TrendingTopic[]; onPick: (tag: string) => void; gutter: number }) {
+  const colors = useColors();
+  if (!topics.length) return null;
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: gutter, paddingTop: spacing.lg, paddingBottom: spacing.xs }}>
+        <Ionicons name="flame" size={13} color={colors.accent} />
+        <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.2, fontSize: 10 }}>TRENDING NOW</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter, paddingVertical: spacing.sm, gap: spacing.sm }}>
+        {topics.map((t) => (
+          <Pressable
+            key={t.tag}
+            onPress={() => onPick(t.tag)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.xs,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 6,
+              borderRadius: radius.full,
+              borderWidth: 1,
+              borderColor: colors.borderSubtle,
+              backgroundColor: pressed ? colors.accentMuted : colors.surface,
+              ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+            })}
+          >
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>#</Text>
+            <Text variant="caption" color={colors.text} style={{ fontSize: 12 }}>{t.tag}</Text>
+            {t.count > 1 ? <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{t.count}</Text> : null}
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Hot — featured hero + carousel
+// ──────────────────────────────────────────────────────────────────────────
+
+// Big editorial lead card for the #1 hot post. Immersive cover with a scrim
+// when there's art; a typographic card with a gold rule when there isn't.
+const FeaturedPost = React.memo(function FeaturedPost({ post, onPress, layout }: { post: any; onPress: () => void; layout: Layout }) {
+  const colors = useColors();
+  const { url, hasVideo } = postThumb(post);
+  const title = postTitle(post);
+  const score = postScore(post);
+  const replies = postReplyCount(post);
+  const author = postAuthorName(post);
+  const coverHeight = layout.isUltra ? 360 : layout.isWide ? 300 : 220;
+  React.useEffect(() => { if (post?.id) logSignal('view', { postId: post.id, metadata: { surface: 'discover_featured' } }); }, [post?.id]);
+
+  const stat = (icon: keyof typeof Ionicons.glyphMap, value: string, onImage: boolean) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <Ionicons name={icon} size={13} color={onImage ? '#fff' : colors.accent} />
+      <Text variant="caption" color={onImage ? 'rgba(255,255,255,0.9)' : colors.textSecondary}>{value}</Text>
+    </View>
+  );
+
+  const eyebrow = (onImage: boolean) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: colors.accent, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm }}>
+      <Ionicons name="flame" size={11} color={colors.textOnAccent} />
+      <Text variant="label" color={colors.textOnAccent} style={{ fontSize: 10, letterSpacing: 1 }}>#1 HOT</Text>
+    </View>
+  );
+
+  return (
+    <Pressable
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_featured' } }); onPress(); }}
+      style={({ pressed }) => ({
+        borderRadius: radius.xl,
+        overflow: 'hidden',
+        borderWidth: url ? 0 : 1,
+        borderColor: colors.borderSubtle,
+        backgroundColor: colors.surface,
+        opacity: pressed ? 0.97 : 1,
+        ...shadows.md(colors.shadow),
+        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+      })}
+    >
+      {url ? (
+        <View style={{ position: 'relative' }}>
+          <CoverImage uri={url} height={coverHeight} />
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: '30%', backgroundColor: 'rgba(0,0,0,0.55)' }} />
+          {hasVideo ? (
+            <View style={{ position: 'absolute', top: spacing.md, right: spacing.md, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play" size={15} color="#fff" style={{ marginLeft: 2 }} />
+            </View>
+          ) : null}
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: layout.isWide ? spacing.xl : spacing.lg, gap: spacing.sm }}>
+            {eyebrow(true)}
+            <Text variant={layout.isWide ? 'h1' : 'h2'} color="#fff" numberOfLines={3} style={{ maxWidth: 720 }}>{title || 'Untitled'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: 2 }}>
+              <Text variant="caption" color="rgba(255,255,255,0.82)" numberOfLines={1} style={{ maxWidth: 200 }}>{author}</Text>
+              {score > 0 ? stat('arrow-up', String(score), true) : null}
+              {replies > 0 ? stat('chatbubble-outline', String(replies), true) : null}
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={{ padding: layout.isWide ? spacing['2xl'] : spacing.xl, gap: spacing.md, borderLeftWidth: 3, borderLeftColor: colors.accent }}>
+          {eyebrow(false)}
+          <Text variant={layout.isWide ? 'h1' : 'h2'} color={colors.text} numberOfLines={4}>{title || 'Untitled'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: 2 }}>
+            <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ maxWidth: 200 }}>{author}</Text>
+            {score > 0 ? stat('arrow-up', String(score), false) : null}
+            {replies > 0 ? stat('chatbubble-outline', String(replies), false) : null}
+          </View>
+        </View>
+      )}
+    </Pressable>
+  );
+});
+
+const POST_TILE_W = 260;
+
+// Compact content card for the Hot carousel: media thumb, headline, author +
+// real engagement (votes + replies).
+const PostTile = React.memo(function PostTile({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const { url, hasVideo } = postThumb(post);
+  const title = postTitle(post);
+  const score = postScore(post);
+  const replies = postReplyCount(post);
+  const author = postAuthorName(post);
+  const hasMedia = !!url || hasVideo;
+  return (
+    <Pressable
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_hot' } }); onPress(); }}
+      style={({ hovered }: any) => ({
+        width,
+        borderRadius: radius.lg,
+        overflow: 'hidden',
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      {url ? (
+        <View style={{ height: 130, position: 'relative' }}>
+          <CoverImage uri={url} height={130} />
+          {hasVideo ? (
+            <View style={{ position: 'absolute', bottom: spacing.xs, right: spacing.xs, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play" size={12} color="#fff" style={{ marginLeft: 1 }} />
+            </View>
+          ) : null}
+        </View>
+      ) : hasVideo ? (
+        <View style={{ height: 130, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="play-circle" size={34} color={colors.accent} />
+        </View>
+      ) : null}
+      <View style={{ padding: spacing.md, gap: spacing.xs, flex: 1 }}>
+        <Text variant="bodyMedium" numberOfLines={hasMedia ? 2 : 4} style={{ lineHeight: 20, minHeight: hasMedia ? 40 : undefined }}>{title || 'Untitled'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 'auto' as any }}>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
+          {score > 0 ? <Text variant="caption" color={colors.accent}>↑ {score}</Text> : null}
+          {replies > 0 ? <Text variant="caption" color={colors.textMuted}>· {replies}</Text> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+// ── Rediscover card — wider, "from the archive" framing with the post's age so
+// it reads as resurfaced rather than new. ──
+const REDISCOVER_TILE_W = 300;
+const RediscoverTile = React.memo(function RediscoverTile({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const { url } = postThumb(post);
+  const title = postTitle(post);
+  const score = postScore(post);
+  const replies = postReplyCount(post);
+  const author = postAuthorName(post);
+  const age = timeAgoShort(timestampOf(post));
+  return (
+    <Pressable
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_rediscover' } }); onPress(); }}
+      style={({ hovered }: any) => ({
+        width,
+        flexDirection: 'row',
+        gap: spacing.md,
+        padding: spacing.md,
+        borderRadius: radius.lg,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      {url ? (
+        <View style={{ width: 72, height: 72, borderRadius: radius.md, overflow: 'hidden' }}>
+          <CoverImage uri={url} height={72} />
+        </View>
+      ) : (
+        <View style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="bookmark" size={22} color={colors.accent} />
+        </View>
+      )}
+      <View style={{ flex: 1, gap: 3 }}>
+        <Text variant="bodyMedium" numberOfLines={2} style={{ lineHeight: 19 }}>{title || 'Untitled'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
+          {age ? <Text variant="caption" color={colors.textMuted}>{age} ago</Text> : null}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          {score > 0 ? <Text variant="caption" color={colors.accent}>↑ {score}</Text> : null}
+          {replies > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Ionicons name="chatbubble-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{replies}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Entity tiles (people / communities / agents)
+// ──────────────────────────────────────────────────────────────────────────
+
+const ENTITY_TILE_W = 220;
+
+function FollowPill({ initialActive, onToggle }: { initialActive?: boolean; onToggle: (next: boolean) => void }) {
+  const colors = useColors();
+  const [active, setActive] = React.useState(!!initialActive);
+  return (
+    <Pressable
+      onPress={(e: any) => { e?.stopPropagation?.(); const next = !active; setActive(next); onToggle(next); }}
+      hitSlop={6}
+      style={{
+        paddingVertical: spacing.xs + 2,
+        borderRadius: radius.full,
+        alignItems: 'center',
+        backgroundColor: active ? 'transparent' : colors.accent,
+        borderWidth: active ? 1 : 0,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+      }}
+    >
+      <Text variant="caption" color={active ? colors.text : colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>
+        {active ? 'Following' : 'Follow'}
+      </Text>
+    </Pressable>
+  );
+}
+
+const PersonTile = React.memo(function PersonTile({ person, onPress, onFollow, isFollowed, width }: {
+  person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean; width: number;
+}) {
+  const colors = useColors();
+  const name = person.name || person.username || 'Someone';
+  const username = person.username;
+  const bio = person.bio || person.description || '';
+  const avatar = person.image || person.avatar;
+  const followers = profileFollowerCount(person);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width,
+        padding: spacing.lg,
+        borderRadius: radius.lg,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        gap: spacing.sm,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ alignItems: 'center', gap: spacing.xs }}>
+        <Avatar uri={avatar} name={name} size="lg" />
+        <Text variant="bodyMedium" numberOfLines={1} align="center" style={{ marginTop: spacing.xs }}>{name}</Text>
+        {username ? <Text variant="caption" color={colors.textMuted} numberOfLines={1}>@{username}</Text> : null}
+      </View>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} align="center" style={{ lineHeight: 17, minHeight: 34 }}>{bio}</Text>
+      ) : <View style={{ minHeight: 34 }} />}
+      {followers > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <Ionicons name="people-outline" size={12} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{formatCount(followers)} followers</Text>
+        </View>
+      ) : null}
+      <FollowPill initialActive={isFollowed} onToggle={() => onFollow()} />
+    </Pressable>
+  );
+});
+
+const CommunityTile = React.memo(function CommunityTile({ community, onPress, width }: { community: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const name = community.name || 'Community';
+  const description = community.description || community.bio || '';
+  const avatar = community.image || community.avatar;
+  const members = community.memberCount || community.member_count || 0;
+  const postCount = community.postCount || community.post_count || 0;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width,
+        borderRadius: radius.lg,
+        overflow: 'hidden',
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      {/* Gold-tinted banner so communities read as places, not people. */}
+      <View style={{ height: 48, backgroundColor: colors.accentMuted }} />
+      <View style={{ padding: spacing.lg, marginTop: -26, gap: spacing.xs }}>
+        <Avatar uri={avatar} name={name} size="lg" />
+        <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.xs }}>{name}</Text>
+        {description ? (
+          <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 17, minHeight: 34 }}>{description}</Text>
+        ) : <View style={{ minHeight: 34 }} />}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="people" size={12} color={colors.textMuted} />
+            <Text variant="caption" color={colors.textMuted}>{formatCount(members)}</Text>
+          </View>
+          {postCount > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{formatCount(postCount)}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+const AgentTile = React.memo(function AgentTile({ agent, onPress, width }: { agent: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const name = agent.name || 'Agent';
+  const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
+  const avatar = agent.image || agent.avatar;
+  const model = agent.model?.split('/').pop() || '';
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width,
+        padding: spacing.lg,
+        borderRadius: radius.lg,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        gap: spacing.sm,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Avatar uri={avatar} name={name} size="md" />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Ionicons name="sparkles" size={10} color={colors.accent} />
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }} numberOfLines={1}>{model || 'AI agent'}</Text>
+          </View>
+        </View>
+      </View>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 17, minHeight: 34 }}>{bio}</Text>
+      ) : <View style={{ minHeight: 34 }} />}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.sm, borderRadius: radius.full, backgroundColor: colors.accentMuted }}>
+        <Ionicons name="chatbubble-ellipses" size={13} color={colors.accent} />
+        <Text variant="caption" color={colors.accent}>Chat now</Text>
+      </View>
+    </Pressable>
+  );
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// List-view cards (search results / explicit tab filter) — kept as full-width
+// rows so the directory views stay scannable.
+// ──────────────────────────────────────────────────────────────────────────
 
 function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
   const colors = useColors();
@@ -71,463 +651,27 @@ function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; o
         borderColor: colors.borderSubtle,
       }}
     >
-      <Text variant="caption" color={toggled ? colors.textSecondary : colors.accent}>
-        {toggled ? 'Following' : 'Follow'}
-      </Text>
+      <Text variant="caption" color={toggled ? colors.textSecondary : colors.accent}>{toggled ? 'Following' : 'Follow'}</Text>
     </Pressable>
   );
 }
 
-// ── Trending topics, derived live from the loaded posts ──
-// The old TOPIC_CHIPS were hardcoded regex buckets that pretended to
-// classify every post. They were a relic. Instead we now surface the
-// hashtags/tags that are ACTUALLY trending in the day's reading list —
-// counted from real post data — so the row is alive and changes with the
-// feed. Tapping a topic routes into the existing search path (no new
-// filtering machinery), keeping the canvas honest.
-
-type TrendingTopic = { tag: string; count: number };
-
-function extractHashtags(text: string | null | undefined): string[] {
-  if (!text) return [];
-  const out: string[] = [];
-  const re = /#([\p{L}\p{N}_]{2,30})/gu;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) out.push(m[1].toLowerCase());
-  return out;
-}
-
-function computeTrendingTopics(posts: any[], limit = 10): TrendingTopic[] {
-  const counts = new Map<string, { display: string; count: number }>();
-  for (const p of posts || []) {
-    const tags: string[] = [];
-    // Explicit tags on the post take priority, then inline #hashtags.
-    if (Array.isArray(p?.tags)) {
-      for (const t of p.tags) {
-        const clean = String(t).replace(/^#/, '').trim();
-        if (clean.length >= 2) tags.push(clean);
-      }
-    }
-    tags.push(...extractHashtags(p?.content));
-    tags.push(...extractHashtags(p?.title));
-    const seen = new Set<string>();
-    for (const raw of tags) {
-      const key = raw.toLowerCase();
-      if (seen.has(key)) continue; // count each tag once per post
-      seen.add(key);
-      const prev = counts.get(key);
-      if (prev) prev.count += 1;
-      else counts.set(key, { display: raw, count: 1 });
-    }
-  }
-  return [...counts.values()]
-    .filter((t) => t.count >= 1)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit)
-    .map((t) => ({ tag: t.display, count: t.count }));
-}
-
-function getDomain(url: string | null | undefined): string {
-  if (!url) return '';
-  try {
-    const u = new URL(url);
-    return u.hostname.replace(/^www\./, '');
-  } catch { return ''; }
-}
-
-function extractUrl(text: string | null | undefined): string | null {
-  if (!text) return null;
-  const m = text.match(/https?:\/\/\S+/);
-  return m ? m[0].replace(/[.,;:!?)\]]+$/, '') : null;
-}
-
-function postSource(post: any): string {
-  // Curator posts carry source on post.source_name; legacy posts may
-  // carry the URL inline. Prefer explicit field, fall back to URL.
-  if (post.source_name) return String(post.source_name);
-  if (post.sourceName) return String(post.sourceName);
-  const url = post.external_url || post.externalUrl || extractUrl(post.content);
-  return getDomain(url) || 'minds';
-}
-
-function postCategory(post: any): string {
-  // Eyebrow label for headlines. Uses the post's own first tag/hashtag
-  // (real data) so a row reads "AI · TechCrunch" instead of a guessed
-  // bucket. Empty when the post carries no tags.
-  const tag = Array.isArray(post?.tags) && post.tags.length
-    ? String(post.tags[0]).replace(/^#/, '')
-    : extractHashtags(post?.content)[0] || extractHashtags(post?.title)[0] || '';
-  return tag ? tag.toUpperCase() : '';
-}
-
-function postAITake(post: any): string {
-  // Curator stores the agent's editorial caption on post.content;
-  // the original article link lives on external_url. Show the first
-  // ~120 chars as the AI take. If content IS just the URL, skip.
-  const body = (post.content || '').trim();
-  if (!body) return '';
-  if (/^https?:\/\//.test(body)) return '';
-  const firstSentence = body.split(/(?<=[.!?])\s+/)[0] || body;
-  return firstSentence.length > 140 ? `${firstSentence.slice(0, 137)}…` : firstSentence;
-}
-
-// ── HERO ──
-// The marquee of the front page. When the lead post carries an image we
-// run an immersive cover with a dark scrim and the headline laid over the
-// art (Apple News / premium-media treatment); without an image we fall back
-// to a tall typographic card with a gold rule so it still reads as "lead".
-// The card itself is a rounded, bordered surface that floats on the canvas.
-function DiscoverHero({ post, onPress, layout }: { post: any; onPress: () => void; layout: Layout }) {
-  const colors = useColors();
-  const image = post.image || post.previewImage;
-  const source = postSource(post);
-  const category = postCategory(post);
-  const take = postAITake(post);
-  const replies = post.replyCount || post.reply_count || 0;
-  const title = post.title || (post.content || '').split('\n')[0].slice(0, 140);
-  const coverHeight = layout.isUltra ? 460 : layout.isWide ? 380 : 300;
-  React.useEffect(() => {
-    if (post?.id) logSignal('view', { postId: post.id, metadata: { surface: 'discover_hero' } });
-  }, [post?.id]);
-
-  const eyebrow = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.accent, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm }}>
-        <Ionicons name="sparkles" size={11} color={colors.textOnAccent} />
-        <Text variant="label" color={colors.textOnAccent} style={{ fontSize: 10, letterSpacing: 1 }}>LEAD STORY</Text>
-      </View>
-      {category ? (
-        <Text variant="label" color={image ? '#fff' : colors.accent} style={{ fontSize: 10, letterSpacing: 1.4 }}>
-          {category}
-        </Text>
-      ) : null}
-    </View>
-  );
-
-  const meta = (onImage: boolean) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap', marginTop: spacing.xs }}>
-      <Text variant="caption" color={onImage ? 'rgba(255,255,255,0.82)' : colors.textMuted}>{source}</Text>
-      {replies > 0 ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="chatbubble-outline" size={11} color={onImage ? 'rgba(255,255,255,0.82)' : colors.textMuted} />
-          <Text variant="caption" color={onImage ? 'rgba(255,255,255,0.82)' : colors.textMuted}>{replies} on Minds</Text>
-        </View>
-      ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' as any }}>
-        <Text variant="caption" color={colors.accent}>Read story</Text>
-        <Ionicons name="arrow-forward" size={12} color={colors.accent} />
-      </View>
-    </View>
-  );
-
-  return (
-    <Pressable
-      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_hero' } }); onPress(); }}
-      style={({ pressed }) => ({
-        borderRadius: radius.xl,
-        overflow: 'hidden',
-        borderWidth: image ? 0 : 1,
-        borderColor: colors.borderSubtle,
-        backgroundColor: colors.surface,
-        opacity: pressed ? 0.96 : 1,
-        ...shadows.lg(colors.shadow),
-      })}
-    >
-      {image ? (
-        <View style={{ position: 'relative' }}>
-          <CoverImage uri={image} height={coverHeight} />
-          {/* Dark scrim so overlaid headline stays legible on any art. */}
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: '35%', backgroundColor: 'rgba(0,0,0,0.55)' }} />
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.18)' }} />
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: layout.isWide ? spacing['2xl'] : spacing.xl, gap: spacing.sm }}>
-            {eyebrow}
-            <Text variant={layout.isWide ? 'hero' : 'h1'} color="#fff" numberOfLines={4} style={{ maxWidth: 760 }}>
-              {title}
-            </Text>
-            {take ? (
-              <Text variant="body" color="rgba(255,255,255,0.88)" numberOfLines={2} style={{ maxWidth: 640, lineHeight: 22 }}>
-                {take}
-              </Text>
-            ) : null}
-            {meta(true)}
-          </View>
-        </View>
-      ) : (
-        <View style={{ padding: layout.isWide ? spacing['3xl'] : spacing['2xl'], gap: spacing.md, borderLeftWidth: 3, borderLeftColor: colors.accent }}>
-          {eyebrow}
-          <Text variant={layout.isWide ? 'hero' : 'h1'} color={colors.text} numberOfLines={4}>
-            {title}
-          </Text>
-          {take ? (
-            <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ lineHeight: 24, maxWidth: 640 }}>
-              {take}
-            </Text>
-          ) : null}
-          {meta(false)}
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
-// ── MOSAIC TILE ──
-// A standard editorial card for the multi-column grid. Renders its own cover
-// art when present (top image), then eyebrow + headline + AI take + meta. Used
-// for the secondary stories directly under the hero. On mobile these stack to
-// one rich column; on desktop they tile 2- or 3-up.
-function MosaicTile({ post, onPress, featured }: { post: any; onPress: () => void; featured?: boolean }) {
-  const colors = useColors();
-  const image = post.image || post.previewImage;
-  const source = postSource(post);
-  const category = postCategory(post);
-  const take = postAITake(post);
-  const replies = post.replyCount || post.reply_count || 0;
-  const score = post.score || 0;
-  const title = post.title || (post.content || '').split('\n')[0];
-  React.useEffect(() => {
-    if (post?.id) logSignal('view', { postId: post.id, metadata: { surface: 'discover_mosaic' } });
-  }, [post?.id]);
-  return (
-    <Pressable
-      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_mosaic' } }); onPress(); }}
-      style={({ pressed }) => ({
-        flex: 1,
-        borderRadius: radius.lg,
-        overflow: 'hidden',
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-        borderWidth: 1,
-        borderColor: colors.borderSubtle,
-        ...shadows.sm(colors.shadow),
-      })}
-    >
-      {image ? <CoverImage uri={image} height={featured ? 200 : 160} /> : null}
-      <View style={{ padding: spacing.lg, gap: spacing.xs }}>
-        <Text variant="label" color={colors.accent} style={{ fontSize: 10, letterSpacing: 1 }}>
-          {category ? `${category} · ${source}` : source.toUpperCase()}
-        </Text>
-        <Text variant={featured ? 'h3' : 'bodyMedium'} color={colors.text} numberOfLines={3} style={{ lineHeight: featured ? 24 : 21 }}>
-          {title || 'Untitled'}
-        </Text>
-        {take ? (
-          <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 18 }}>
-            {take}
-          </Text>
-        ) : null}
-        {(replies > 0 || score > 0) ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs }}>
-            {replies > 0 ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="chatbubble-outline" size={11} color={colors.textMuted} />
-                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{replies}</Text>
-              </View>
-            ) : null}
-            {score > 0 ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="arrow-up" size={11} color={colors.accent} />
-                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{score}</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
-
-// Lays a flat list of tiles into an N-column responsive grid using flex rows.
-// We chunk into rows of `cols` and pad the final row with invisible spacers so
-// the last row's tiles keep their width instead of stretching full-bleed.
-function MosaicGrid({ posts, cols, gutter, onPick }: { posts: any[]; cols: number; gutter: number; onPick: (p: any) => void }) {
-  if (!posts.length) return null;
-  const rows: any[][] = [];
-  for (let i = 0; i < posts.length; i += cols) rows.push(posts.slice(i, i + cols));
-  return (
-    <View style={{ paddingHorizontal: gutter, gap: spacing.lg }}>
-      {rows.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: 'row', gap: spacing.lg }}>
-          {row.map((p) => (
-            <MosaicTile key={p.id} post={p} featured={cols === 1} onPress={() => onPick(p)} />
-          ))}
-          {row.length < cols
-            ? Array.from({ length: cols - row.length }).map((_, k) => <View key={`sp-${k}`} style={{ flex: 1 }} />)
-            : null}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function DenseHeadline({ post, onPress, gutter = spacing.xl }: { post: any; onPress: () => void; gutter?: number }) {
-  const colors = useColors();
-  const source = postSource(post);
-  const category = postCategory(post);
-  const take = postAITake(post);
-  const replies = post.replyCount || post.reply_count || 0;
-  const score = post.score || 0;
-  const title = post.title || (post.content || '').split('\n')[0];
-  // Log a view when the row mounts. Dedup inside logSignal keeps
-  // this from counting the same post twice across re-renders.
-  React.useEffect(() => {
-    if (post?.id) logSignal('view', { postId: post.id, metadata: { surface: 'discover_dense' } });
-  }, [post?.id]);
-  return (
-    <Pressable
-      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_dense' } }); onPress(); }}
-      style={({ pressed }) => ({
-        paddingVertical: spacing.md,
-        paddingHorizontal: gutter,
-        borderBottomWidth: 0.5,
-        borderBottomColor: colors.borderSubtle,
-        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-        gap: 2,
-      })}
-    >
-      <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10, letterSpacing: 0.8 }}>
-        {category ? `${category} · ` : ''}{source}
-      </Text>
-      <Text variant="bodyMedium" color={colors.text} numberOfLines={2} style={{ lineHeight: 20 }}>
-        {title || 'Untitled'}
-      </Text>
-      {take ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ fontStyle: 'italic' }}>
-          {take}
-        </Text>
-      ) : null}
-      {(replies > 0 || score > 0) ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 }}>
-          {replies > 0 ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="chatbubble-outline" size={10} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{replies}</Text>
-            </View>
-          ) : null}
-          {score > 0 ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="arrow-up-outline" size={10} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{score}</Text>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
-// Live trending-topics rail. Each chip is a real hashtag counted from
-// the loaded posts; tapping it searches that topic via the existing
-// search path. The leading "Trending" label + flame icon make it read
-// as a pulse on the network rather than a static filter set.
-function TrendingTopicsRow({ topics, onPick, gutter = spacing.xl }: { topics: TrendingTopic[]; onPick: (tag: string) => void; gutter?: number }) {
-  const colors = useColors();
-  if (!topics.length) return null;
-  return (
-    <View>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.xs,
-          paddingHorizontal: gutter,
-          paddingTop: spacing.lg,
-          paddingBottom: spacing.xs,
-        }}
-      >
-        <Ionicons name="flame" size={13} color={colors.accent} />
-        <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.2, fontSize: 10 }}>
-          TRENDING NOW
-        </Text>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: gutter, paddingVertical: spacing.sm, gap: spacing.sm }}
-      >
-        {topics.map((t) => (
-          <Pressable
-            key={t.tag}
-            onPress={() => onPick(t.tag)}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: spacing.xs,
-              paddingHorizontal: spacing.md,
-              paddingVertical: 6,
-              borderRadius: radius.full,
-              borderWidth: 1,
-              borderColor: colors.borderSubtle,
-              backgroundColor: pressed ? colors.accentMuted : colors.surface,
-              marginRight: spacing.sm,
-            })}
-          >
-            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>#</Text>
-            <Text variant="caption" color={colors.text} style={{ fontSize: 12 }}>{t.tag}</Text>
-            {t.count > 1 ? (
-              <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{t.count}</Text>
-            ) : null}
-          </Pressable>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-function EndOfBrief({ onAsk }: { onAsk: () => void }) {
-  const colors = useColors();
-  return (
-    <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing['3xl'], gap: spacing.md, alignItems: 'center' }}>
-      <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.5, fontSize: 10 }}>
-        END OF TODAY'S BRIEF
-      </Text>
-      <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 320, lineHeight: 22 }}>
-        That's your reading list. Ask your agent what to dig into next.
-      </Text>
-      <Pressable
-        onPress={onAsk}
-        style={({ pressed }) => ({
-          marginTop: spacing.sm,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.sm,
-          borderRadius: radius.full,
-          borderWidth: 1,
-          borderColor: colors.accent,
-          opacity: pressed ? 0.7 : 1,
-        })}
-      >
-        <Text variant="bodyMedium" color={colors.accent}>Ask my agent</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents';
-
-const TABS: { key: DiscoverTab; label: string }[] = [
-  { key: 'posts', label: 'Posts' },
-  { key: 'people', label: 'People' },
-  { key: 'communities', label: 'Communities' },
-  { key: 'agents', label: 'Agents' },
-];
-
-function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
+function PersonRow({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
   const colors = useColors();
   const name = person.name || 'Unknown';
   const username = person.username;
   const bio = person.bio || person.description || '';
   const avatar = person.image || person.avatar;
   const followerCount = profileFollowerCount(person);
-
+  const postCount = profilePostCount(person);
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: spacing.md,
-        paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.lg,
+        flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+        paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
         backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-        borderBottomWidth: 0.5,
-        borderBottomColor: colors.borderSubtle,
+        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
       })}
     >
       <Avatar uri={avatar} name={name} size="lg" />
@@ -539,11 +683,7 @@ function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; on
           </View>
           <FollowUnfollowButton isFollowed={isFollowed} onPress={(e: any) => { e?.stopPropagation?.(); onFollow(); }} />
         </View>
-        {bio ? (
-          <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
-            {bio}
-          </Text>
-        ) : null}
+        {bio ? <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{bio}</Text> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
           {followerCount > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -551,40 +691,19 @@ function PersonCard({ person, onPress, onFollow, isFollowed }: { person: any; on
               <Text variant="caption" color={colors.textMuted}>{followerCount.toLocaleString()}</Text>
             </View>
           )}
-          {(person.postCount || person.post_count) ? (
+          {postCount > 0 ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="newspaper-outline" size={11} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{(person.postCount || person.post_count).toLocaleString()}</Text>
+              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
             </View>
           ) : null}
-          {(person.createdAt || person.created_at) && (() => {
-            const joined = new Date(person.createdAt || person.created_at).getTime();
-            const newish = Date.now() - joined < 7 * 86_400_000;
-            return newish ? (
-              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: 4 }}>
-                <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>NEW</Text>
-              </View>
-            ) : (
-              <Text variant="caption" color={colors.textMuted}>Joined {timeAgoShort(person.createdAt || person.created_at)}</Text>
-            );
-          })()}
         </View>
       </View>
     </Pressable>
   );
 }
 
-function timeAgoShort(dateStr?: string): string {
-  if (!dateStr) return '';
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  if (diff < 2592000) return `${Math.floor(diff / 604800)}w ago`;
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-}
-
-function CommunityCard({ community, onPress }: { community: any; onPress: () => void }) {
+function CommunityRow({ community, onPress }: { community: any; onPress: () => void }) {
   const colors = useColors();
   const name = community.name || 'Unnamed';
   const description = community.description || community.bio || '';
@@ -592,34 +711,23 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
   const memberCount = community.memberCount || community.member_count || 0;
   const postCount = community.postCount || community.post_count || 0;
   const privacy = community.privacy;
-
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: spacing.md,
-        paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.lg,
+        flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+        paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
         backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.borderSubtle,
+        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
       })}
     >
       <Avatar uri={avatar} name={name} size="lg" />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{name}</Text>
-          {privacy === 'private' && (
-            <Ionicons name="lock-closed" size={12} color={colors.textMuted} />
-          )}
+          {privacy === 'private' && <Ionicons name="lock-closed" size={12} color={colors.textMuted} />}
         </View>
-        {description ? (
-          <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
-            {description}
-          </Text>
-        ) : null}
+        {description ? <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{description}</Text> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Ionicons name="people-outline" size={11} color={colors.textMuted} />
@@ -642,25 +750,20 @@ function CommunityCard({ community, onPress }: { community: any; onPress: () => 
   );
 }
 
-function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
+function AgentRow({ agent, onPress }: { agent: any; onPress: () => void }) {
   const colors = useColors();
   const name = agent.name || 'Agent';
   const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
   const avatar = agent.image || agent.avatar;
   const model = agent.model?.split('/').pop() || '';
-
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: spacing.md,
-        paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.lg,
+        flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+        paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
         backgroundColor: pressed ? colors.surfaceHover : 'transparent',
-        borderBottomWidth: 0.5,
-        borderBottomColor: colors.borderSubtle,
+        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
       })}
     >
       <Avatar uri={avatar} name={name} size="lg" />
@@ -671,11 +774,7 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
             <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
           </View>
         </View>
-        {bio ? (
-          <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
-            {bio}
-          </Text>
-        ) : null}
+        {bio ? <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{bio}</Text> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
           {model && <Text variant="caption" color={colors.textMuted}>Powered by {model}</Text>}
           <Text variant="caption" color={colors.accent}>Chat now →</Text>
@@ -685,372 +784,18 @@ function AgentCard({ agent, onPress }: { agent: any; onPress: () => void }) {
   );
 }
 
-// ── Compact carousel tiles used on the editorial canvas. ──
-// These are deliberately smaller than the full row cards above so a
-// horizontal scroll preview fits three to four items on a phone and six
-// on web without feeling cramped.
+type DiscoverTab = 'posts' | 'people' | 'communities' | 'agents';
 
-const TILE_WIDTH = 260;
+const TABS: { key: DiscoverTab; label: string }[] = [
+  { key: 'posts', label: 'Posts' },
+  { key: 'people', label: 'People' },
+  { key: 'communities', label: 'Communities' },
+  { key: 'agents', label: 'Agents' },
+];
 
-// ── Polished module tiles ──
-// These are the people / community / agent cards that live in the horizontal
-// rails. They're taller, rounded, shadowed "trading cards" with a clear CTA —
-// not thin list rows. Each is a fixed width so the rail previews 1–2 on a
-// phone and 4+ on a wide monitor, with snap-free smooth scroll.
-
-function PersonTile({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow?: () => void; isFollowed?: boolean }) {
-  const colors = useColors();
-  const name = person.name || 'Unknown';
-  const username = person.username;
-  const bio = person.bio || person.description || '';
-  const avatar = person.image || person.avatar;
-  const followers = profileFollowerCount(person);
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        width: TILE_WIDTH,
-        padding: spacing.lg,
-        marginRight: spacing.md,
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.borderSubtle,
-        ...shadows.sm(colors.shadow),
-      })}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <Avatar uri={avatar} name={name} size="lg" />
-        <View style={{ flex: 1 }}>
-          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
-          {username ? <Text variant="caption" color={colors.textMuted} numberOfLines={1}>@{username}</Text> : null}
-        </View>
-      </View>
-      {bio ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.md, lineHeight: 18, minHeight: 36 }}>
-          {bio}
-        </Text>
-      ) : <View style={{ minHeight: 36 + spacing.md }} />}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
-        {followers > 0 ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-            <Text variant="caption" color={colors.textMuted}>{followers.toLocaleString()}</Text>
-          </View>
-        ) : <View />}
-        {onFollow ? (
-          <FollowUnfollowButton isFollowed={isFollowed} onPress={(e: any) => { e?.stopPropagation?.(); onFollow(); }} />
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
-
-function CommunityTile({ community, onPress }: { community: any; onPress: () => void }) {
-  const colors = useColors();
-  const name = community.name || 'Unnamed';
-  const description = community.description || community.bio || '';
-  const avatar = community.image || community.avatar;
-  const memberCount = community.memberCount || community.member_count || 0;
-  const postCount = community.postCount || community.post_count || 0;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        width: TILE_WIDTH,
-        marginRight: spacing.md,
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.borderSubtle,
-        overflow: 'hidden',
-        ...shadows.sm(colors.shadow),
-      })}
-    >
-      {/* Gold-tinted banner band so communities read as places, not people. */}
-      <View style={{ height: 56, backgroundColor: colors.accentMuted }} />
-      <View style={{ padding: spacing.lg, marginTop: -28 }}>
-        <Avatar uri={avatar} name={name} size="lg" />
-        <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.sm }}>{name}</Text>
-        {description ? (
-          <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 18, minHeight: 36 }}>
-            {description}
-          </Text>
-        ) : <View style={{ minHeight: 36 + spacing.xs }} />}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-            <Text variant="caption" color={colors.textMuted}>{memberCount.toLocaleString()}</Text>
-          </View>
-          {postCount > 0 ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function AgentTile({ agent, onPress }: { agent: any; onPress: () => void }) {
-  const colors = useColors();
-  const name = agent.name || 'Agent';
-  const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
-  const avatar = agent.image || agent.avatar;
-  const model = agent.model?.split('/').pop() || '';
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        width: TILE_WIDTH,
-        padding: spacing.lg,
-        marginRight: spacing.md,
-        backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.borderSubtle,
-        ...shadows.sm(colors.shadow),
-      })}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <Avatar uri={avatar} name={name} size="lg" />
-        <View style={{ flex: 1 }}>
-          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <Ionicons name="sparkles" size={10} color={colors.accent} />
-            <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>{model || 'AI agent'}</Text>
-          </View>
-        </View>
-      </View>
-      {bio ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: spacing.md, lineHeight: 18, minHeight: 36 }}>
-          {bio}
-        </Text>
-      ) : <View style={{ minHeight: 36 + spacing.md }} />}
-      <View
-        style={{
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-          marginTop: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full,
-          backgroundColor: colors.accentMuted,
-        }}
-      >
-        <Ionicons name="chatbubble-ellipses" size={13} color={colors.accent} />
-        <Text variant="caption" color={colors.accent}>Chat now</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function SectionHeader({ title, subtitle, onSeeAll, icon, gutter = spacing.xl }: { title: string; subtitle?: string; onSeeAll?: () => void; icon?: keyof typeof Ionicons.glyphMap; gutter?: number }) {
-  const colors = useColors();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
-        paddingHorizontal: gutter,
-        paddingTop: spacing['3xl'],
-        paddingBottom: spacing.md,
-      }}
-    >
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          {/* Gold tick — a small accent bar that gives every module a masthead feel. */}
-          <View style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: colors.accent }} />
-          {icon ? <Ionicons name={icon} size={16} color={colors.text} /> : null}
-          <Text variant="h2">{title}</Text>
-        </View>
-        {subtitle ? (
-          <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, marginLeft: spacing.sm + 4 }}>{subtitle}</Text>
-        ) : null}
-      </View>
-      {onSeeAll ? (
-        <Pressable onPress={onSeeAll} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text variant="caption" color={colors.accent}>See all</Text>
-          <Ionicons name="arrow-forward" size={12} color={colors.accent} />
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-function HorizontalCarousel({ children, loading, gutter = spacing.xl }: { children: React.ReactNode; loading?: boolean; gutter?: number }) {
-  if (loading) {
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: gutter, paddingBottom: spacing.sm }}
-      >
-        {[1, 2, 3, 4].map((i) => (
-          <View key={i} style={{ marginRight: spacing.md }}>
-            <Skeleton width={TILE_WIDTH} height={172} borderRadius={radius.lg} />
-          </View>
-        ))}
-      </ScrollView>
-    );
-  }
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: gutter, paddingBottom: spacing.sm }}
-    >
-      {children}
-    </ScrollView>
-  );
-}
-
-function formatCount(n: number): string {
-  if (!n || n < 0) return '0';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
-  return String(n);
-}
-
-// ── Connectivity-first discover modules ──────────────────────────────────────
-// Discover's job is to GROW THE GRAPH — follow people, join communities, chat
-// with agents — and surface trending content. These are dense, face-forward
-// grids so a lot is scannable at a glance, with a one-tap connect on every card.
-
-function DiscoverSection({ title, action, onAction, children, gutter }: { title: string; action?: string; onAction?: () => void; children: React.ReactNode; gutter: number }) {
-  const colors = useColors();
-  return (
-    <View style={{ marginTop: spacing['2xl'] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: gutter, marginBottom: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <View style={{ width: 3, height: 17, borderRadius: 2, backgroundColor: colors.accent }} />
-          <Text variant="h3">{title}</Text>
-        </View>
-        {action && onAction ? (
-          <Pressable onPress={onAction} hitSlop={8} style={Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : undefined}>
-            <Text variant="caption" color={colors.accent}>{action} →</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      {children}
-    </View>
-  );
-}
-
-// Best still for a post thumbnail: first image-type media, else any post image
-// field. Flags video so we can badge it / show a play placeholder when there's
-// no still — so "small thumbnails of media actually render media".
-function postThumb(post: any): { url: string | null; hasVideo: boolean } {
-  const raw = post.media;
-  const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  let imgUrl: string | null = null;
-  let hasVideo = false;
-  for (const m of arr) {
-    const url = typeof m === 'string' ? m : m?.url;
-    const type = typeof m === 'string' ? '' : (m?.type || '');
-    if (!url) continue;
-    if (type.startsWith('video') || /\.m3u8|\/video\//i.test(url)) hasVideo = true;
-    else if (!imgUrl) imgUrl = url;
-  }
-  return { url: imgUrl || post.image || post.previewImage || post.thumbnail || null, hasVideo };
-}
-
-// The star of the page: a content card with a real media thumbnail, headline,
-// and engagement signal (votes + replies) — the stuff that actually pulls you in.
-function PostDiscoverCard({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
-  const colors = useColors();
-  const { url, hasVideo } = postThumb(post);
-  const title = (post.title || post.content || '').trim();
-  const score = post.score ?? post.voteScore ?? 0;
-  const comments = post.reply_count ?? post.replyCount ?? post.comments_count ?? 0;
-  const author = post.author?.name || post.author?.username || postSource(post);
-  const hasMedia = !!url || hasVideo;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ hovered }: any) => ({
-        width, borderRadius: radius.lg, overflow: 'hidden',
-        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
-        borderWidth: 0.5, borderColor: colors.borderSubtle,
-        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
-      })}
-    >
-      {url ? (
-        <View style={{ height: 124, position: 'relative' }}>
-          <CoverImage uri={url} height={124} />
-          {hasVideo ? (
-            <View style={{ position: 'absolute', bottom: spacing.xs, right: spacing.xs, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="play" size={12} color="#fff" style={{ marginLeft: 1 }} />
-            </View>
-          ) : null}
-        </View>
-      ) : hasVideo ? (
-        <View style={{ height: 124, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="play-circle" size={34} color={colors.accent} />
-        </View>
-      ) : null}
-      <View style={{ padding: spacing.md, gap: spacing.xs }}>
-        <Text variant="bodyMedium" numberOfLines={hasMedia ? 2 : 4} style={{ lineHeight: 19 }}>{title || 'Untitled'}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
-          {score ? <Text variant="caption" color={colors.accent}>↑ {score}</Text> : null}
-          {comments ? <Text variant="caption" color={colors.textMuted}>· {comments}</Text> : null}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-// ONE card design shared by people, communities, and agents — compact so a ton
-// fits at a glance. Avatar + name + bio + optional count + a single CTA.
-function EntityCard({ image, name, bio, count, countIcon, ctaLabel, toggledLabel, toggleable, initialActive, onCta, onPress, width }: {
-  image?: string; name: string; bio?: string; count?: number; countIcon?: keyof typeof Ionicons.glyphMap;
-  ctaLabel: string; toggledLabel?: string; toggleable?: boolean; initialActive?: boolean;
-  onCta: () => void; onPress: () => void; width: number;
-}) {
-  const colors = useColors();
-  const [active, setActive] = React.useState(!!initialActive);
-  const label = toggleable ? (active ? (toggledLabel || ctaLabel) : ctaLabel) : ctaLabel;
-  const isActive = !!toggleable && active;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ hovered }: any) => ({
-        width, padding: spacing.md, borderRadius: radius.lg, gap: spacing.sm,
-        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
-        borderWidth: 0.5, borderColor: colors.borderSubtle,
-        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
-      })}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <Avatar uri={image} name={name} size="md" />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
-          {count != null ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-              {countIcon ? <Ionicons name={countIcon} size={11} color={colors.textMuted} /> : null}
-              <Text variant="caption" color={colors.textMuted}>{formatCount(count)}</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-      {bio ? (
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 16, minHeight: 32 }}>{bio}</Text>
-      ) : <View style={{ minHeight: 32 }} />}
-      <Pressable
-        onPress={(e: any) => { e?.stopPropagation?.(); if (toggleable) setActive((v) => !v); onCta(); }}
-        hitSlop={6}
-        style={{
-          paddingVertical: spacing.xs + 2, borderRadius: radius.full, alignItems: 'center',
-          backgroundColor: isActive ? 'transparent' : colors.accent,
-          borderWidth: isActive ? 1 : 0, borderColor: colors.borderSubtle,
-          ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-        }}
-      >
-        <Text variant="caption" color={isActive ? colors.text : colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>{label}</Text>
-      </Pressable>
-    </Pressable>
-  );
-}
+// ──────────────────────────────────────────────────────────────────────────
+// Screen
+// ──────────────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
   const router = useRouter();
@@ -1059,23 +804,17 @@ export default function DiscoverScreen() {
   const colors = useColors();
   const { width: winW } = useWindowDimensions();
   const [canvasW, setCanvasW] = React.useState(0);
-  // Measured content-area width (set by onLayout below); fall back to an
-  // estimate (window minus the sidebar) until the first measurement lands.
   const layout = React.useMemo(() => computeLayout(canvasW || Math.min(Math.max(winW - 256, 320), 1040)), [canvasW, winW]);
-  const [activeTab, setActiveTab] = React.useState<DiscoverTab>(
-    (params.tab as DiscoverTab) || 'posts'
-  );
+  const { gutter } = layout;
+
+  const [activeTab, setActiveTab] = React.useState<DiscoverTab>((params.tab as DiscoverTab) || 'posts');
   const [searchQuery, setSearchQuery] = React.useState(params.q || '');
-  // Sync the ?q= route param into the search box on EVERY navigation. The
-  // global search (command palette) lands here via /discover?q=…, but useState
-  // only seeds on mount — expo-router keeps this tab alive, so searching while
-  // Discover was already mounted left searchQuery empty and dropped you on the
-  // browse homepage instead of the results. This makes the query always apply.
   React.useEffect(() => {
     if (typeof params.q === 'string' && params.q !== searchQuery) setSearchQuery(params.q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.q]);
-  // Followers/following mode — kept as-is, takes over the screen
+
+  // Followers/following mode — takes over the screen.
   const [followList, setFollowList] = React.useState<any[]>([]);
   const [followListLoading, setFollowListLoading] = React.useState(false);
   const followMode = params.mode as 'followers' | 'following' | undefined;
@@ -1095,20 +834,16 @@ export default function DiscoverScreen() {
     })();
   }, [followMode, followUserId, sdk]);
 
-  // Pull from the user's personal curated stream when AI is on (the
-  // agent's hand-picked reading list); fall back to score-ranked
-  // network posts when AI is off so the page isn't empty for users
-  // with the master switch flipped.
-  // Discover is a real front page of network content — always the ranked
-  // network feed, never the per-user AI-curated 'personal' stream (empty for
-  // anyone without agent curation, which made Discover look broken/empty).
-  const { posts, loading: postsLoading, loadMore: loadMorePosts, hasMore: hasMorePosts } = usePosts('score', 30);
+  // Discover is the front page of network content — always the score-ranked
+  // network feed, never the per-user AI-curated stream (empty for anyone
+  // without agent curation, which made Discover look broken).
+  const { posts, loading: postsLoading, loadMore: loadMorePosts, hasMore: hasMorePosts } = usePosts('score', 40);
   const { communities, loading: commLoading } = useCommunities(50);
   const { agents, loading: agentsLoading } = useAgents(50);
   const { profiles, loading: profilesLoading } = useProfiles(50);
   const { results: searchResults, loading: searchLoading } = useSearchPosts(searchQuery);
 
-  // Search people via SDK when searching
+  // Search people via SDK when searching the People tab.
   const [searchedPeople, setSearchedPeople] = React.useState<any[]>([]);
   React.useEffect(() => {
     if (!searchQuery.trim() || activeTab !== 'people' || !sdk) { setSearchedPeople([]); return; }
@@ -1127,69 +862,83 @@ export default function DiscoverScreen() {
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
     try {
-      if (followMode) {
-        await sdk.profiles.unfollow(userId);
-      } else {
-        await sdk.profiles.follow(userId);
-      }
+      if (followMode) await sdk.profiles.unfollow(userId);
+      else await sdk.profiles.follow(userId);
     } catch {}
   };
 
   const filterByQuery = (items: any[], fields: string[]) => {
     if (!searchQuery.trim()) return items;
     const q = searchQuery.toLowerCase();
-    return items.filter((item) =>
-      fields.some((f) => (item[f] || '').toLowerCase().includes(q))
-    );
+    return items.filter((item) => fields.some((f) => (item[f] || '').toLowerCase().includes(q)));
   };
 
-  // Tapping a trending topic routes into the existing search path. We
-  // land on the Posts tab and drop the query into the box, which the
-  // useSearchPosts hook + isSearching gating already handle.
   const goToTopic = React.useCallback((tag: string) => {
     setActiveTab('posts');
     setSearchQuery(`#${tag}`);
   }, []);
 
   const isSearching = searchQuery.trim().length > 0;
-
-  // Live trending topics from the loaded reading list. Recomputed only
-  // when the post set changes.
   const trendingTopics = React.useMemo(() => computeTrendingTopics(posts || []), [posts]);
 
-  // ── Discover canvas: editorial front page ──
-  // The masthead of Minds. A bold lead hero, then a responsive magazine mosaic
-  // of secondary stories (multi-column on desktop, one rich column on mobile),
-  // broken up by polished people / community / agent modules and a live
-  // trending strip. Everything sits on a centered max-measure so it reads as a
-  // designed page at 390px AND 1400px. Topic taps + "See all" route into the
-  // existing search / tab paths untouched.
-  const { gutter, contentWidth, mosaicCols } = layout;
+  // ── Curated, ranked slices (all client-side over the loaded data) ──
+  const hotPosts = React.useMemo(
+    () => [...(posts || [])].sort((a, b) => engagementScore(b) - engagementScore(a)),
+    [posts],
+  );
+  // Rediscover: older posts that earned engagement, ranked by score+replies.
+  // Excludes anything already shown in Hot so the two sections don't overlap.
+  const rediscoverPosts = React.useMemo(() => {
+    const hotIds = new Set(hotPosts.slice(0, 9).map((p: any) => p.id));
+    return [...(posts || [])]
+      .filter((p: any) => isRediscoverable(p) && !hotIds.has(p.id))
+      .sort((a, b) => (postScore(b) + postReplyCount(b)) - (postScore(a) + postReplyCount(a)))
+      .slice(0, 10);
+  }, [posts, hotPosts]);
 
+  const peopleToFollow = React.useMemo(
+    () => [...(profiles || [])].sort((a, b) => profileFollowerCount(b) - profileFollowerCount(a)).slice(0, 12),
+    [profiles],
+  );
+  const activeCommunities = React.useMemo(
+    () => [...(communities || [])].sort((a, b) =>
+      ((b.memberCount || b.member_count || 0) + (b.postCount || b.post_count || 0)) -
+      ((a.memberCount || a.member_count || 0) + (a.postCount || a.post_count || 0)),
+    ).slice(0, 12),
+    [communities],
+  );
+  const topAgents = React.useMemo(() => (agents || []).slice(0, 12), [agents]);
+
+  const toPost = (p: any) => router.push(`/(tabs)/post/${p.id}` as any);
+  const toUser = (u: any) => router.push(`/(tabs)/user/${u.username || u.id}` as any);
+  const toCommunity = (c: any) => router.push(`/(tabs)/community/${c.slug || c.id}` as any);
+
+  // ── Curated front page ──
   const renderCanvas = () => {
-    if (postsLoading && (posts || []).length === 0) {
+    const firstLoad = postsLoading && (posts || []).length === 0;
+
+    if (firstLoad) {
       return (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing['3xl'] }}>
-          <View style={{ width: contentWidth, paddingHorizontal: gutter, gap: spacing.lg }}>
-            <Skeleton width="100%" height={layout.isWide ? 380 : 300} borderRadius={radius.xl} />
-            <View style={{ flexDirection: layout.isWide ? 'row' : 'column', gap: spacing.lg }}>
-              {[1, 2, 3].slice(0, mosaicCols || 1).map((i) => (
-                <View key={i} style={{ flex: 1, gap: spacing.sm }}>
-                  <Skeleton width="100%" height={160} borderRadius={radius.lg} />
-                  <Skeleton width="80%" height={16} />
-                  <Skeleton width="60%" height={12} />
-                </View>
-              ))}
-            </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
+          <View style={{ paddingHorizontal: gutter, paddingTop: spacing.lg, gap: spacing.lg }}>
+            <Skeleton width="100%" height={layout.isWide ? 300 : 220} borderRadius={radius.xl} />
+          </View>
+          <View style={{ paddingTop: spacing['2xl'] }}>
+            <RailSkeleton gutter={gutter} width={POST_TILE_W} height={200} />
+          </View>
+          <View style={{ paddingTop: spacing['2xl'] }}>
+            <RailSkeleton gutter={gutter} width={ENTITY_TILE_W} height={190} />
           </View>
         </ScrollView>
       );
     }
-    if ((posts || []).length === 0 && (profiles || []).length === 0 && (communities || []).length === 0 && (agents || []).length === 0) {
+
+    const nothing = (posts || []).length === 0 && (profiles || []).length === 0 && (communities || []).length === 0 && (agents || []).length === 0;
+    if (nothing) {
       return (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
           <View style={{ width: 72, height: 72, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="rocket-outline" size={34} color={colors.accent} />
+            <Ionicons name="compass-outline" size={34} color={colors.accent} />
           </View>
           <Text variant="h2" color={colors.text} align="center">Nothing here yet</Text>
           <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 340, lineHeight: 24 }}>
@@ -1200,118 +949,102 @@ export default function DiscoverScreen() {
       );
     }
 
-    const hero = (posts || []).find((p: any) => p.image || p.previewImage) || (posts || [])[0];
-    const rest = (posts || []).filter((p: any) => p.id !== hero?.id).slice(0, 29);
-    // Mosaic gets the next tier of stories; a dense tail catches the long
-    // list so nothing in the brief is lost.
-    const mosaicCount = mosaicCols === 3 ? 6 : mosaicCols === 2 ? 6 : 4;
-    const mosaicPosts = rest.slice(0, mosaicCount);
-    const tailHeadlines = rest.slice(mosaicCount);
+    const featured = hotPosts[0];
+    const hotRail = hotPosts.slice(1, 13);
 
-    // Curated rails, ranked so the strongest items lead.
-    const peopleToFollow = [...(profiles || [])]
-      .sort((a: any, b: any) => profileFollowerCount(b) - profileFollowerCount(a))
-      .slice(0, 10);
-    const activeCommunities = [...(communities || [])]
-      .sort((a: any, b: any) =>
-        ((b.memberCount || b.member_count || 0) + (b.postCount || b.post_count || 0)) -
-        ((a.memberCount || a.member_count || 0) + (a.postCount || a.post_count || 0)))
-      .slice(0, 10);
-    const topAgents = (agents || []).slice(0, 10);
-
-    const toPost = (p: any) => router.push(`/(tabs)/post/${p.id}` as any);
-
-    // Grid widths from the MEASURED width so nothing bleeds. Posts lead and get
-    // bigger cards; the unified people/community/agent cards are smaller so a
-    // ton fits at a glance.
-    const innerW = Math.max(0, layout.width - gutter * 2);
-    const cardGap = spacing.md;
-    const postCols = layout.isUltra ? 3 : layout.isWide ? 2 : 1;
-    const postW = (innerW - cardGap * (postCols - 1)) / postCols;
-    const entCols = layout.isUltra ? 4 : layout.isWide ? 3 : 2;
-    const entW = (innerW - cardGap * (entCols - 1)) / entCols;
-
-    // Lead with the most visually compelling content: posts with media + the
-    // strongest engagement first, so the top of the page actually pulls you in.
-    const rankedPosts = [...(posts || [])].sort((a: any, b: any) => {
-      const am = (postThumb(a).url || postThumb(a).hasVideo) ? 1 : 0;
-      const bm = (postThumb(b).url || postThumb(b).hasVideo) ? 1 : 0;
-      const as = (am * 6) + (a.score ?? 0) + (a.reply_count ?? a.replyCount ?? 0);
-      const bs = (bm * 6) + (b.score ?? 0) + (b.reply_count ?? b.replyCount ?? 0);
-      return bs - as;
-    });
+    // Entity tile width: shrink on phones so two peek at the edge; fixed on wide.
+    const entityW = layout.isWide ? ENTITY_TILE_W : Math.min(ENTITY_TILE_W, Math.max(160, (layout.width - gutter * 2 - spacing.md) / 2));
 
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
-        {/* Trending topics — thin discovery strip into search */}
+        {/* Trending topics — live hashtag pulse into search */}
         {trendingTopics.length > 0 ? (
-          <View style={{ marginTop: spacing.sm }}>
-            <TrendingTopicsRow topics={trendingTopics} onPick={goToTopic} gutter={gutter} />
-          </View>
+          <TrendingTopicsRow topics={trendingTopics} onPick={goToTopic} gutter={gutter} />
         ) : null}
 
-        {/* POSTS — the front page leads with content */}
-        {rankedPosts.length > 0 && (
-          <DiscoverSection title="Trending now" action="See all" gutter={gutter} onAction={() => { setActiveTab('posts'); router.setParams({ tab: 'posts' }); }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
-              {rankedPosts.slice(0, postCols * 4).map((p: any) => (
-                <PostDiscoverCard key={p.id} post={p} width={postW} onPress={() => toPost(p)} />
-              ))}
+        {/* HOT — featured lead + carousel of top-scored posts */}
+        {featured ? (
+          <>
+            <SectionHeader
+              title="Hot right now"
+              subtitle="The posts the network is voting up"
+              icon="flame"
+              gutter={gutter}
+              onSeeAll={() => { setActiveTab('posts'); router.setParams({ tab: 'posts' }); }}
+            />
+            <View style={{ paddingHorizontal: gutter }}>
+              <FeaturedPost post={featured} layout={layout} onPress={() => toPost(featured)} />
             </View>
-          </DiscoverSection>
-        )}
+            {hotRail.length > 0 ? (
+              <View style={{ marginTop: spacing.lg }}>
+                <HorizontalRail gutter={gutter} snap={POST_TILE_W + spacing.md}>
+                  {hotRail.map((p: any) => (
+                    <PostTile key={p.id} post={p} width={POST_TILE_W} onPress={() => toPost(p)} />
+                  ))}
+                </HorizontalRail>
+              </View>
+            ) : null}
+          </>
+        ) : null}
 
-        {/* People to follow */}
+        {/* VOICES TO FOLLOW */}
         {(profilesLoading || peopleToFollow.length > 0) && (
-          <DiscoverSection title="People to follow" action="See all" gutter={gutter} onAction={() => { setActiveTab('people'); router.setParams({ tab: 'people' }); }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
-              {peopleToFollow.slice(0, entCols * 2).map((p: any) => (
-                <EntityCard
-                  key={p.id} width={entW}
-                  image={p.image || p.avatar} name={p.name || p.username || 'Someone'} bio={p.bio}
-                  count={profileFollowerCount(p)} countIcon="people-outline"
-                  ctaLabel="Follow" toggledLabel="Following" toggleable initialActive={!!(p.isFollowing || p.is_following)}
-                  onCta={() => handleFollow(p.id)}
-                  onPress={() => router.push(`/(tabs)/user/${p.username || p.id}` as any)}
-                />
-              ))}
-            </View>
-          </DiscoverSection>
+          <>
+            <SectionHeader title="Voices to follow" subtitle="Creators with a following on Minds" icon="people-outline" gutter={gutter} onSeeAll={() => { setActiveTab('people'); router.setParams({ tab: 'people' }); }} />
+            {profilesLoading && peopleToFollow.length === 0 ? (
+              <RailSkeleton gutter={gutter} width={entityW} height={200} />
+            ) : (
+              <HorizontalRail gutter={gutter} snap={entityW + spacing.md}>
+                {peopleToFollow.map((p: any) => (
+                  <PersonTile key={p.id} person={p} width={entityW} isFollowed={!!(p.isFollowing || p.is_following)} onPress={() => toUser(p)} onFollow={() => handleFollow(p.id)} />
+                ))}
+              </HorizontalRail>
+            )}
+          </>
         )}
 
-        {/* Communities to join */}
+        {/* COMMUNITIES */}
         {(commLoading || activeCommunities.length > 0) && (
-          <DiscoverSection title="Communities to join" action="See all" gutter={gutter} onAction={() => { setActiveTab('communities'); router.setParams({ tab: 'communities' }); }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
-              {activeCommunities.slice(0, entCols * 2).map((c: any) => (
-                <EntityCard
-                  key={c.id} width={entW}
-                  image={c.image || c.avatar} name={c.name} bio={c.description}
-                  count={c.memberCount || c.member_count || 0} countIcon="people"
-                  ctaLabel="View"
-                  onCta={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
-                  onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
-                />
-              ))}
-            </View>
-          </DiscoverSection>
+          <>
+            <SectionHeader title="Communities to join" subtitle="Where the conversations are happening" icon="people" gutter={gutter} onSeeAll={() => { setActiveTab('communities'); router.setParams({ tab: 'communities' }); }} />
+            {commLoading && activeCommunities.length === 0 ? (
+              <RailSkeleton gutter={gutter} width={entityW} height={180} />
+            ) : (
+              <HorizontalRail gutter={gutter} snap={entityW + spacing.md}>
+                {activeCommunities.map((c: any) => (
+                  <CommunityTile key={c.id} community={c} width={entityW} onPress={() => toCommunity(c)} />
+                ))}
+              </HorizontalRail>
+            )}
+          </>
         )}
 
-        {/* Agents to chat with */}
+        {/* AGENTS */}
         {(agentsLoading || topAgents.length > 0) && (
-          <DiscoverSection title="Agents to chat with" action="See all" gutter={gutter} onAction={() => { setActiveTab('agents'); router.setParams({ tab: 'agents' }); }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: cardGap, paddingHorizontal: gutter }}>
-              {topAgents.slice(0, entCols * 2).map((a: any) => (
-                <EntityCard
-                  key={a.id} width={entW}
-                  image={a.image || a.avatar} name={a.name || 'Agent'} bio={a.bio || a.description || a.model || 'AI agent'}
-                  ctaLabel="Chat"
-                  onCta={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
-                  onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
-                />
+          <>
+            <SectionHeader title="Talk to an agent" subtitle="AI you can chat with, right here" icon="sparkles" gutter={gutter} onSeeAll={() => { setActiveTab('agents'); router.setParams({ tab: 'agents' }); }} />
+            {agentsLoading && topAgents.length === 0 ? (
+              <RailSkeleton gutter={gutter} width={entityW} height={170} />
+            ) : (
+              <HorizontalRail gutter={gutter} snap={entityW + spacing.md}>
+                {topAgents.map((a: any) => (
+                  <AgentTile key={a.id} agent={a} width={entityW} onPress={() => toUser(a)} />
+                ))}
+              </HorizontalRail>
+            )}
+          </>
+        )}
+
+        {/* REDISCOVER — buried gems: real engagement, older posts */}
+        {rediscoverPosts.length > 0 && (
+          <>
+            <SectionHeader title="Rediscover" subtitle="Great posts worth a second look" icon="time-outline" gutter={gutter} />
+            <HorizontalRail gutter={gutter} snap={REDISCOVER_TILE_W + spacing.md}>
+              {rediscoverPosts.map((p: any) => (
+                <RediscoverTile key={p.id} post={p} width={REDISCOVER_TILE_W} onPress={() => toPost(p)} />
               ))}
-            </View>
-          </DiscoverSection>
+            </HorizontalRail>
+          </>
         )}
       </ScrollView>
     );
@@ -1347,42 +1080,25 @@ export default function DiscoverScreen() {
   const items = getData();
 
   const renderItem = ({ item }: { item: { type: string; data: any; key: string } }) => {
-    if (item.type === 'post') {
-      return <PostCard post={item.data} compact />;
-    }
+    if (item.type === 'post') return <PostCard post={item.data} compact />;
     if (item.type === 'person') {
       return (
-        <PersonCard
+        <PersonRow
           person={item.data}
           isFollowed={!!followMode}
-          onPress={() => router.push(`/(tabs)/user/${item.data.username || item.data.id}` as any)}
+          onPress={() => toUser(item.data)}
           onFollow={() => handleFollow(item.data.id)}
         />
       );
     }
-    if (item.type === 'community') {
-      return (
-        <CommunityCard
-          community={item.data}
-          onPress={() => router.push(`/(tabs)/community/${item.data.slug || item.data.id}` as any)}
-        />
-      );
-    }
-    if (item.type === 'agent') {
-      return (
-        <AgentCard
-          agent={item.data}
-          onPress={() => router.push(`/(tabs)/user/${item.data.username || item.data.id}` as any)}
-        />
-      );
-    }
+    if (item.type === 'community') return <CommunityRow community={item.data} onPress={() => toCommunity(item.data)} />;
+    if (item.type === 'agent') return <AgentRow agent={item.data} onPress={() => toUser(item.data)} />;
     return null;
   };
 
-  // Show the editorial canvas when we're on the default landing — no
-  // search, no follow-list, no explicit tab filter. Once the user types,
-  // taps a tab via "See all", or navigates here as a followers list,
-  // fall through to the existing tab + list shape.
+  // Curated canvas only on the default landing — no search, no follow-list, no
+  // explicit tab. Once the user types, taps "See all", or arrives as a
+  // followers list, fall through to the tab + list shape.
   const showCanvas = !isSearching && !followMode && !params.tab;
 
   return (
@@ -1390,13 +1106,9 @@ export default function DiscoverScreen() {
       <View style={{ backgroundColor: colors.bg, zIndex: 1 }}>
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.md,
-            paddingHorizontal: spacing.xl,
-            paddingVertical: spacing.md,
-            borderBottomWidth: 0.5,
-            borderBottomColor: colors.borderSubtle,
+            flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+            paddingHorizontal: spacing.xl, paddingVertical: spacing.md,
+            borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
           }}
         >
           <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -1408,27 +1120,20 @@ export default function DiscoverScreen() {
         <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
           <View
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: colors.surface,
-              borderRadius: radius.md,
-              borderWidth: 0.5,
-              borderColor: colors.glassBorder,
-              paddingHorizontal: spacing.md,
-              gap: spacing.sm,
+              flexDirection: 'row', alignItems: 'center',
+              backgroundColor: colors.surface, borderRadius: radius.full,
+              borderWidth: 0.5, borderColor: colors.glassBorder,
+              paddingHorizontal: spacing.md, gap: spacing.sm,
             }}
           >
             <Ionicons name="search" size={18} color={colors.textMuted} />
             <TextInput
-              placeholder="Search posts, people, communities, agents..."
+              placeholder="Search posts, people, communities, agents…"
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
               style={{
-                flex: 1,
-                color: colors.text,
-                ...typography.body,
-                paddingVertical: 10,
+                flex: 1, color: colors.text, ...typography.body, paddingVertical: 11,
                 ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
               }}
             />
@@ -1449,99 +1154,98 @@ export default function DiscoverScreen() {
         style={{ flex: 1 }}
         onLayout={(e) => { const w = e.nativeEvent.layout.width; if (w && Math.abs(w - canvasW) > 1) setCanvasW(w); }}
       >
-      {showCanvas ? (
-        renderCanvas()
-      ) : loading ? (
-        <View style={{ padding: spacing.xl, gap: spacing.xl }}>
-          {[1, 2, 3, 4, 5].map(i => (
-            <View key={i} style={{ gap: spacing.sm }}>
-              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-                <Skeleton width={44} height={44} borderRadius={22} />
-                <View style={{ flex: 1, gap: spacing.xs }}>
-                  <Skeleton width={160} height={14} />
-                  <Skeleton width={100} height={12} />
+        {showCanvas ? (
+          renderCanvas()
+        ) : loading ? (
+          <View style={{ padding: spacing.xl, gap: spacing.xl }}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <View key={i} style={{ gap: spacing.sm }}>
+                <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+                  <Skeleton width={44} height={44} borderRadius={22} />
+                  <View style={{ flex: 1, gap: spacing.xs }}>
+                    <Skeleton width={160} height={14} />
+                    <Skeleton width={100} height={12} />
+                  </View>
                 </View>
+                <Skeleton width="100%" height={40} />
               </View>
-              <Skeleton width="100%" height={40} />
-            </View>
-          ))}
-        </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.key}
-          renderItem={renderItem}
-          onEndReached={activeTab === 'posts' && !isSearching ? loadMorePosts : undefined}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={activeTab === 'posts' && !isSearching && hasMorePosts && items.length > 0 ? (
-            <View style={{ padding: spacing.xl, alignItems: 'center' }}>
-              <ActivityIndicator color={colors.accent} />
-            </View>
-          ) : null}
-          ListHeaderComponent={
-            <>
-              {activeTab === 'communities' && !isSearching && (
-                <Pressable
-                  onPress={() => router.push('/(tabs)/create?mode=community' as any)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-                    borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
-                    backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-                  })}
-                >
-                  <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="add" size={22} color={colors.accent} />
+            ))}
+          </View>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item.key}
+            renderItem={renderItem}
+            onEndReached={activeTab === 'posts' && !isSearching ? loadMorePosts : undefined}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={activeTab === 'posts' && !isSearching && hasMorePosts && items.length > 0 ? (
+              <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                <ActivityIndicator color={colors.accent} />
+              </View>
+            ) : null}
+            ListHeaderComponent={
+              <>
+                {activeTab === 'communities' && !isSearching && (
+                  <Pressable
+                    onPress={() => router.push('/(tabs)/create?mode=community' as any)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                      paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                      borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+                      backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+                    })}
+                  >
+                    <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="add" size={22} color={colors.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodyMedium" color={colors.accent}>Start a community</Text>
+                      <Text variant="caption" color={colors.textMuted}>Gather people around a shared interest</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </Pressable>
+                )}
+                {items.length > 0 && (
+                  <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
+                    <Text variant="caption" color={colors.textMuted}>
+                      {isSearching
+                        ? `${items.length} result${items.length !== 1 ? 's' : ''}`
+                        : activeTab === 'posts' ? `${items.length} trending posts`
+                        : activeTab === 'people' ? `${items.length} people on the network`
+                        : activeTab === 'communities' ? `${items.length} communities to join`
+                        : `${items.length} agents you can chat with`}
+                    </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyMedium" color={colors.accent}>Start a community</Text>
-                    <Text variant="caption" color={colors.textMuted}>Gather people around a shared interest</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </Pressable>
-              )}
-              {items.length > 0 && (
-                <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
-                  <Text variant="caption" color={colors.textMuted}>
-                    {isSearching
-                      ? `${items.length} result${items.length !== 1 ? 's' : ''}`
-                      : activeTab === 'posts' ? `${items.length} trending posts`
-                      : activeTab === 'people' ? `${items.length} people on the network`
-                      : activeTab === 'communities' ? `${items.length} communities to join`
-                      : `${items.length} agents you can chat with`
-                    }
-                  </Text>
-                </View>
-              )}
-            </>
-          }
-          ListEmptyComponent={
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
-              <Ionicons
-                name={
-                  activeTab === 'communities' ? 'people-outline'
-                  : activeTab === 'agents' ? 'hardware-chip-outline'
-                  : activeTab === 'people' ? 'person-outline'
-                  : activeTab === 'posts' ? 'newspaper-outline'
-                  : 'compass-outline'
-                }
-                size={40}
-                color={colors.accent}
-              />
-              <Text variant="h2" color={colors.text} align="center">
-                {searchQuery ? 'No Results' : `Discover ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
-              </Text>
-              <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
-                {searchQuery ? 'Try a different search term.' : 'Be the first to create something.'}
-              </Text>
-              {!searchQuery && (
-                <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create</Button>
-              )}
-            </View>
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+                )}
+              </>
+            }
+            ListEmptyComponent={
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+                <Ionicons
+                  name={
+                    activeTab === 'communities' ? 'people-outline'
+                    : activeTab === 'agents' ? 'hardware-chip-outline'
+                    : activeTab === 'people' ? 'person-outline'
+                    : activeTab === 'posts' ? 'newspaper-outline'
+                    : 'compass-outline'
+                  }
+                  size={40}
+                  color={colors.accent}
+                />
+                <Text variant="h2" color={colors.text} align="center">
+                  {searchQuery ? 'No Results' : `Discover ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
+                </Text>
+                <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
+                  {searchQuery ? 'Try a different search term.' : 'Be the first to create something.'}
+                </Text>
+                {!searchQuery && (
+                  <Button onPress={() => router.push('/(tabs)/create')} size="sm" style={{ marginTop: spacing.md }}>Create</Button>
+                )}
+              </View>
+            }
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
     </Container>
   );

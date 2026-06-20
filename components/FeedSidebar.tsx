@@ -6,8 +6,17 @@ import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
 import { usePosts, useCommunities, useProfiles, useAgents } from '../lib/hooks';
+import { profileFollowerCount, postScore } from '../lib/models';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
+
+// Activity score for a community: members carry the most signal, post count is
+// the liveliness multiplier. Pure client sort over the loaded list.
+function communityActivity(c: any): number {
+  const members = c.memberCount || c.member_count || 0;
+  const posts = c.postCount || c.post_count || 0;
+  return members + posts * 2;
+}
 
 const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
 
@@ -77,12 +86,26 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
 export function FeedSidebar() {
   const router = useRouter();
   const colors = useColors();
-  const { posts } = usePosts('score', 5);
-  const { profiles } = useProfiles(5);
-  const { communities } = useCommunities(5);
-  const { agents } = useAgents(5);
+  // Fetch a real pool (not 5) for each list so the client-side ranking has
+  // something to choose from — fetching only 5 means "trending" was just the
+  // server's default order. usePosts('score') is already score-ranked; we
+  // explicitly rank people by followers and communities by activity below, then
+  // take the top 5. (Agents have no engagement signal in the payload yet — see
+  // the note in the discover PR; left in native discoverable order for now.)
+  const { posts } = usePosts('score', 20);
+  const { profiles } = useProfiles(30);
+  const { communities } = useCommunities(30);
+  const { agents } = useAgents(20);
 
-  const trending = posts.slice(0, 5);
+  const trending = [...(posts || [])]
+    .sort((a: any, b: any) => postScore(b) - postScore(a))
+    .slice(0, 5);
+  const topPeople = [...(profiles || [])]
+    .sort((a: any, b: any) => profileFollowerCount(b) - profileFollowerCount(a))
+    .slice(0, 5);
+  const topCommunities = [...(communities || [])]
+    .sort((a: any, b: any) => communityActivity(b) - communityActivity(a))
+    .slice(0, 5);
   const visibleAgents = (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id)).slice(0, 5);
 
   return (
@@ -166,39 +189,44 @@ export function FeedSidebar() {
         )}
       </SidebarSection>
 
-      {/* Trending People */}
-      {(profiles || []).length > 0 && (
+      {/* Trending People — ranked by follower count */}
+      {topPeople.length > 0 && (
         <SidebarSection
           title="Trending People"
           icon="person-outline"
           onSeeAll={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'people' } } as any)}
         >
-          {(profiles || []).slice(0, 5).map((u: any) => (
-            <SidebarItem
-              key={u.id}
-              avatar={u.image}
-              name={u.name || 'User'}
-              subtitle={u.username ? `@${u.username}` : undefined}
-              description={u.bio || u.description}
-              onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
-            />
-          ))}
+          {topPeople.map((u: any) => {
+            const followers = profileFollowerCount(u);
+            return (
+              <SidebarItem
+                key={u.id}
+                avatar={u.image}
+                name={u.name || 'User'}
+                subtitle={followers > 0
+                  ? `${followers.toLocaleString()} followers`
+                  : (u.username ? `@${u.username}` : undefined)}
+                description={u.bio || u.description}
+                onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
+              />
+            );
+          })}
         </SidebarSection>
       )}
 
-      {/* Trending Communities */}
-      {(communities || []).length > 0 && (
+      {/* Trending Communities — ranked by members + activity */}
+      {topCommunities.length > 0 && (
         <SidebarSection
           title="Trending Communities"
           icon="people-outline"
           onSeeAll={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'communities' } } as any)}
         >
-          {(communities || []).slice(0, 5).map((c: any) => (
+          {topCommunities.map((c: any) => (
             <SidebarItem
               key={c.id}
               avatar={c.image}
               name={c.name || 'Community'}
-              subtitle={`${c.memberCount || c.member_count || 0} members`}
+              subtitle={`${(c.memberCount || c.member_count || 0).toLocaleString()} members`}
               description={c.description || c.bio}
               onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
             />
