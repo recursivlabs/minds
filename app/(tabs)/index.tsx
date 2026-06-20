@@ -101,12 +101,11 @@ export default function FeedScreen() {
     void markAgentCtaDismissed();
   }, []);
 
-  // For You uses the personal-agent curator feed. When the user has
-  // disabled AI in Settings, fall back to chronological so they still
-  // see content but no agent surfaces.
-  const aiEnabled = getPreference('aiEnabled');
+  // For You is always the server-side recommender (a cheap, LLM-free SQL ranker —
+  // no agent/AI involved). It is NOT gated by the personal-agent setting; that
+  // toggle only controls whether the personal-agent DM shows in the inbox.
   const sortMap = {
-    foryou: aiEnabled ? 'personal' : 'latest',
+    foryou: 'personal',
     following: 'following',
   } as const;
   const { posts, setPosts, loading: postsLoading, error: feedError, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);

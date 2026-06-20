@@ -801,8 +801,8 @@ export default function SettingsScreen() {
             />
             <SettingRow
               icon="hardware-chip-outline"
-              label="Use my personal AI agent"
-              sublabel="Off: clean Minds with no AI mediation. For You falls back to chronological; agent hidden from chat. You can still post, follow, comment, and DM."
+              label="Personal AI agent"
+              sublabel="Shows your personal agent as a DM in your inbox. Off: no agent in your inbox. For You and the rest of Minds work the same either way."
               right={<Toggle value={getPreference('aiEnabled')} onValueChange={v => { setPreference('aiEnabled', v); }} />}
             />
           </Section>
