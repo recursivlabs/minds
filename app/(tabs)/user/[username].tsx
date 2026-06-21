@@ -244,7 +244,11 @@ export default function UserProfileScreen() {
     } catch {}
   };
 
-  if (loading) {
+  // Show the skeleton while loading AND during the brief post-fetch window where
+  // profile hasn't committed yet (no error). Without the `!profile && !error`
+  // guard, that transient flashed the "User not found" state before the profile
+  // rendered. Not-found only shows once an error is actually set.
+  if (loading || (!profile && !error)) {
     return (
       <Container safeTop padded={false}>
         <ScreenHeader title="" />

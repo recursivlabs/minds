@@ -89,6 +89,12 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       if (ORG_ID && sort !== 'score') {
         baseParams.organization_id = ORG_ID;
       }
+      // Server-side engagement ordering for discovery/trending, so high-voted
+      // imported posts surface instead of only the most-recent (which one active
+      // user can dominate). Client still re-sorts for the joined-community boost.
+      if (sort === 'score') {
+        baseParams.sort = 'score';
+      }
 
       // Client-side filters (followed authors, muted users) can wipe out an
       // entire server page, so pagination must be tracked in RAW server rows:
