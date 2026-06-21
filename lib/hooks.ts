@@ -133,6 +133,16 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       }
       if (stale()) return;
 
+      // Collapse reposts of the same original (and any duplicate) so a single
+      // viral post doesn't fill discovery/trending via each of its reposters.
+      const seenContentKey = new Set<string>();
+      data = data.filter((p: any) => {
+        const key = p.reposted_from_id || p.reposted_from?.id || p.repostedFromId || p.id;
+        if (seenContentKey.has(key)) return false;
+        seenContentKey.add(key);
+        return true;
+      });
+
       if (sort === 'score') {
         // Boost posts from communities the user has joined
         const myComms = myCommunityIdsRef.current;

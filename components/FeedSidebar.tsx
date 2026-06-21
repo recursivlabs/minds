@@ -174,7 +174,7 @@ export function FeedSidebar() {
               })}
             >
               <Text variant="body" numberOfLines={2} style={{ fontSize: 13 }}>
-                {post.title || post.content?.slice(0, 80) || 'Untitled'}
+                {post.title || post.content?.slice(0, 80) || post.reposted_from?.content?.slice(0, 80) || post.reposted_from?.title || 'Untitled'}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 }}>
                 <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>

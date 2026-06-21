@@ -139,7 +139,12 @@ function postAuthorName(post: any): string {
   return post.author?.name || post.author?.username || postSource(post);
 }
 function postTitle(post: any): string {
-  return (post.title || post.content || '').trim();
+  const own = (post.title || post.content || '').trim();
+  if (own) return own;
+  // Repost rows carry no text of their own — show the reposted original's.
+  const orig = post.reposted_from || post.repostedFrom;
+  if (orig) return ((orig.title || orig.content) || '').trim();
+  return '';
 }
 
 // Best still for a post thumbnail. Flags video so we can badge it.
