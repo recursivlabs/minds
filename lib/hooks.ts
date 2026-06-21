@@ -82,7 +82,11 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       // NOT the old per-user agent brief. It needs no audience/org param (the
       // key's project scope drives it). Other sorts page the shared post list.
       const baseParams: Record<string, any> = { limit };
-      if (ORG_ID) {
+      // Imported legacy posts are project-scoped with org_id NULL. Org-scoping
+      // the discovery/trending fetch ('score') hides them, leaving only the few
+      // native org posts (looked like "all one user"). Network scope includes
+      // the imported content. Other sorts keep org scope.
+      if (ORG_ID && sort !== 'score') {
         baseParams.organization_id = ORG_ID;
       }
 
