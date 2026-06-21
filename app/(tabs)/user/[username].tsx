@@ -89,6 +89,7 @@ export default function UserProfileScreen() {
   const [followLoading, setFollowLoading] = React.useState(false);
   const [followsYou, setFollowsYou] = React.useState(false);
   const [userPosts, setUserPosts] = React.useState<any[]>([]);
+  const [userReplies, setUserReplies] = React.useState<any[]>([]);
   const [postsLoading, setPostsLoading] = React.useState(true);
   const [followersList, setFollowersList] = React.useState<any[] | null>(null);
   const [followingList, setFollowingList] = React.useState<any[] | null>(null);
@@ -164,8 +165,16 @@ export default function UserProfileScreen() {
         // recents + client-filtering — the latter returns ~0 for any given
         // profile on a populated network. NOTE: the REST param is snake_case
         // `author_id`; camelCase is silently dropped → leaks the whole network.
-        const res = await sdk.posts.list({ author_id: profile.id, limit: 50 } as any);
-        if (!cancelled) setUserPosts(res.data || []);
+        // Posts tab = top-level posts; Replies tab = the author's replies with
+        // the parent post hydrated (server `replies=true`). Fetch both in parallel.
+        const [postsRes, repliesRes] = await Promise.all([
+          sdk.posts.list({ author_id: profile.id, limit: 50 } as any),
+          sdk.posts.list({ author_id: profile.id, replies: true, limit: 50 } as any),
+        ]);
+        if (!cancelled) {
+          setUserPosts(postsRes.data || []);
+          setUserReplies(repliesRes.data || []);
+        }
       } catch {}
       finally { if (!cancelled) setPostsLoading(false); }
     })();
@@ -505,18 +514,37 @@ export default function UserProfileScreen() {
           )
         )}
 
-        {/* Replies */}
+        {/* Replies — X-style: each reply shows "Replying to @x" (clickable to the
+            parent) above the reply card. */}
         {profileTab === 'replies' && (
           postsLoading ? (
             <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={60} />)}</View>
-          ) : userPosts.filter((p: any) => p.reply_to_id || p.replyToId).length === 0 ? (
+          ) : userReplies.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
               <Text variant="body" color={colors.textMuted}>No replies yet</Text>
             </View>
           ) : (
-            userPosts.filter((p: any) => p.reply_to_id || p.replyToId).map((post: any) => (
-              <PostCard key={post.id} post={post} compact />
-            ))
+            userReplies.map((post: any) => {
+              const parent = post.reply_to;
+              const parentHandle = parent?.author?.username;
+              return (
+                <View key={post.id}>
+                  {parentHandle ? (
+                    <Pressable
+                      onPress={() => { if (parent?.id) router.push(`/post/${parent.id}` as any); }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}
+                    >
+                      <Ionicons name="arrow-undo-outline" size={13} color={colors.textMuted} />
+                      <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
+                        Replying to <Text variant="caption" color={colors.accent}>@{parentHandle}</Text>
+                        {parent?.content ? `  ${parent.content.slice(0, 50)}` : ''}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <PostCard post={post} compact />
+                </View>
+              );
+            })
           )
         )}
 
