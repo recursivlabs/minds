@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable, Platform, TextInput } from 'react-native';
 import { showToast } from '../../components/Toast';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Button, Input, Card, Skeleton, Divider, Avatar } from '../../components';
+import { Text, Button, Input, Card, Skeleton, Divider, Avatar, PostCard } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { TabBar } from '../../components/TabBar';
@@ -474,13 +474,117 @@ function ContentTab({ sdk }: { sdk: any }) {
 
 /* --- Invites --- */
 /* --- Reports --- */
+// A fully self-contained moderation card: hydrates the reported post inline (so
+// the admin never has to click through), shows who reported it + why, surfaces
+// the offending user, and offers the three concrete actions that exist today.
+function ReportCard({ report, sdk, onResolved }: { report: any; sdk: any; onResolved: (id: string, status: string) => void }) {
+  const colors = useColors();
+  const router = useRouter();
+  const [post, setPost] = React.useState<any>(null);
+  const [reporter, setReporter] = React.useState<any>(null);
+  const [loadingPost, setLoadingPost] = React.useState(report.target_type === 'post');
+  const [busy, setBusy] = React.useState('');
+
+  React.useEffect(() => {
+    let alive = true;
+    if (report.target_type === 'post' && report.target_id) {
+      sdk.posts.get(report.target_id)
+        .then((r: any) => { if (alive) setPost(r?.data || r); })
+        .catch(() => {})
+        .finally(() => { if (alive) setLoadingPost(false); });
+    }
+    if (report.reporter_id) {
+      sdk.profiles.get(report.reporter_id).then((r: any) => { if (alive) setReporter(r?.data || r); }).catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [report.id]);
+
+  // Offending user = the reported user, or (for post reports) the post's author.
+  const targetUser = report.target_type === 'user'
+    ? { id: report.target_id, username: report.target_username, image: undefined }
+    : post?.author;
+
+  const act = async (kind: 'dismiss' | 'remove' | 'ban') => {
+    setBusy(kind);
+    try {
+      if (kind === 'dismiss') {
+        await sdk.admin.dismissReport(report.id);
+        showToast('Report dismissed — no action taken.', 'success');
+        onResolved(report.id, 'dismissed');
+      } else if (kind === 'remove') {
+        if (report.target_type === 'post') await sdk.admin.deletePost(report.target_id);
+        await sdk.admin.resolveReport(report.id);
+        showToast('Post removed.', 'success');
+        onResolved(report.id, 'resolved');
+      } else if (kind === 'ban') {
+        const uid = targetUser?.id;
+        if (uid) await sdk.admin.banUser(uid, `Report: ${report.reason || 'policy violation'}`);
+        await sdk.admin.resolveReport(report.id);
+        showToast(`@${targetUser?.username || 'user'} banned.`, 'success');
+        onResolved(report.id, 'resolved');
+      }
+    } catch { showToast(`Could not ${kind === 'ban' ? 'ban user' : kind === 'remove' ? 'remove post' : 'dismiss'}.`, 'error'); }
+    setBusy('');
+  };
+
+  return (
+    <Card key={report.id}>
+      <View style={{ gap: spacing.md }}>
+        {/* Why it was reported */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Ionicons name="flag" size={15} color={colors.error} />
+          <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{report.reason || 'Reported'}</Text>
+          <Text variant="caption" color={colors.textMuted}>{report.created_at ? new Date(report.created_at).toLocaleDateString() : ''}</Text>
+        </View>
+        <Text variant="caption" color={colors.textSecondary}>
+          {report.target_type === 'post' ? 'Post' : 'User'} reported{reporter?.username ? ` by @${reporter.username}` : ''}
+          {report.details ? ` — "${report.details}"` : ''}
+        </Text>
+
+        {/* The reported content, inline — no click-through needed */}
+        {report.target_type === 'post' ? (
+          loadingPost ? <Skeleton height={120} />
+          : post ? (
+            <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: 'hidden' }}>
+              <PostCard post={post} compact />
+            </View>
+          ) : <Text variant="caption" color={colors.textMuted}>Post unavailable — it may already be deleted.</Text>
+        ) : (
+          <Pressable
+            onPress={() => targetUser?.username && router.push(`/user/${targetUser.username}` as any)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, backgroundColor: colors.surfaceRaised, borderRadius: radius.md }}
+          >
+            <Avatar uri={targetUser?.image} name={targetUser?.username} size="md" />
+            <Text variant="bodyMedium">@{targetUser?.username || String(report.target_id).slice(0, 8)}</Text>
+          </Pressable>
+        )}
+
+        {/* The offending user (author of a reported post) */}
+        {report.target_type === 'post' && post?.author && (
+          <Pressable onPress={() => router.push(`/user/${post.author.username}` as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Avatar uri={post.author.image} name={post.author.username} size="xs" />
+            <Text variant="caption" color={colors.textSecondary}>Posted by @{post.author.username}</Text>
+          </Pressable>
+        )}
+
+        {/* The three actions that exist today: do nothing / remove post / ban */}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, flexWrap: 'wrap', marginTop: spacing.xs }}>
+          <Button onPress={() => act('dismiss')} variant="ghost" size="sm" loading={busy === 'dismiss'}>Do nothing</Button>
+          {report.target_type === 'post' && (
+            <Button onPress={() => act('remove')} variant="secondary" size="sm" loading={busy === 'remove'}>Remove post</Button>
+          )}
+          <Button onPress={() => act('ban')} size="sm" accentColor={colors.error} loading={busy === 'ban'}>Ban user</Button>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
 function ReportsTab({ sdk }: { sdk: any }) {
   const colors = useColors();
   const [reports, setReports] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [actionId, setActionId] = React.useState('');
   const [showResolved, setShowResolved] = React.useState(false);
-  const router = useRouter();
 
   const load = React.useCallback(async () => {
     try {
@@ -491,28 +595,9 @@ function ReportsTab({ sdk }: { sdk: any }) {
   }, [sdk]);
   React.useEffect(() => { load(); }, [load]);
 
-  const resolve = async (id: string) => {
-    setActionId(id);
-    try { await sdk.admin.resolveReport(id); setReports(rs => rs.map(r => r.id === id ? { ...r, status: 'resolved' } : r)); }
-    catch { showToast('Failed to resolve report.', 'error'); }
-    setActionId('');
-  };
-  const dismiss = async (id: string) => {
-    setActionId(id);
-    try { await sdk.admin.dismissReport(id); setReports(rs => rs.map(r => r.id === id ? { ...r, status: 'dismissed' } : r)); }
-    catch { showToast('Failed to dismiss report.', 'error'); }
-    setActionId('');
-  };
-  const removeContent = async (r: any) => {
-    setActionId(r.id);
-    try {
-      if (r.target_type === 'post') await sdk.admin.deletePost(r.target_id);
-      await sdk.admin.resolveReport(r.id);
-      setReports(rs => rs.map(x => x.id === r.id ? { ...x, status: 'resolved' } : x));
-      showToast('Content removed.', 'success');
-    } catch { showToast('Failed to remove content.', 'error'); }
-    setActionId('');
-  };
+  const onResolved = React.useCallback((id: string, status: string) => {
+    setReports(rs => rs.map(r => r.id === id ? { ...r, status } : r));
+  }, []);
 
   if (loading) return <Skeleton height={200} />;
 
@@ -535,36 +620,20 @@ function ReportsTab({ sdk }: { sdk: any }) {
             No open reports. When users report content, it appears here for review.
           </Text>
         </View>
-      ) : visible.map((r: any) => {
-        const resolved = (r.status || 'pending') !== 'pending';
-        return (
-        <Card key={r.id}>
-          <View style={{ gap: spacing.md }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="bodyMedium">{r.reason || 'Reported'}</Text>
-                <Text variant="caption" color={resolved ? colors.textMuted : colors.accent}>
-                  {r.target_type} · {r.status || 'pending'}{r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString()}` : ''}
+      ) : visible.map((r: any) => (
+        (r.status || 'pending') === 'pending'
+          ? <ReportCard key={r.id} report={r} sdk={sdk} onResolved={onResolved} />
+          : (
+            <Card key={r.id}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md }}>
+                <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
+                  {r.reason || 'Reported'} · {r.target_type}
                 </Text>
-                {r.details ? <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs }}>{r.details}</Text> : null}
+                <Text variant="caption" color={colors.textMuted}>{r.status}</Text>
               </View>
-              {r.target_type === 'post' && (
-                <Button onPress={() => router.push(`/(tabs)/post/${r.target_id}` as any)} variant="ghost" size="sm">View</Button>
-              )}
-            </View>
-            {!resolved && (
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm }}>
-                <Button onPress={() => dismiss(r.id)} variant="ghost" size="sm" loading={actionId === r.id}>Dismiss</Button>
-                {r.target_type === 'post' && (
-                  <Button onPress={() => removeContent(r)} variant="ghost" size="sm" accentColor={colors.error} loading={actionId === r.id}>Remove</Button>
-                )}
-                <Button onPress={() => resolve(r.id)} size="sm" loading={actionId === r.id}>Resolve</Button>
-              </View>
-            )}
-          </View>
-        </Card>
-        );
-      })}
+            </Card>
+          )
+      ))}
     </View>
   );
 }
