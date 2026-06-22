@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, Platform } from 'react-native';
+import { View, Platform, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { parseMarkdownSegments, renderMarkdownToHtml } from '../lib/markdown';
 import { spacing, radius } from '../constants/theme';
@@ -12,9 +13,13 @@ interface Props {
   // plain text, no bubble. User messages stay in a bubble. For human DMs leave
   // this false and both sides render as iMessage bubbles.
   agentChat?: boolean;
+  // Tap-to-retry for a failed optimistic send. Wired by the chat screen; when
+  // absent the failed row still shows its "Not delivered" state, just without
+  // the retry affordance.
+  onRetry?: (message: any) => void;
 }
 
-export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agentChat }: Props) {
+export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agentChat, onRetry }: Props) {
   const colors = useColors();
   const content = message.content || message.text || message.body || '';
   // Never render an empty bubble. A streaming placeholder legitimately starts
@@ -31,6 +36,11 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
   // bubble doesn't bounce-resize as new chunks land. Once `streaming`
   // goes false the timestamp + final layout render normally.
   const isStreaming = message.streaming === true;
+  // Delivery state for the user's own optimistic rows (iMessage semantics):
+  //   pending  → in flight (dim + a tiny clock), reconciles to a real id
+  //   failed   → server never confirmed; show "Not delivered" + tap to retry
+  const isPending = isOwn && message.pending === true && message.failed !== true;
+  const isFailed = isOwn && message.failed === true;
   // Claude-style document layout for the agent's side of an agent chat.
   const isDocument = agentChat === true && !isOwn;
 
@@ -98,7 +108,13 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
     >
       <View
         style={{
-          backgroundColor: isOwn ? colors.accent : colors.surfaceRaised,
+          // Failed sends go red-tinted; pending sends dim slightly so the
+          // "still sending" state reads at a glance — both reconcile to the
+          // solid accent bubble once the server confirms.
+          backgroundColor: isOwn
+            ? (isFailed ? colors.error : colors.accent)
+            : colors.surfaceRaised,
+          opacity: isPending ? 0.6 : 1,
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.md,
           borderRadius: radius.lg,
@@ -111,7 +127,32 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
         <View style={{ flexShrink: 1 }}>{renderContent()}</View>
         {isStreaming ? <StreamingCaret color={textColor} /> : null}
       </View>
-      {!isStreaming && formattedTime ? (
+      {/* Failed send: clear "Not delivered" + tap-to-retry, iMessage-style. */}
+      {isFailed ? (
+        <Pressable
+          onPress={() => onRetry?.(message)}
+          hitSlop={6}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            marginTop: spacing.xs,
+            alignSelf: 'flex-end',
+            opacity: pressed ? 0.6 : 1,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+          })}
+        >
+          <Ionicons name="alert-circle" size={13} color={colors.error} />
+          <Text variant="caption" color={colors.error} style={{ fontSize: 11 }}>
+            Not delivered{onRetry ? ' · Tap to retry' : ''}
+          </Text>
+        </Pressable>
+      ) : isPending ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: spacing.xs, alignSelf: 'flex-end' }}>
+          <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>Sending…</Text>
+        </View>
+      ) : !isStreaming && formattedTime ? (
         <Text
           variant="caption"
           color={colors.textMuted}

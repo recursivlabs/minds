@@ -48,7 +48,9 @@ export function VideoPlayer({ uri, autoplay = true, height = 260 }: VideoPlayerP
 }
 
 const styles = StyleSheet.create({
-  wrap: { width: '100%', borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' },
+  // Transparent surround + left-aligned video so any contain() letterbox shows
+  // the card background (no visible black bars) and the frame hugs the leading edge.
+  wrap: { width: '100%', borderRadius: 12, overflow: 'hidden', backgroundColor: 'transparent', alignItems: 'flex-start', justifyContent: 'flex-start' },
   video: { width: '100%', height: '100%' },
   badge: {
     position: 'absolute',

@@ -138,9 +138,12 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
   return (
     <div
       style={{
-        width: '100%', aspectRatio: String(ratio), maxHeight: height, margin: '0 auto',
-        background: '#000', borderRadius: 12, overflow: 'hidden', position: 'relative',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        // Transparent surround + left-justified video: any contain() letterbox
+        // shows the card background instead of black bars, and the frame hugs
+        // the leading edge rather than centering.
+        width: '100%', aspectRatio: String(ratio), maxHeight: height, marginLeft: 0, marginRight: 'auto',
+        background: 'transparent', borderRadius: 12, overflow: 'hidden', position: 'relative',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start',
       }}
     >
       <video
@@ -152,7 +155,7 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
         playsInline
         controls
         onLoadedMetadata={onLoadedMetadata}
-        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', visibility: state === 'ready' ? 'visible' : 'hidden' }}
+        style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center', display: 'block', visibility: state === 'ready' ? 'visible' : 'hidden' }}
       />
       {(state === 'processing' || state === 'loading' || state === 'failed') && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: '#cfcfd6' }}>

@@ -19,6 +19,7 @@ import { captureException } from '../../lib/monitoring';
 import { connectRealtime } from '../../lib/realtime';
 import { conversationUnreadCount, isAiActor } from '../../lib/models';
 import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
+import { publishLocalChat } from '../../lib/chatEvents';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -822,13 +823,18 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     // user hits send — no waiting on the server round-trip. Reconciled
     // with the real server id when the response lands. iMessage feel.
     const tempId = `temp-${Date.now()}`;
+    const optimisticCreatedAt = new Date().toISOString();
     setMessages(prev => [...prev, {
       id: tempId,
       content: messageText,
       sender: { id: user?.id, name: user?.name },
-      createdAt: new Date().toISOString(),
+      createdAt: optimisticCreatedAt,
       pending: true,
     }]);
+    // Tell the sidebar inbox NOW (not after the WS echo) so its preview text,
+    // ordering, and — for a brand-new DM — the row itself update in lockstep
+    // with the thread view. Reconciles against server truth on the next refetch.
+    publishLocalChat({ conversationId, content: messageText, createdAt: optimisticCreatedAt });
 
     try {
       const otherId = partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId;
@@ -974,6 +980,19 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     }
   };
 
+  // Retry a failed send: drop the failed optimistic row and re-run handleSend
+  // with its original text. Mirrors iMessage's tap-to-retry on a "Not
+  // delivered" bubble.
+  const retryMessage = React.useCallback((msg: any) => {
+    const body = (msg?.content || '').trim();
+    if (!body) return;
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    void handleSend(body);
+    // handleSend is stable enough for this purpose; intentionally not in deps to
+    // avoid re-creating the callback on every keystroke-driven render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Fire a route-param prompt once the recipient is resolved (so agent
   // detection + agents.chatStream work). Runs once per distinct prompt, then
   // clears it from the URL so navigating back / remounting doesn't resend.
@@ -1023,7 +1042,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
             const senderId = item.sender?.id || item.senderId || item.sender_id;
-            return <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} />;
+            return <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} />;
           }}
           contentContainerStyle={{
             paddingVertical: spacing.xl,

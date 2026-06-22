@@ -7,6 +7,7 @@ import { captureRefFromUrl, getPendingRef, clearPendingRef } from './referral';
 import { registerPushToken, registerTokenWithServer } from './notifications';
 import { captureException } from './monitoring';
 import { clearAll as clearCacheAll, setCacheUser } from './cache';
+import { invalidatePersonalAgent } from './resolvePersonalAgent';
 import { setSignalsSdk } from './signals';
 
 function registerPushTokenBackground(sdk: Recursiv) {
@@ -360,6 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // signs in, and sees jack's audience-scoped Discover posts +
     // 404s when clicking them.
     clearCacheAll();
+    invalidatePersonalAgent(); // drop the cached personal agent so the next user re-resolves their own
     setCacheUser(null); // reset to the anon namespace
     setUser(null);
     setAuthedSdk(null);

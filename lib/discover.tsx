@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Platform, Pressable, ScrollView, Image } from 'react-native';
+import { View, Platform, Pressable, ScrollView, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Skeleton } from '../components';
 import { logSignal } from './signals';
@@ -867,6 +867,91 @@ export function FilterChips<K extends string>({ chips, active, onChange, gutter 
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// FilterMenu — a compact, native-feeling dropdown. A small pill showing the
+// current selection + a chevron; tapping opens a centered menu (Modal) of
+// options. Replaces stacked chip rows: a row of one or two of these reads like
+// X/Bluesky's filter controls instead of three rails of chips.
+//
+// Selection still lives in the URL — the menu just calls onChange with the same
+// key the chips set before, so deep-links + back/forward are unchanged.
+// ──────────────────────────────────────────────────────────────────────────
+export function FilterMenu<K extends string>({ options, value, onChange, icon }: {
+  options: { key: K; label: string }[];
+  value: K;
+  onChange: (key: K) => void;
+  icon?: keyof typeof Ionicons.glyphMap;
+}) {
+  const colors = useColors();
+  const [open, setOpen] = React.useState(false);
+  const current = options.find((o) => o.key === value) ?? options[0];
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => ({
+          flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+          paddingLeft: spacing.md, paddingRight: spacing.sm, paddingVertical: 6,
+          borderRadius: radius.full, borderWidth: 1,
+          borderColor: colors.borderSubtle,
+          backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+          ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+        })}
+      >
+        {icon ? <Ionicons name={icon} size={12} color={colors.textMuted} /> : null}
+        <Text variant="caption" color={colors.textSecondary} style={{ fontSize: 12 }}>{current?.label}</Text>
+        <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable
+          onPress={() => setOpen(false)}
+          style={{ flex: 1, backgroundColor: colors.scrimStrong, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg, borderRadius: radius.xl,
+              paddingVertical: spacing.sm, width: '100%', maxWidth: 320,
+              borderWidth: 1, borderColor: colors.border,
+              ...shadows.lg(colors.shadow),
+            }}
+          >
+            {options.map((o) => {
+              const isActive = o.key === value;
+              return (
+                <Pressable
+                  key={o.key}
+                  onPress={() => { onChange(o.key); setOpen(false); }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
+                    backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                  })}
+                >
+                  <Text variant="body" color={isActive ? colors.accent : colors.text}>{o.label}</Text>
+                  {isActive ? <Ionicons name="checkmark" size={18} color={colors.accent} /> : null}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+// ── One-line row that holds the compact FilterMenu dropdowns (sort + time). ──
+export function FilterBar({ children, gutter }: { children: React.ReactNode; gutter?: number }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: gutter ?? spacing.xl, paddingVertical: spacing.sm }}>
+      {children}
+    </View>
+  );
+}
+
 // ── Full-width list skeleton, shared by every entity tab's loading state. ──
 export function ListSkeleton() {
   return (
@@ -966,18 +1051,14 @@ export function TopicChips({ tags, activeId, onPick, gutter }: {
       <Text variant="caption" color={active ? colors.accent : colors.textSecondary} style={{ fontSize: 12 }}>{label}</Text>
     </Pressable>
   );
+  // Primary filter bar now — a clean horizontal scroll of topic chips, no row
+  // label (the chevron dropdowns below carry the secondary sort/time filters).
   return (
-    <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: gutter ?? spacing.xl, paddingTop: spacing.sm }}>
-        <Ionicons name="pricetag" size={11} color={colors.accent} />
-        <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.2, fontSize: 10 }}>TOPICS</Text>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter ?? spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm }}>
-        <Chip id={null} label="All" active={!activeId} />
-        {tags.map((t) => (
-          <Chip key={t.id} id={t.id} label={t.name} active={activeId === t.id} />
-        ))}
-      </ScrollView>
-    </View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter ?? spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm }}>
+      <Chip id={null} label="All" active={!activeId} />
+      {tags.map((t) => (
+        <Chip key={t.id} id={t.id} label={t.name} active={activeId === t.id} />
+      ))}
+    </ScrollView>
   );
 }

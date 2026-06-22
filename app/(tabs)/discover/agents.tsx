@@ -7,7 +7,7 @@ import { useAgents } from '../../../lib/hooks';
 import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { timestampOf } from '../../../lib/models';
-import { FilterChips, AgentRow, ListSkeleton, agentPopularity } from '../../../lib/discover';
+import { FilterMenu, FilterBar, AgentRow, ListSkeleton, agentPopularity } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Agents tab — leaderboard by popularity. The agent payload carries no
@@ -69,7 +69,11 @@ export default function DiscoverAgents() {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <>
-          {!isSearching && <FilterChips chips={CHIPS} active={sort} onChange={setSort} />}
+          {!isSearching && (
+            <FilterBar>
+              <FilterMenu options={CHIPS} value={sort} icon="swap-vertical" onChange={setSort} />
+            </FilterBar>
+          )}
           {ranked.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>

@@ -19,7 +19,7 @@ import { invalidate } from '../lib/cache';
 import { ensureIntroDM, INTRO_DM_TEMPLATE as _IDT, firstName as _FN } from '../lib/agentIntro';
 import { spacing, radius, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
-import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
+import { resolvePersonalAgent, invalidatePersonalAgent } from '../lib/resolvePersonalAgent';
 
 // Model options — must match server allowlist in lib/modelAllowlist.ts.
 // IDs are dotted (OpenRouter convention), not dashed. Keep list short to
@@ -163,6 +163,10 @@ export default function AgentSetupScreen() {
       });
       const newAgentId: string | undefined = ensureRes?.data?.agent_id || ensureRes?.data?.id || agentId;
       if (newAgentId && !agentId) setAgentId(newAgentId);
+      // A personal agent was just created/updated — drop the cached resolution
+      // so the chat back-fill / sidebar / command palette pick it up without a
+      // full reload.
+      invalidatePersonalAgent();
 
       // 3. Trigger an initial curator run so the feed has content waiting
       //    when they land back. Cycle status lines so the user has

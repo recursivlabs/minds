@@ -8,7 +8,8 @@ import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { postScore, postReplyCount, timestampOf, dedupePosts } from '../../../lib/models';
 import {
-  FilterChips,
+  FilterMenu,
+  FilterBar,
   TopicChips,
   hotScore,
   withinRange,
@@ -52,7 +53,8 @@ export default function DiscoverPosts() {
   const isSearching = query.length > 0;
 
   // Filter state lives in the URL so deep-links + filters are shareable.
-  const sort: PostSort = (params.sort === 'top' || params.sort === 'hot') ? params.sort : 'new';
+  // Default sort is Top (highest-scoring) — absent param → 'top'.
+  const sort: PostSort = (params.sort === 'new' || params.sort === 'hot') ? params.sort : 'top';
   const range: TimeRange =
     (params.range === 'today' || params.range === 'week' || params.range === 'month') ? params.range : 'all';
   const tagId = typeof params.tag === 'string' && params.tag ? params.tag : null;
@@ -139,21 +141,27 @@ export default function DiscoverPosts() {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <>
-          {!isSearching && (
-            <>
-              <FilterChips chips={SORT_CHIPS} active={sort} onChange={(k) => setParam({ sort: k === 'new' ? undefined : k })} />
-              <FilterChips
-                chips={TIME_RANGE_CHIPS}
-                active={range}
-                onChange={(k) => setParam({ range: k === 'all' ? undefined : k })}
-              />
-            </>
-          )}
           <TopicChips
             tags={tags as any}
             activeId={tagId}
             onPick={(id) => setParam({ tag: id || undefined })}
           />
+          {!isSearching && (
+            <FilterBar>
+              <FilterMenu
+                options={SORT_CHIPS}
+                value={sort}
+                icon="swap-vertical"
+                onChange={(k) => setParam({ sort: k === 'top' ? undefined : k })}
+              />
+              <FilterMenu
+                options={TIME_RANGE_CHIPS}
+                value={range}
+                icon="time-outline"
+                onChange={(k) => setParam({ range: k === 'all' ? undefined : k })}
+              />
+            </FilterBar>
+          )}
           {data.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>

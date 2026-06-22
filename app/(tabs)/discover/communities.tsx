@@ -7,7 +7,7 @@ import { useCommunities, useTags } from '../../../lib/hooks';
 import { spacing, radius } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { timestampOf } from '../../../lib/models';
-import { FilterChips, TopicChips, CommunityRow, ListSkeleton, communityMemberCount, communityActivity } from '../../../lib/discover';
+import { FilterMenu, FilterBar, TopicChips, CommunityRow, ListSkeleton, communityMemberCount, communityActivity } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Communities tab — leaderboard + filter chips. There's no community search
@@ -98,8 +98,12 @@ export default function DiscoverCommunities() {
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
           )}
-          {!isSearching && <FilterChips chips={CHIPS} active={sort} onChange={setSort} />}
           <TopicChips tags={tags as any} activeId={tagId} onPick={(id) => router.setParams({ tag: id || undefined } as any)} />
+          {!isSearching && (
+            <FilterBar>
+              <FilterMenu options={CHIPS} value={sort} icon="swap-vertical" onChange={setSort} />
+            </FilterBar>
+          )}
           {ranked.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>

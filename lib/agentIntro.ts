@@ -9,6 +9,7 @@
 // cache afterwards so the Recent sidebar refetches.
 
 import { ORG_ID } from './recursiv';
+import { fetchDeduped } from './cache';
 
 // Plain, no-possessive greeting. Earlier version templated the user's
 // first name ("Hey jack, ...") but Jack's stored display name had a
@@ -53,6 +54,15 @@ export async function ensureIntroDM(
   _userName?: string | null | undefined,
 ): Promise<string | null> {
   if (!sdk || !agentId) return null;
+  // De-dupe the whole back-fill. The chat tab AND the SideNav both run an
+  // intro back-fill on a web load, so without this each one independently
+  // hit chat.dm + chat.messages for the SAME agent thread — doubling the
+  // request load (and racing two intro posts). Coalescing on the agent id
+  // collapses concurrent callers onto a single shared run.
+  return fetchDeduped(`req:intro-dm:${agentId}`, () => doEnsureIntroDM(sdk, agentId));
+}
+
+async function doEnsureIntroDM(sdk: any, agentId: string): Promise<string | null> {
   const dmRes: any = await sdk.chat.dm({ user_id: agentId, organization_id: ORG_ID || undefined } as any);
   const conversationId: string | undefined = dmRes?.data?.id;
   if (!conversationId) return null;

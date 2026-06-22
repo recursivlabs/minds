@@ -13,7 +13,7 @@ import { useProfile, useMyProfile, useCommunities } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { getFollowRelationship } from '../../../lib/moderation';
 import { getBookmarks } from '../../../lib/bookmarks';
-import { getCached, invalidate } from '../../../lib/cache';
+import { getCached, invalidate, fetchDeduped } from '../../../lib/cache';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { profileFollowerCount, profileFollowingCount } from '../../../lib/models';
@@ -72,7 +72,10 @@ export default function UserProfileScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await sdk.agents.list({ limit: 100 });
+        // Dedupe the heavy owned-agents scan so two profile views (or a view
+        // racing the chat/sidebar personal-agent lookup) don't each fire a
+        // separate /agents?limit=100 — part of the request-storm cleanup.
+        const res = await fetchDeduped('req:owned-agents:100', () => sdk.agents.list({ limit: 100 }));
         if (cancelled) return;
         const owned = (res.data || []).some((a: any) => a.id === profile.id);
         setIsMyAgent(owned);

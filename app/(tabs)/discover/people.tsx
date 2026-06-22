@@ -9,7 +9,7 @@ import { ORG_ID } from '../../../lib/recursiv';
 import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { profileFollowerCount, profilePostCount } from '../../../lib/models';
-import { FilterChips, TopicChips, PersonRow, ListSkeleton } from '../../../lib/discover';
+import { FilterMenu, FilterBar, TopicChips, PersonRow, ListSkeleton } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // People tab — leaderboard + filter chips, or search results when the shared
@@ -135,8 +135,12 @@ export default function DiscoverPeople() {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <>
-          {!isSearching && <FilterChips chips={CHIPS} active={sort} onChange={setSort} />}
           <TopicChips tags={tags as any} activeId={tagId} onPick={(id) => router.setParams({ tag: id || undefined } as any)} />
+          {!isSearching && (
+            <FilterBar>
+              <FilterMenu options={CHIPS} value={sort} icon="swap-vertical" onChange={setSort} />
+            </FilterBar>
+          )}
           {data.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>

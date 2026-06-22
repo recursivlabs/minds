@@ -16,6 +16,7 @@ import { ensureIntroDM } from '../lib/agentIntro';
 import { invalidate } from '../lib/cache';
 import { getPreference } from '../lib/preferences';
 import { useActiveConvoId } from '../lib/activeConvo';
+import { subscribeLocalChat } from '../lib/chatEvents';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
 import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
 
@@ -297,6 +298,27 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       if (refreshTimer) clearTimeout(refreshTimer);
     };
   }, [sdk, user?.id, refreshConvos]);
+
+  // Source 3: LOCAL optimistic sends. The chat screen publishes the instant the
+  // user hits send — before the WS echo round-trips — so the sidebar preview +
+  // ordering (and a brand-new DM's row) move in lockstep with the thread view.
+  // This NEVER lights the unread dot (it's the user's OWN message); it only
+  // updates the preview overlay and schedules a reconcile refetch so a newly
+  // created conversation appears.
+  React.useEffect(() => {
+    const unsub = subscribeLocalChat((evt) => {
+      if (!evt.content) return;
+      setLivePreviews(prev => {
+        const n = new Map(prev);
+        n.set(evt.conversationId, { content: evt.content, createdAt: evt.createdAt });
+        return n;
+      });
+      // A brand-new DM won't be in the cached list yet — pull it in so the row
+      // renders. invalidate() forces useConversations to refetch immediately.
+      invalidate('conversations');
+    });
+    return unsub;
+  }, []);
 
   // Opening a thread is the ONLY thing that clears its dot. Suppress re-adding it
   // until the server's read cursor catches up (readLocallyRef), so a refresh that

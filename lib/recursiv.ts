@@ -36,6 +36,16 @@ export function createAuthedSdk(apiKey: string): Recursiv {
     apiKey,
     baseUrl: BASE_URL,
     timeout: 120_000,
+    // BOUNDED retry budget. The SDK's fetchWithRetry already backs off
+    // exponentially (1s → 2s → … capped at 10s) and HONORS the server's
+    // Retry-After header before retrying a 429/5xx — so a single request never
+    // hammers. The remaining storm risk was AMPLIFICATION: many components each
+    // firing the same heavy lookup (e.g. /agents?limit=100) in parallel, each
+    // with its own retry budget. That's fixed at the app layer (resolvePersonalAgent
+    // + ensureIntroDM are now cached + in-flight-deduped to ONE request). We keep
+    // the retry count tight (2) so even a cache-miss burst can't fan a 429 into a
+    // long retry chain. Do NOT raise this — a higher budget re-opens the storm.
+    maxRetries: 2,
   });
 }
 

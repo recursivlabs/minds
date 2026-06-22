@@ -132,7 +132,6 @@ function PostImage({ uri, onPress, badge, initialWidth, initialHeight }: {
   initialWidth?: number;
   initialHeight?: number;
 }) {
-  const colors = useColors();
   const [size, setSize] = React.useState<{ w: number; h: number } | null>(
     initialWidth && initialHeight ? { w: initialWidth, h: initialHeight } : null
   );
@@ -158,12 +157,21 @@ function PostImage({ uri, onPress, badge, initialWidth, initialHeight }: {
         maxHeight: MAX_IMAGE_HEIGHT,
         minHeight: MIN_IMAGE_HEIGHT,
         borderRadius: radius.md,
-        backgroundColor: colors.surfaceHover,
+        // Transparent surround + left-justified image: any contain() letterbox
+        // (from the min/max-height clamp) shows the card background instead of a
+        // grey bar, and the image hugs the leading edge rather than centering.
+        backgroundColor: 'transparent',
         overflow: 'hidden',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
       }}>
         <Image
           source={{ uri }}
-          style={{ width: '100%', height: '100%' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            ...(Platform.OS === 'web' ? { objectPosition: 'left center' } as any : null),
+          }}
           resizeMode="contain"
         />
         {badge}
