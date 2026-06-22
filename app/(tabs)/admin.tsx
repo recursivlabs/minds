@@ -15,6 +15,19 @@ import { profileFollowerCount, profileFollowingCount, profilePostCount } from '.
 
 type Tab = 'dashboard' | 'users' | 'content' | 'reports' | 'communities';
 
+// Raw authed call to the REST API — used for the reports endpoints, which the
+// pinned SDK (0.5.6, kept for deployed-API CORS compatibility) doesn't expose.
+async function adminFetch(path: string, opts: RequestInit = {}): Promise<any> {
+  const apiKey = await require('../../lib/storage').getItem('minds:api_key');
+  const base = require('../../lib/recursiv').BASE_ORIGIN;
+  const res = await fetch(`${base}/api/v1${path}`, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}), ...((opts.headers as any) || {}) },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
+
 const BUSINESS_AI_AGENT_ID = '411ac3a9-dfbc-4463-8963-2e26a645211e';
 
 /* --- AI Chat --- */
@@ -565,18 +578,18 @@ function ReportCard({ report, sdk, onResolved, allReports }: { report: any; sdk:
     setBusy(kind);
     try {
       if (kind === 'dismiss') {
-        await sdk.admin.dismissReport(report.id);
+        await adminFetch(`/reports/${report.id}/dismiss`, { method: 'POST' });
         showToast('Report dismissed — no action taken.', 'success');
         onResolved(report.id, 'dismissed');
       } else if (kind === 'remove') {
         if (report.target_type === 'post') await sdk.admin.deletePost(report.target_id);
-        await sdk.admin.resolveReport(report.id);
+        await adminFetch(`/reports/${report.id}/resolve`, { method: 'POST' });
         showToast('Post removed.', 'success');
         onResolved(report.id, 'resolved');
       } else if (kind === 'ban') {
         const uid = targetUser?.id;
         if (uid) await sdk.admin.banUser(uid, `Report: ${report.reason || 'policy violation'}`);
-        await sdk.admin.resolveReport(report.id);
+        await adminFetch(`/reports/${report.id}/resolve`, { method: 'POST' });
         showToast(`@${targetUser?.username || 'user'} banned.`, 'success');
         onResolved(report.id, 'resolved');
       }
@@ -648,7 +661,7 @@ function ReportsTab({ sdk }: { sdk: any }) {
 
   const load = React.useCallback(async () => {
     try {
-      const res = await sdk.admin.listReports({ limit: 100 });
+      const res = await adminFetch('/reports?limit=100');
       setReports(Array.isArray(res) ? res : res?.data || []);
     } catch {}
     setLoading(false);

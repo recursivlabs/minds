@@ -24,8 +24,8 @@ importers:
         specifier: 2.2.0
         version: 2.2.0(react-native@0.81.5(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.1.17)(react@19.1.0))
       '@recursiv/sdk':
-        specifier: ^0.5.8
-        version: 0.5.8(react@19.1.0)
+        specifier: 0.5.6
+        version: 0.5.6(react@19.1.0)
       expo:
         specifier: ^54.0.34
         version: 54.0.34(@babel/core@7.29.7)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
@@ -1936,8 +1936,8 @@ packages:
   '@react-navigation/routers@7.5.3':
     resolution: {integrity: sha512-1tJHg4KKRJuQ1/EvJxatrMef3NZXEPzwUIUZ3n1yJ2t7Q97siwRtbynRpQG9/69ebbtiZ8W3ScOZF/OmhvM4Rg==}
 
-  '@recursiv/sdk@0.5.8':
-    resolution: {integrity: sha512-Jv8FQ49P4fFbF2UqWtS5WaRtN9hqwnwaPvpf6ypzrpE8J4P4PYN6JkfQttLKk/bWbdcX0/6JfRIBQmH5FaDO9g==}
+  '@recursiv/sdk@0.5.6':
+    resolution: {integrity: sha512-R1844PIOH4vValxqdBvSVCTwBSg1viwoY5MwjwAoSICRF85t/shetZqUyi3KIvUkpi6tKLCzAfxi/6XToZKyYA==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18.3.1 || ^19.0.0
@@ -7258,7 +7258,7 @@ snapshots:
     dependencies:
       nanoid: 3.3.11
 
-  '@recursiv/sdk@0.5.8(react@19.1.0)':
+  '@recursiv/sdk@0.5.6(react@19.1.0)':
     dependencies:
       react: 19.1.0
       socket.io-client: 4.8.3
