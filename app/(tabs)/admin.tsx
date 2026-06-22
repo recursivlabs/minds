@@ -11,6 +11,7 @@ import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
+import { profileFollowerCount, profileFollowingCount, profilePostCount } from '../../lib/models';
 
 type Tab = 'dashboard' | 'users' | 'content' | 'reports' | 'communities';
 
@@ -474,10 +475,66 @@ function ContentTab({ sdk }: { sdk: any }) {
 
 /* --- Invites --- */
 /* --- Reports --- */
+// Transparent, heuristic risk read on a reported user — the "rap sheet" that
+// admins used to assemble by hand. Pure client-side from the profile + the
+// loaded report queue; no server scoring needed.
+function assessUser(profile: any, reportsAgainst: number) {
+  let score = 0;
+  const flags: string[] = [];
+  const created = profile?.created_at || profile?.createdAt;
+  const ageDays = created ? Math.floor((Date.now() - new Date(created).getTime()) / 86_400_000) : null;
+  const followers = profileFollowerCount(profile);
+  const following = profileFollowingCount(profile);
+  const posts = profilePostCount(profile);
+  if (reportsAgainst >= 2) { score += 3; flags.push(`${reportsAgainst} open reports`); }
+  if (ageDays != null && ageDays < 7) { score += 2; flags.push('account < 1wk old'); }
+  if (followers < 3) { score += 1; flags.push('few followers'); }
+  if (following > 50 && followers < 5) { score += 2; flags.push('follow-spam pattern'); }
+  if (profile?.banned_at || profile?.bannedAt) { score += 5; flags.push('previously banned'); }
+  const level = score >= 6 ? 'High' : score >= 3 ? 'Medium' : 'Low';
+  return { level, score, flags, ageDays, followers, following, posts };
+}
+
+function UserRapSheet({ user, sdk, allReports }: { user: any; sdk: any; allReports: any[] }) {
+  const colors = useColors();
+  const [profile, setProfile] = React.useState<any>(null);
+  React.useEffect(() => {
+    let alive = true;
+    const handle = user?.username;
+    if (handle) {
+      sdk.profiles.getByUsername(handle)
+        .then((r: any) => { if (alive) setProfile(r?.data || r); })
+        .catch(() => { if (user?.id) sdk.profiles.get(user.id).then((r: any) => { if (alive) setProfile(r?.data || r); }).catch(() => {}); });
+    }
+    return () => { alive = false; };
+  }, [user?.username, user?.id]);
+
+  if (!user) return null;
+  // Reports in the queue that target this user directly (best-effort rap sheet).
+  const reportsAgainst = (allReports || []).filter((r: any) => r.target_type === 'user' && r.target_id === user.id).length;
+  const a = assessUser(profile || user, reportsAgainst);
+  const riskColor = a.level === 'High' ? colors.error : a.level === 'Medium' ? (colors.warning || colors.accent) : (colors.success || colors.textMuted);
+
+  return (
+    <View style={{ gap: 4, padding: spacing.sm, backgroundColor: colors.surfaceRaised, borderRadius: radius.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Text variant="label" color={colors.textMuted}>USER SUMMARY</Text>
+        <View style={{ paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radius.full, backgroundColor: riskColor + '22' }}>
+          <Text variant="caption" color={riskColor}>{a.level} risk</Text>
+        </View>
+      </View>
+      <Text variant="caption" color={colors.textSecondary}>
+        {a.ageDays != null ? `${a.ageDays}d old` : 'age —'} · {a.followers} followers · {a.following} following · {a.posts} posts
+      </Text>
+      {a.flags.length > 0 && <Text variant="caption" color={riskColor}>⚑ {a.flags.join(' · ')}</Text>}
+    </View>
+  );
+}
+
 // A fully self-contained moderation card: hydrates the reported post inline (so
 // the admin never has to click through), shows who reported it + why, surfaces
 // the offending user, and offers the three concrete actions that exist today.
-function ReportCard({ report, sdk, onResolved }: { report: any; sdk: any; onResolved: (id: string, status: string) => void }) {
+function ReportCard({ report, sdk, onResolved, allReports }: { report: any; sdk: any; onResolved: (id: string, status: string) => void; allReports: any[] }) {
   const colors = useColors();
   const router = useRouter();
   const [post, setPost] = React.useState<any>(null);
@@ -567,6 +624,9 @@ function ReportCard({ report, sdk, onResolved }: { report: any; sdk: any; onReso
           </Pressable>
         )}
 
+        {/* Quick risk read on the offending user — the "rap sheet" */}
+        {targetUser && <UserRapSheet user={targetUser} sdk={sdk} allReports={allReports} />}
+
         {/* The three actions that exist today: do nothing / remove post / ban */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, flexWrap: 'wrap', marginTop: spacing.xs }}>
           <Button onPress={() => act('dismiss')} variant="ghost" size="sm" loading={busy === 'dismiss'}>Do nothing</Button>
@@ -622,7 +682,7 @@ function ReportsTab({ sdk }: { sdk: any }) {
         </View>
       ) : visible.map((r: any) => (
         (r.status || 'pending') === 'pending'
-          ? <ReportCard key={r.id} report={r} sdk={sdk} onResolved={onResolved} />
+          ? <ReportCard key={r.id} report={r} sdk={sdk} onResolved={onResolved} allReports={reports} />
           : (
             <Card key={r.id}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md }}>
