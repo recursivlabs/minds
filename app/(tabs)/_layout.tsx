@@ -112,6 +112,8 @@ export default function TabLayout() {
             <Tabs.Screen name="boost" options={{ href: null }} />
             <Tabs.Screen name="discover" options={{ href: null }} />
             <Tabs.Screen name="admin" options={{ href: null }} />
+            {/* Root-level /<username> profile (legacy minds.com/<user> compat) */}
+            <Tabs.Screen name="[username]" options={{ href: null }} />
             <Tabs.Screen name="notifications" options={{ href: null }} />
             <Tabs.Screen name="settings" options={{ href: null }} />
             <Tabs.Screen name="billing" options={{ href: null }} />
