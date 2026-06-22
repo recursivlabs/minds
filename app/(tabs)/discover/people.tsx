@@ -3,13 +3,13 @@ import { View, FlatList } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../components';
-import { useProfiles, useProfileLeaderboard } from '../../../lib/hooks';
+import { useProfiles, useProfileLeaderboard, useTags } from '../../../lib/hooks';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
 import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { profileFollowerCount, profilePostCount } from '../../../lib/models';
-import { FilterChips, PersonRow, ListSkeleton } from '../../../lib/discover';
+import { FilterChips, TopicChips, PersonRow, ListSkeleton } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // People tab — leaderboard + filter chips, or search results when the shared
@@ -34,13 +34,20 @@ const CHIPS: { key: PeopleSort; label: string }[] = [
 
 export default function DiscoverPeople() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ q?: string }>();
+  const params = useLocalSearchParams<{ q?: string; sort?: string; tag?: string }>();
   const colors = useColors();
   const { sdk } = useAuth();
   const query = (params.q || '').trim();
   const isSearching = query.length > 0;
 
-  const [sort, setSort] = React.useState<PeopleSort>('followers');
+  // Sort lives in the URL so it deep-links + survives back/forward.
+  const sort: PeopleSort = (params.sort === 'active' || params.sort === 'suggested') ? params.sort : 'followers';
+  const setSort = React.useCallback((k: PeopleSort) => router.setParams({ sort: k === 'followers' ? undefined : k } as any), [router]);
+  const tagId = typeof params.tag === 'string' && params.tag ? params.tag : null;
+  // Topic chips light up once tags backfill; profiles carry no tag field yet, so
+  // a picked tag narrows nothing today — wired so it filters for free the moment
+  // profiles return tag ids (graceful no-op until then).
+  const { tags } = useTags(50);
   // 200 is the server's max for /profiles — fetch the largest pool it allows so
   // the directory + leaderboard re-rank the whole corpus, not just ~60.
   const { profiles, loading: profilesLoading } = useProfiles(200);
@@ -76,7 +83,15 @@ export default function DiscoverPeople() {
   }, [engagementById]);
 
   const ranked = React.useMemo(() => {
-    const list = [...(profiles || [])];
+    let list = [...(profiles || [])];
+    // Topic filter: no-op until profile payloads carry tag ids, then filters
+    // for free (profiles with the picked tag in their `tags` array).
+    if (tagId) {
+      list = list.filter((p: any) => {
+        const ids = Array.isArray(p.tags) ? p.tags.map((t: any) => t?.id ?? t) : null;
+        return ids ? ids.includes(tagId) : true;
+      });
+    }
     if (sort === 'active') {
       return list.sort((a, b) => activityScore(b) - activityScore(a));
     }
@@ -97,7 +112,7 @@ export default function DiscoverPeople() {
       if (f) return f;
       return activityScore(b) - activityScore(a);
     });
-  }, [profiles, sort, activityScore]);
+  }, [profiles, sort, activityScore, tagId]);
 
   const data = isSearching ? searchedPeople : ranked;
   const loading = (isSearching ? searchLoading : profilesLoading) && data.length === 0;
@@ -121,6 +136,7 @@ export default function DiscoverPeople() {
       ListHeaderComponent={
         <>
           {!isSearching && <FilterChips chips={CHIPS} active={sort} onChange={setSort} />}
+          <TopicChips tags={tags as any} activeId={tagId} onPick={(id) => router.setParams({ tag: id || undefined } as any)} />
           {data.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>

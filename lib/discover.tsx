@@ -877,10 +877,96 @@ export function ListSkeleton() {
 }
 
 // ── Navigation helpers shared across the tabs ──
+// For You lives on the main Feed now — Discover is a pure search/directory
+// console that defaults to Posts.
 export const DISCOVER_TABS: { key: string; label: string }[] = [
-  { key: 'index', label: 'For You' },
   { key: 'posts', label: 'Posts' },
   { key: 'people', label: 'People' },
   { key: 'communities', label: 'Communities' },
   { key: 'agents', label: 'Agents' },
 ];
+
+// ──────────────────────────────────────────────────────────────────────────
+// Time-range filter — Today / This week / This month / All time.
+//
+// `sinceForRange` turns a range key into a `since` ISO string. The console
+// passes it to the server as ?since= (not honored yet) AND client-filters
+// created_at over the fetched pages as the fallback, so swapping to a pure
+// server filter later is a one-line change (drop the client filter).
+// ──────────────────────────────────────────────────────────────────────────
+export type TimeRange = 'today' | 'week' | 'month' | 'all';
+
+export const TIME_RANGE_CHIPS: { key: TimeRange; label: string }[] = [
+  { key: 'all', label: 'All time' },
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This week' },
+  { key: 'month', label: 'This month' },
+];
+
+const RANGE_MS: Record<Exclude<TimeRange, 'all'>, number> = {
+  today: 86_400_000,
+  week: 7 * 86_400_000,
+  month: 30 * 86_400_000,
+};
+
+/** ISO timestamp marking the start of the window, or undefined for 'all'. */
+export function sinceForRange(range: TimeRange): string | undefined {
+  if (range === 'all') return undefined;
+  return new Date(Date.now() - RANGE_MS[range]).toISOString();
+}
+
+/** Client-side fallback for the time window (until the server honors ?since). */
+export function withinRange(post: any, range: TimeRange): boolean {
+  if (range === 'all') return true;
+  const ts = timestampOf(post);
+  if (!ts) return false;
+  return Date.now() - new Date(ts).getTime() <= RANGE_MS[range];
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Topic chips — a horizontal row of tag chips wired to the tags backfill.
+//
+// Reads the available tags from useTags() (sdk.tags.list). The tags table is
+// empty today, so this renders NOTHING until tags are backfilled — at which
+// point it lights up automatically. Picking a chip drives a server query
+// (?tag_ids=<id>) in the consuming tab.
+// ──────────────────────────────────────────────────────────────────────────
+export function TopicChips({ tags, activeId, onPick, gutter }: {
+  tags: { id: string; name: string; slug?: string; color?: string | null }[];
+  activeId?: string | null;
+  onPick: (id: string | null) => void;
+  gutter?: number;
+}) {
+  const colors = useColors();
+  if (!tags || tags.length === 0) return null;
+  const Chip = ({ id, label, active }: { id: string | null; label: string; active: boolean }) => (
+    <Pressable
+      onPress={() => onPick(id)}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+        paddingHorizontal: spacing.md, paddingVertical: 6,
+        borderRadius: radius.full, borderWidth: 1,
+        borderColor: active ? colors.accent : colors.borderSubtle,
+        backgroundColor: active ? colors.accentMuted : (pressed ? colors.surfaceHover : colors.surface),
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <Text variant="caption" color={active ? colors.accent : colors.textMuted} style={{ fontSize: 12 }}>#</Text>
+      <Text variant="caption" color={active ? colors.accent : colors.textSecondary} style={{ fontSize: 12 }}>{label}</Text>
+    </Pressable>
+  );
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: gutter ?? spacing.xl, paddingTop: spacing.sm }}>
+        <Ionicons name="pricetag" size={11} color={colors.accent} />
+        <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.2, fontSize: 10 }}>TOPICS</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter ?? spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm }}>
+        <Chip id={null} label="All" active={!activeId} />
+        {tags.map((t) => (
+          <Chip key={t.id} id={t.id} label={t.name} active={activeId === t.id} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}

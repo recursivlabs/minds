@@ -259,6 +259,102 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
 }
 
 /**
+ * Discover Posts feed — the master search console's Posts tab.
+ *
+ * Unlike usePosts (which the main Feed uses and bakes in follow/community
+ * personalization), this is a THIN paginator over the raw /posts list with the
+ * server params the console exposes as filters:
+ *   - order: 'new'  → recency (no sort param, server default)
+ *            'top'  → sort=score (all-time)
+ *            'hot'  → recency (pages recent posts; the CALLER re-ranks by
+ *                     hotScore client-side — recent × engagement)
+ *   - since:  ISO string → ?since= (server date filter; not honored yet, so the
+ *             caller ALSO client-filters created_at as a fallback)
+ *   - tagId:  string → ?tag_ids= (topic filter; lights up once tags backfill)
+ *
+ * Returns the raw fetched pages deduped; ranking/time-window filtering is the
+ * caller's job so the hook stays a dumb pager. Infinite scroll via loadMore.
+ */
+export function useDiscoverPosts(opts: { order: 'new' | 'top' | 'hot'; since?: string; tagId?: string; limit?: number }) {
+  const { order, since, tagId, limit = 30 } = opts;
+  const { sdk } = useAuth();
+  // Server order: 'new' and 'hot' both page recency (hot re-ranks client-side);
+  // only 'top' asks the server for the all-time score sort.
+  const serverSort = order === 'top' ? 'score' : undefined;
+  const cacheKey = `discover-posts:${serverSort || 'recent'}:${since || ''}:${tagId || ''}:${limit}`;
+  const cached = getCached(cacheKey);
+  const [posts, setPosts] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+  const offsetRef = React.useRef(0);
+  const reqIdRef = React.useRef(0);
+  const inFlightRef = React.useRef(false);
+
+  const buildParams = React.useCallback((offset: number) => {
+    const p: Record<string, any> = { limit, offset };
+    // Network scope (org_id NULL legacy posts included) — same reasoning as
+    // usePosts('score'): org-scoping the discovery fetch hides imported content.
+    if (serverSort) p.sort = serverSort;
+    else if (ORG_ID) p.organization_id = ORG_ID;
+    // Date window. The server doesn't honor ?since yet; we pass it so it lights
+    // up for free once it does, AND the caller client-filters as the fallback.
+    if (since) p.since = since;
+    if (tagId) p.tag_ids = tagId;
+    return p;
+  }, [serverSort, since, tagId, limit]);
+
+  const fetchPage = React.useCallback(async (refresh: boolean) => {
+    if (!sdk) return; // identity-scoped; never fall back to the shared app key
+    if (inFlightRef.current && !refresh) return;
+    const myReq = ++reqIdRef.current;
+    inFlightRef.current = true;
+    const stale = () => reqIdRef.current !== myReq;
+    try {
+      if (refresh) { setRefreshing(true); offsetRef.current = 0; }
+      const offset = refresh ? 0 : offsetRef.current;
+      const res: any = await fetchDeduped(`req:${cacheKey}:${offset}`, () =>
+        sdk.posts.list(buildParams(offset) as any));
+      if (stale()) return;
+      const raw = res.data || [];
+      const more = res.meta?.has_more ?? raw.length >= limit;
+      const visible = filterMuted(raw);
+      visible.forEach((p: any) => { if (p.id) setCache(`post:${p.id}`, p); });
+      setPosts((prev) => {
+        const base = refresh ? [] : prev;
+        const seen = new Set(base.map((p: any) => p.id));
+        const merged = [...base, ...visible.filter((p: any) => !seen.has(p.id))];
+        setCache(cacheKey, merged);
+        return merged;
+      });
+      setHasMore(more);
+      offsetRef.current = offset + raw.length;
+    } catch (err: any) {
+      captureException(err, { hook: 'useDiscoverPosts', order });
+    } finally {
+      if (!stale()) { inFlightRef.current = false; setLoading(false); setRefreshing(false); }
+    }
+  }, [sdk, cacheKey, buildParams, limit, order]);
+
+  // Refetch from scratch whenever the server query (sort/since/tag) changes.
+  React.useEffect(() => {
+    const fresh = getCached(cacheKey);
+    setPosts(fresh || []);
+    setLoading(!fresh);
+    offsetRef.current = 0;
+    setHasMore(true);
+    fetchPage(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, sdk]);
+
+  const loadMore = React.useCallback(() => {
+    if (hasMore && !loading && !refreshing && !inFlightRef.current) fetchPage(false);
+  }, [fetchPage, hasMore, loading, refreshing]);
+
+  return { posts, loading, refreshing, hasMore, loadMore, refresh: () => fetchPage(true) };
+}
+
+/**
  * Fetch a single post by ID.
  */
 export function usePost(postId: string) {

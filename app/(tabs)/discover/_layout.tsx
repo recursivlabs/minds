@@ -9,32 +9,34 @@ import { useColors } from '../../../lib/theme';
 import { DISCOVER_TABS } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
-// Discover — X-style tabbed front door. A shared header (back + search box)
-// sits on top of a tab bar that switches between 5 sub-routes, each its own
-// URL:
-//   /discover              → For You master (curated multi-section page)
-//   /discover/posts        → post leaderboard + search
-//   /discover/people       → people leaderboard + search
-//   /discover/communities  → community leaderboard + search
-//   /discover/agents       → agent leaderboard + search
+// Discover — X-style master search console. A shared header (back + search box)
+// sits on top of a tab bar that switches between 4 entity sub-routes, each its
+// own URL:
+//   /discover              → redirects to /discover/posts (the default)
+//   /discover/posts        → ALL posts, paginated, filterable + search
+//   /discover/people       → people directory + search
+//   /discover/communities  → community directory + search
+//   /discover/agents       → agent directory + search
 //
-// The search box drives the ACTIVE tab. Typing writes ?q=… on the current
-// route; each child reads it and searches its own entity. Keeping the query in
-// the URL means deep-links (e.g. a #tag → /discover/posts?q=%23tag) just work.
+// "For You" lives on the main Feed now — Discover is a pure search/directory
+// surface. The search box drives the ACTIVE tab. Typing writes ?q=… on the
+// current route; each child reads it and searches its own entity. Keeping the
+// query in the URL means deep-links (e.g. a #tag → /discover/posts?q=%23tag)
+// just work.
 // ──────────────────────────────────────────────────────────────────────────
 
-// Map a pathname to the active sub-route key. `/discover` (no trailing
-// segment) is the For You master = the `index` route.
+// Map a pathname to the active sub-route key. The bare `/discover` redirects to
+// posts, so it's the default highlight.
 function activeKeyFromPath(pathname: string): string {
   const m = pathname.match(/\/discover\/?([a-z]*)/i);
   const seg = m?.[1] || '';
-  if (seg === 'posts' || seg === 'people' || seg === 'communities' || seg === 'agents') return seg;
-  return 'index';
+  if (seg === 'people' || seg === 'communities' || seg === 'agents') return seg;
+  return 'posts';
 }
 
-// Build the href for a tab key. The master is the bare folder route.
+// Build the href for a tab key.
 function hrefForKey(key: string): string {
-  return key === 'index' ? '/(tabs)/discover' : `/(tabs)/discover/${key}`;
+  return `/(tabs)/discover/${key}`;
 }
 
 function DiscoverTabBar({ active, onChange }: { active: string; onChange: (key: string) => void }) {
@@ -115,8 +117,7 @@ export default function DiscoverLayout() {
     activeKey === 'people' ? 'Search people…'
     : activeKey === 'communities' ? 'Search communities…'
     : activeKey === 'agents' ? 'Search agents…'
-    : activeKey === 'posts' ? 'Search posts…'
-    : 'Search posts, people, communities, agents…';
+    : 'Search posts…';
 
   return (
     <Container safeTop padded={false}>

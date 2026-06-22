@@ -36,12 +36,14 @@ function popularity(a: any): number {
 
 export default function DiscoverAgents() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ q?: string }>();
+  const params = useLocalSearchParams<{ q?: string; sort?: string }>();
   const colors = useColors();
   const query = (params.q || '').trim();
   const isSearching = query.length > 0;
 
-  const [sort, setSort] = React.useState<AgentSort>('popular');
+  // Sort lives in the URL so it deep-links + survives back/forward.
+  const sort: AgentSort = (params.sort === 'newest' || params.sort === 'az') ? params.sort : 'popular';
+  const setSort = React.useCallback((k: AgentSort) => router.setParams({ sort: k === 'popular' ? undefined : k } as any), [router]);
   // 100 is the server's max for /agents/discoverable — fetch the whole set.
   const { agents, loading } = useAgents(100);
 
