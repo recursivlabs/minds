@@ -147,6 +147,15 @@ function postTitle(post: any): string {
   return '';
 }
 
+// Card label: real text if present, else a media-aware placeholder (an image
+// post with no caption should read as "Photo", never the ugly "Untitled").
+function cardLabel(post: any, title: string): string {
+  if (title) return title;
+  const thumb = postThumb(post);
+  if (thumb.url) return thumb.hasVideo ? 'Video' : 'Photo';
+  return 'Untitled';
+}
+
 // Best still for a post thumbnail. Flags video so we can badge it.
 function postThumb(post: any): { url: string | null; hasVideo: boolean } {
   const raw = post.media;
@@ -349,7 +358,7 @@ const FeaturedPost = React.memo(function FeaturedPost({ post, onPress, layout }:
           ) : null}
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: layout.isWide ? spacing.xl : spacing.lg, gap: spacing.sm }}>
             {eyebrow(true)}
-            <Text variant={layout.isWide ? 'h1' : 'h2'} color="#fff" numberOfLines={3} style={{ maxWidth: 720 }}>{title || 'Untitled'}</Text>
+            <Text variant={layout.isWide ? 'h1' : 'h2'} color="#fff" numberOfLines={3} style={{ maxWidth: 720 }}>{cardLabel(post, title)}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: 2 }}>
               <Text variant="caption" color="rgba(255,255,255,0.82)" numberOfLines={1} style={{ maxWidth: 200 }}>{author}</Text>
               {score > 0 ? stat('arrow-up', String(score), true) : null}
@@ -360,7 +369,7 @@ const FeaturedPost = React.memo(function FeaturedPost({ post, onPress, layout }:
       ) : (
         <View style={{ padding: layout.isWide ? spacing['2xl'] : spacing.xl, gap: spacing.md, borderLeftWidth: 3, borderLeftColor: colors.accent }}>
           {eyebrow(false)}
-          <Text variant={layout.isWide ? 'h1' : 'h2'} color={colors.text} numberOfLines={4}>{title || 'Untitled'}</Text>
+          <Text variant={layout.isWide ? 'h1' : 'h2'} color={colors.text} numberOfLines={4}>{cardLabel(post, title)}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: 2 }}>
             <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ maxWidth: 200 }}>{author}</Text>
             {score > 0 ? stat('arrow-up', String(score), false) : null}
@@ -412,7 +421,7 @@ const PostTile = React.memo(function PostTile({ post, onPress, width }: { post: 
         </View>
       ) : null}
       <View style={{ padding: spacing.md, gap: spacing.xs, flex: 1 }}>
-        <Text variant="bodyMedium" numberOfLines={hasMedia ? 2 : 4} style={{ lineHeight: 20, minHeight: hasMedia ? 40 : undefined }}>{title || 'Untitled'}</Text>
+        <Text variant="bodyMedium" numberOfLines={hasMedia ? 2 : 4} style={{ lineHeight: 20, minHeight: hasMedia ? 40 : undefined }}>{cardLabel(post, title)}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 'auto' as any }}>
           <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
           {score > 0 ? <Text variant="caption" color={colors.accent}>↑ {score}</Text> : null}
@@ -459,7 +468,7 @@ const RediscoverTile = React.memo(function RediscoverTile({ post, onPress, width
         </View>
       )}
       <View style={{ flex: 1, gap: 3 }}>
-        <Text variant="bodyMedium" numberOfLines={2} style={{ lineHeight: 19 }}>{title || 'Untitled'}</Text>
+        <Text variant="bodyMedium" numberOfLines={2} style={{ lineHeight: 19 }}>{cardLabel(post, title)}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
           {age ? <Text variant="caption" color={colors.textMuted}>{age} ago</Text> : null}

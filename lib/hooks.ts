@@ -137,7 +137,11 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       // viral post doesn't fill discovery/trending via each of its reposters.
       const seenContentKey = new Set<string>();
       data = data.filter((p: any) => {
-        const key = p.reposted_from_id || p.reposted_from?.id || p.repostedFromId || p.id;
+        // Collapse by repost link OR shared media — orphaned legacy reminds carry
+        // the original's image with no reposted_from link, so the same image
+        // would otherwise repeat under different authors.
+        const mediaUrl = Array.isArray(p.media) ? p.media[0]?.url : p.media?.url;
+        const key = p.reposted_from_id || p.reposted_from?.id || p.repostedFromId || mediaUrl || p.id;
         if (seenContentKey.has(key)) return false;
         seenContentKey.add(key);
         return true;
