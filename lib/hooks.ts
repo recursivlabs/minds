@@ -7,6 +7,7 @@ import { loadPreferences, markCuratedNow } from './onboarding';
 import { buildCuratorRequest } from './curator';
 import { getPreference } from './preferences';
 import { captureException } from './monitoring';
+import { dedupePosts } from './models';
 
 // Once-per-session guard for the personal-agent config upsert (see recurate).
 let ensuredPersonalThisSession = false;
@@ -133,19 +134,13 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       }
       if (stale()) return;
 
-      // Collapse reposts of the same original (and any duplicate) so a single
-      // viral post doesn't fill discovery/trending via each of its reposters.
-      const seenContentKey = new Set<string>();
-      data = data.filter((p: any) => {
-        // Collapse by repost link OR shared media — orphaned legacy reminds carry
-        // the original's image with no reposted_from link, so the same image
-        // would otherwise repeat under different authors.
-        const mediaUrl = Array.isArray(p.media) ? p.media[0]?.url : p.media?.url;
-        const key = p.reposted_from_id || p.reposted_from?.id || p.repostedFromId || mediaUrl || p.id;
-        if (seenContentKey.has(key)) return false;
-        seenContentKey.add(key);
-        return true;
-      });
+      // Collapse reposts of the same original (and orphaned legacy reminds that
+      // share one image with no reposted_from link) so a single viral post /
+      // remind chain doesn't fill discovery/trending. Shared helper normalizes
+      // the media URL (strips query string / trailing slash) so CDN variants of
+      // the same image collapse — the old inline key matched the raw first-media
+      // URL and let cache-busted dups (the "john Untitled" noise) slip through.
+      data = dedupePosts(data);
 
       if (sort === 'score') {
         // Boost posts from communities the user has joined
@@ -689,6 +684,59 @@ export function useProfiles(limit = 20) {
   }, [sdk, limit, cacheKey]);
 
   return { profiles, loading, error };
+}
+
+/**
+ * Engagement leaderboard for people (server-ranked by post_count + reactions).
+ *
+ * The plain /profiles list returns NO follower/post counts — just identity
+ * columns ordered by signup date — so a client-side "Most active" sort over it
+ * has nothing to rank on. This endpoint (/profiles/leaderboard, server max 100)
+ * returns post_count + engagement per user, network-ranked. The People tab joins
+ * it onto the project-scoped directory by user id to give the "Most active" chip
+ * a real signal without a server change. Returns a Map id -> {post_count,
+ * engagement} so callers can enrich their own list.
+ */
+export function useProfileLeaderboard(limit = 100) {
+  const { sdk } = useAuth();
+  const cacheKey = `profile-leaderboard:${limit}`;
+  const cached = getCached(cacheKey);
+  const [entries, setEntries] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached && limit > 0);
+
+  React.useEffect(() => {
+    if (limit === 0) { setLoading(false); return; }
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key
+        const s = sdk;
+        const res: any = await fetchDeduped(`req:profile-leaderboard:${limit}`, () =>
+          (s as any).profiles.leaderboard({ limit, organization_id: ORG_ID || undefined }));
+        if (!cancelled) {
+          const data = res.data || [];
+          setEntries(data);
+          setCache(cacheKey, data);
+        }
+      } catch {
+        // Non-fatal: the People tab falls back to follower-only ranking.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, limit, cacheKey]);
+
+  const byId = React.useMemo(() => {
+    const m = new Map<string, { postCount: number; engagement: number }>();
+    for (const e of entries) {
+      if (e?.id) m.set(e.id, { postCount: Number(e.post_count ?? e.postCount ?? 0) || 0, engagement: Number(e.engagement ?? 0) || 0 });
+    }
+    return m;
+  }, [entries]);
+
+  return { entries, byId, loading };
 }
 
 /**

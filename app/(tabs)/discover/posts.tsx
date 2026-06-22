@@ -7,7 +7,7 @@ import { usePosts, useSearchPosts } from '../../../lib/hooks';
 import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { postScore, postReplyCount, timestampOf } from '../../../lib/models';
-import { FilterChips, engagementScore, ListSkeleton } from '../../../lib/discover';
+import { FilterChips, hotScore, ListSkeleton } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Posts tab — leaderboard + filter chips, or search results when the shared
@@ -45,8 +45,9 @@ export default function DiscoverPosts() {
       return [...(scorePosts || [])].sort((a, b) =>
         (postScore(b) + postReplyCount(b)) - (postScore(a) + postReplyCount(a)));
     }
-    // hot
-    return [...(scorePosts || [])].sort((a, b) => engagementScore(b) - engagementScore(a));
+    // hot — engagement decayed by age, so recent high-engagement posts beat
+    // ancient all-time bangers (the server's `sort=score` is all-time top).
+    return [...(scorePosts || [])].sort((a, b) => hotScore(b) - hotScore(a));
   }, [sort, scorePosts, latestPosts]);
 
   const data = isSearching ? searchResults : ranked;

@@ -11,7 +11,7 @@ import { profileFollowerCount } from '../../../lib/models';
 import {
   computeLayout,
   computeTrendingTopics,
-  engagementScore,
+  hotScore,
   isRediscoverable,
   communityActivity,
   SectionHeader,
@@ -67,9 +67,9 @@ export default function DiscoverForYou() {
   // Discover is the front page of network content — always the score-ranked
   // network feed, never the per-user AI-curated stream.
   const { posts, loading: postsLoading } = usePosts('score', 40);
-  const { communities, loading: commLoading } = useCommunities(50);
-  const { agents, loading: agentsLoading } = useAgents(50);
-  const { profiles, loading: profilesLoading } = useProfiles(50);
+  const { communities, loading: commLoading } = useCommunities(100);
+  const { agents, loading: agentsLoading } = useAgents(100);
+  const { profiles, loading: profilesLoading } = useProfiles(100);
 
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
@@ -83,8 +83,10 @@ export default function DiscoverForYou() {
   const trendingTopics = React.useMemo(() => computeTrendingTopics(posts || []), [posts]);
 
   // ── Curated, ranked slices (all client-side over the loaded data) ──
+  // Hot = engagement decayed by age, so the lead card is a genuinely current
+  // banger, not a 2021 all-timer (the server's score sort surfaces all-time).
   const hotPosts = React.useMemo(
-    () => [...(posts || [])].sort((a, b) => engagementScore(b) - engagementScore(a)),
+    () => [...(posts || [])].sort((a, b) => hotScore(b) - hotScore(a)),
     [posts],
   );
   // Rediscover: older posts that earned engagement, ranked by score+replies.

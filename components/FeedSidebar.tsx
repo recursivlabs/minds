@@ -6,7 +6,8 @@ import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
 import { usePosts, useCommunities, useProfiles, useAgents } from '../lib/hooks';
-import { profileFollowerCount, postScore } from '../lib/models';
+import { profileFollowerCount } from '../lib/models';
+import { hotScore, cardLabel, postTitle, dedupePosts } from '../lib/discover';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
@@ -92,13 +93,16 @@ export function FeedSidebar() {
   // explicitly rank people by followers and communities by activity below, then
   // take the top 5. (Agents have no engagement signal in the payload yet — see
   // the note in the discover PR; left in native discoverable order for now.)
-  const { posts } = usePosts('score', 20);
-  const { profiles } = useProfiles(30);
-  const { communities } = useCommunities(30);
-  const { agents } = useAgents(20);
+  const { posts } = usePosts('score', 40);
+  const { profiles } = useProfiles(60);
+  const { communities } = useCommunities(60);
+  const { agents } = useAgents(40);
 
-  const trending = [...(posts || [])]
-    .sort((a: any, b: any) => postScore(b) - postScore(a))
+  // Dedup first (collapse orphaned reminds sharing one image — the "john
+  // Untitled" noise), then rank by the time-decayed HOT score so the rail shows
+  // genuinely current posts, not a years-old all-time top.
+  const trending = dedupePosts([...(posts || [])])
+    .sort((a: any, b: any) => hotScore(b) - hotScore(a))
     .slice(0, 5);
   const topPeople = [...(profiles || [])]
     .sort((a: any, b: any) => profileFollowerCount(b) - profileFollowerCount(a))
@@ -174,7 +178,7 @@ export function FeedSidebar() {
               })}
             >
               <Text variant="body" numberOfLines={2} style={{ fontSize: 13 }}>
-                {post.title || post.content?.slice(0, 80) || post.reposted_from?.content?.slice(0, 80) || post.reposted_from?.title || 'Untitled'}
+                {cardLabel(post, postTitle(post).slice(0, 80))}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 }}>
                 <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>

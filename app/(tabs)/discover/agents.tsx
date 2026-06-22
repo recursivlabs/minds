@@ -6,7 +6,8 @@ import { Text } from '../../../components';
 import { useAgents } from '../../../lib/hooks';
 import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
-import { AgentRow, ListSkeleton } from '../../../lib/discover';
+import { timestampOf } from '../../../lib/models';
+import { FilterChips, AgentRow, ListSkeleton } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Agents tab — leaderboard by popularity. The agent payload carries no
@@ -17,9 +18,18 @@ import { AgentRow, ListSkeleton } from '../../../lib/discover';
 
 const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
 
+type AgentSort = 'popular' | 'newest' | 'az';
+const CHIPS: { key: AgentSort; label: string }[] = [
+  { key: 'popular', label: 'Popular' },
+  { key: 'newest', label: 'Newest' },
+  { key: 'az', label: 'A–Z' },
+];
+
+// Best-effort engagement signal if the payload ever carries one; otherwise 0 so
+// "Popular" degrades to the server's native featured order.
 function popularity(a: any): number {
   return Number(
-    a?.chatCount ?? a?.chat_count ?? a?.conversationCount ?? a?.conversation_count ??
+    a?.engagement ?? a?.chatCount ?? a?.chat_count ?? a?.conversationCount ?? a?.conversation_count ??
     a?.usageCount ?? a?.usage_count ?? a?.followersCount ?? a?.followers_count ?? 0,
   );
 }
@@ -31,7 +41,9 @@ export default function DiscoverAgents() {
   const query = (params.q || '').trim();
   const isSearching = query.length > 0;
 
-  const { agents, loading } = useAgents(60);
+  const [sort, setSort] = React.useState<AgentSort>('popular');
+  // 100 is the server's max for /agents/discoverable — fetch the whole set.
+  const { agents, loading } = useAgents(100);
 
   const ranked = React.useMemo(() => {
     let list = (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id));
@@ -42,9 +54,15 @@ export default function DiscoverAgents() {
         (a.bio || '').toLowerCase().includes(q) ||
         (a.description || '').toLowerCase().includes(q));
     }
-    // Stable: keep native order, but lift any agent that has a real usage signal.
+    if (sort === 'newest') {
+      return [...list].sort((a, b) => new Date(timestampOf(b)).getTime() - new Date(timestampOf(a)).getTime());
+    }
+    if (sort === 'az') {
+      return [...list].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    }
+    // popular — native featured order, lifted by any real usage signal.
     return [...list].sort((a, b) => popularity(b) - popularity(a));
-  }, [agents, isSearching, query]);
+  }, [agents, isSearching, query, sort]);
 
   const toAgent = (a: any) => router.push(`/(tabs)/user/${a.username || a.id}` as any);
 
@@ -57,13 +75,16 @@ export default function DiscoverAgents() {
       renderItem={({ item }) => <AgentRow agent={item} onPress={() => toAgent(item)} />}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
-        ranked.length > 0 ? (
-          <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
-            <Text variant="caption" color={colors.textMuted}>
-              {isSearching ? `${ranked.length} result${ranked.length !== 1 ? 's' : ''}` : `${ranked.length} agents you can chat with`}
-            </Text>
-          </View>
-        ) : null
+        <>
+          {!isSearching && <FilterChips chips={CHIPS} active={sort} onChange={setSort} />}
+          {ranked.length > 0 && (
+            <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
+              <Text variant="caption" color={colors.textMuted}>
+                {isSearching ? `${ranked.length} result${ranked.length !== 1 ? 's' : ''}` : `${ranked.length} agents you can chat with`}
+              </Text>
+            </View>
+          )}
+        </>
       }
       ListEmptyComponent={
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>

@@ -3,7 +3,7 @@ import { View, FlatList } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../components';
-import { useProfiles } from '../../../lib/hooks';
+import { useProfiles, useProfileLeaderboard } from '../../../lib/hooks';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
 import { spacing } from '../../../constants/theme';
@@ -15,6 +15,14 @@ import { FilterChips, PersonRow, ListSkeleton } from '../../../lib/discover';
 // People tab — leaderboard + filter chips, or search results when the shared
 // search box has a query. Chips: Most followers / Most active (post count) /
 // Suggested (network-closeness when the payload carries it, else followers).
+//
+// Data note: the /profiles list (server max 200) returns identity columns only
+// — NO follower/post counts — ordered by signup date. So "Most active" can't
+// rank on the list payload; we enrich it with the /profiles/leaderboard
+// endpoint (server-ranked post_count + engagement) joined by user id. A TRUE
+// cross-corpus follower leaderboard would need a server sort the list endpoint
+// doesn't expose (and can't ship right now), so "Most followers" ranks whatever
+// follower signal individual profiles carry, falling back to the active order.
 // ──────────────────────────────────────────────────────────────────────────
 
 type PeopleSort = 'followers' | 'active' | 'suggested';
@@ -23,14 +31,6 @@ const CHIPS: { key: PeopleSort; label: string }[] = [
   { key: 'active', label: 'Most active' },
   { key: 'suggested', label: 'Suggested' },
 ];
-
-// Network-closeness score, when the payload exposes it; otherwise followers act
-// as the proxy so "Suggested" still ranks something sensible.
-function closeness(p: any): number {
-  return Number(
-    p?.closeness ?? p?.relevance ?? p?.mutualCount ?? p?.mutual_count ?? p?.affinity ?? 0,
-  ) || profileFollowerCount(p);
-}
 
 export default function DiscoverPeople() {
   const router = useRouter();
@@ -41,7 +41,11 @@ export default function DiscoverPeople() {
   const isSearching = query.length > 0;
 
   const [sort, setSort] = React.useState<PeopleSort>('followers');
-  const { profiles, loading: profilesLoading } = useProfiles(60);
+  // 200 is the server's max for /profiles — fetch the largest pool it allows so
+  // the directory + leaderboard re-rank the whole corpus, not just ~60.
+  const { profiles, loading: profilesLoading } = useProfiles(200);
+  // Engagement signal (post_count) joined by id, so "Most active" really ranks.
+  const { byId: engagementById } = useProfileLeaderboard(100);
 
   // Search people via the SDK (the same path the old discover used).
   const [searchedPeople, setSearchedPeople] = React.useState<any[]>([]);
@@ -63,12 +67,37 @@ export default function DiscoverPeople() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query, isSearching, sdk]);
 
+  // Post count for "Most active": prefer any count on the profile payload, else
+  // the leaderboard's post_count joined by id.
+  const activityScore = React.useCallback((p: any): number => {
+    const own = profilePostCount(p);
+    if (own) return own;
+    return engagementById.get(p?.id)?.engagement ?? engagementById.get(p?.id)?.postCount ?? 0;
+  }, [engagementById]);
+
   const ranked = React.useMemo(() => {
     const list = [...(profiles || [])];
-    if (sort === 'active') return list.sort((a, b) => profilePostCount(b) - profilePostCount(a));
-    if (sort === 'suggested') return list.sort((a, b) => closeness(b) - closeness(a));
-    return list.sort((a, b) => profileFollowerCount(b) - profileFollowerCount(a));
-  }, [profiles, sort]);
+    if (sort === 'active') {
+      return list.sort((a, b) => activityScore(b) - activityScore(a));
+    }
+    if (sort === 'suggested') {
+      // No closeness signal in the directory payload, so "Suggested" surfaces the
+      // most active+followed first (a sensible fallback): engagement, then
+      // followers, then signup recency (newest, which is the list's native order).
+      return list.sort((a, b) => {
+        const e = activityScore(b) - activityScore(a);
+        if (e) return e;
+        return profileFollowerCount(b) - profileFollowerCount(a);
+      });
+    }
+    // Most followers — ranks the follower signal profiles carry; ties fall back
+    // to activity so the list still orders meaningfully when followers are 0.
+    return list.sort((a, b) => {
+      const f = profileFollowerCount(b) - profileFollowerCount(a);
+      if (f) return f;
+      return activityScore(b) - activityScore(a);
+    });
+  }, [profiles, sort, activityScore]);
 
   const data = isSearching ? searchedPeople : ranked;
   const loading = (isSearching ? searchLoading : profilesLoading) && data.length === 0;
@@ -95,7 +124,7 @@ export default function DiscoverPeople() {
           {data.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>
-                {isSearching ? `${data.length} result${data.length !== 1 ? 's' : ''}` : `${data.length} people on the network`}
+                {isSearching ? `${data.length} result${data.length !== 1 ? 's' : ''}` : `${data.length}${data.length >= 200 ? '+' : ''} people on the network`}
               </Text>
             </View>
           )}

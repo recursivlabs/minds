@@ -12,7 +12,10 @@ import { FilterChips, CommunityRow, ListSkeleton, communityMemberCount, communit
 // ──────────────────────────────────────────────────────────────────────────
 // Communities tab — leaderboard + filter chips. There's no community search
 // endpoint, so a query client-filters the loaded list. Chips: Most members /
-// Most active (members + posts) / Newest.
+// Most active (members + posts*2) / Newest (created_at). The list payload
+// carries member_count + created_at but not post_count, so "Most active"
+// currently tracks membership — it gains the post weighting for free the moment
+// the list endpoint starts returning post_count (no client change needed).
 // ──────────────────────────────────────────────────────────────────────────
 
 type CommSort = 'members' | 'active' | 'newest';
@@ -30,7 +33,9 @@ export default function DiscoverCommunities() {
   const isSearching = query.length > 0;
 
   const [sort, setSort] = React.useState<CommSort>('members');
-  const { communities, loading } = useCommunities(60);
+  // 100 is the server's max for /communities — fetch the whole set (~95 live) so
+  // the count is accurate and the chips re-sort the FULL corpus, not a page.
+  const { communities, loading } = useCommunities(100);
 
   const ranked = React.useMemo(() => {
     let list = [...(communities || [])];

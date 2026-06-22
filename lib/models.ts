@@ -58,3 +58,55 @@ export function isAiActor(x: Raw): boolean {
     || x.type === 'agent'
     || x.user?.type === 'agent';
 }
+
+// ── Post dedup ──
+// Orphaned legacy reminds carry the original's image with NO `reposted_from_id`,
+// so the same photo repeats under different authors (the "john Untitled" noise
+// on Discover/trending). We collapse by repost link OR a NORMALIZED media URL
+// (strip query string + trailing slash, lowercase host) so CDN / cache-busting
+// variants of one image collapse to a single key. `media` may be an array of
+// {url}, a bare object, or a string — handle every shape.
+export function normalizeMediaUrl(post: Raw): string | null {
+  const raw = post?.media;
+  const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  for (const m of arr) {
+    const url = typeof m === 'string' ? m : m?.url;
+    if (url) {
+      try {
+        const u = new URL(url);
+        return `${u.host.toLowerCase()}${u.pathname.replace(/\/+$/, '')}`;
+      } catch {
+        return String(url).split('?')[0].replace(/\/+$/, '').toLowerCase();
+      }
+    }
+  }
+  return null;
+}
+
+export function postDedupKey(post: Raw): string {
+  return (
+    post?.reposted_from_id ||
+    post?.reposted_from?.id ||
+    post?.repostedFromId ||
+    post?.repostedFrom?.id ||
+    normalizeMediaUrl(post) ||
+    post?.id
+  );
+}
+
+/**
+ * Collapse reposts of the same original (and orphaned reminds sharing one image)
+ * so a single viral post / remind chain can't fill a list. Keeps the first
+ * occurrence — rank the list BEFORE calling this.
+ */
+export function dedupePosts<T extends Raw>(posts: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const p of posts || []) {
+    const key = postDedupKey(p);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out;
+}

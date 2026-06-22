@@ -3,6 +3,7 @@ import {
   postScore, postReplyCount, postRepostCount, postUserVote,
   profileFollowerCount, profileFollowingCount, profilePostCount,
   conversationUnreadCount, timestampOf, isAiActor,
+  normalizeMediaUrl, postDedupKey, dedupePosts,
 } from '../models';
 
 describe('post accessors', () => {
@@ -58,5 +59,37 @@ describe('conversation + common accessors', () => {
     expect(isAiActor({ type: 'agent' })).toBe(true);
     expect(isAiActor({ user: { is_ai: true } })).toBe(true);
     expect(isAiActor({ name: 'human' })).toBe(false);
+  });
+});
+
+describe('post dedup (orphaned reminds / "john Untitled" noise)', () => {
+  it('normalizes media url across shapes, stripping query + trailing slash', () => {
+    expect(normalizeMediaUrl({ media: [{ url: 'https://cdn.minds.io/img/abc.jpg?v=2' }] })).toBe('cdn.minds.io/img/abc.jpg');
+    expect(normalizeMediaUrl({ media: { url: 'https://CDN.minds.io/img/abc.jpg/' } })).toBe('cdn.minds.io/img/abc.jpg');
+    expect(normalizeMediaUrl({ media: 'https://cdn.minds.io/img/abc.jpg' })).toBe('cdn.minds.io/img/abc.jpg');
+    expect(normalizeMediaUrl({ media: [] })).toBeNull();
+    expect(normalizeMediaUrl({})).toBeNull();
+  });
+  it('keys orphaned reminds (no reposted_from_id) by their shared image', () => {
+    // Two different post rows, different ids/authors, same image with cache-busting
+    // query param — the legacy "john Untitled" dup pattern. Same dedup key.
+    const a = { id: 'p1', author: { name: 'john' }, media: [{ url: 'https://cdn/x.jpg?v=1' }] };
+    const b = { id: 'p2', author: { name: 'john' }, media: [{ url: 'https://cdn/x.jpg?v=9' }] };
+    expect(postDedupKey(a)).toBe(postDedupKey(b));
+  });
+  it('prefers the repost link when present', () => {
+    expect(postDedupKey({ id: 'p1', reposted_from_id: 'orig' })).toBe('orig');
+    expect(postDedupKey({ id: 'p1', repostedFrom: { id: 'orig2' } })).toBe('orig2');
+  });
+  it('dedupePosts collapses the dups but keeps distinct posts', () => {
+    const list = [
+      { id: 'p1', media: [{ url: 'https://cdn/x.jpg?v=1' }] },
+      { id: 'p2', media: [{ url: 'https://cdn/x.jpg?v=9' }] }, // dup of p1
+      { id: 'p3', content: 'unique text' },
+      { id: 'p4', reposted_from_id: 'orig' },
+      { id: 'p5', reposted_from_id: 'orig' }, // dup repost of same original
+    ];
+    const out = dedupePosts(list);
+    expect(out.map((p) => p.id)).toEqual(['p1', 'p3', 'p4']);
   });
 });

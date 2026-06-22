@@ -7,6 +7,10 @@ import { spacing, radius, shadows } from '../constants/theme';
 import { useColors } from './theme';
 import { profileFollowerCount, profilePostCount, postScore, postReplyCount, timestampOf } from './models';
 
+// Re-export so the Discover tabs can import dedup from one place (the shared kit)
+// alongside the ranking helpers, without reaching into lib/models directly.
+export { dedupePosts, postDedupKey } from './models';
+
 // ──────────────────────────────────────────────────────────────────────────
 // Discover shared kit.
 //
@@ -168,6 +172,20 @@ export function engagementScore(post: any): number {
   const hasMedia = postThumb(post).url || postThumb(post).hasVideo ? 1 : 0;
   return votes + replies * 2 + hasMedia * 4;
 }
+
+// ── HOT score — engagement decayed by age, so recent high-engagement posts beat
+// ancient all-time bangers. `sort=score` from the API returns the all-time top
+// (e.g. a 2021 post with 9k votes), which feels stale on a "trending/hot"
+// surface. We divide the raw engagement by a super-linear function of age so a
+// fresh post with modest engagement can out-rank a years-old one. Posts with no
+// usable timestamp fall back to a large age so they sink (they can't be "hot").
+export function hotScore(post: any): number {
+  const eng = engagementScore(post);
+  const ts = timestampOf(post);
+  const ageDays = ts ? Math.max(0, (Date.now() - new Date(ts).getTime()) / 86_400_000) : 3650;
+  return eng / Math.pow(ageDays + 2, 1.5);
+}
+
 
 // ── A "gem score" for Rediscover: posts that earned real engagement but aren't
 // fresh, so great older content resurfaces instead of decaying into the
