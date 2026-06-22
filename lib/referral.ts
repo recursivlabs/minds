@@ -25,20 +25,37 @@ export function clearPendingRef(): void {
   try { setItem(REF_KEY, ''); } catch {}
 }
 
+// Normalize the various code shapes the SDK returns into a usable code string.
+//   myCodes()  -> { data: { codes: InviteCode[] } }  (objects: {code, status, used_by, ...})
+//   generate() -> { data: { codes: string[] } }      (plain code strings)
+// Returns the best *shareable* code: an active, not-yet-redeemed one if present,
+// otherwise the first code of any kind (still a valid link for new signups).
+function pickCode(res: any): string | null {
+  const d = res?.data ?? res;
+  const list = d?.codes ?? (Array.isArray(d) ? d : null);
+  if (Array.isArray(list) && list.length) {
+    // generate() shape: array of plain strings.
+    if (typeof list[0] === 'string') {
+      const firstString = list.find((c: any) => typeof c === 'string' && c.length > 0);
+      return firstString ?? null;
+    }
+    // myCodes() shape: array of InviteCode objects. Prefer an active, unused code.
+    const active = list.find(
+      (c: any) => (c?.status ?? 'active') === 'active' && !c?.used_by,
+    );
+    return (active?.code || list[0]?.code) ?? null;
+  }
+  // Fallbacks for any single-object shape.
+  return d?.code ?? null;
+}
+
 // Get — or lazily generate — the current user's referral link.
 export async function getReferralLink(sdk: any): Promise<string | null> {
   if (!sdk) return null;
   try {
-    const pickCode = (res: any): string | null => {
-      const d = res?.data ?? res;
-      const list = d?.codes ?? d ?? [];
-      if (Array.isArray(list)) {
-        const active = list.find((c: any) => (c?.status ?? 'active') === 'active' && !c?.usedById && !c?.used_by_id);
-        return (active?.code || list[0]?.code) ?? null;
-      }
-      return d?.code ?? null;
-    };
+    // 1. Reuse an existing code if the user already has one.
     let code = pickCode(await sdk.inviteCodes.myCodes().catch(() => null));
+    // 2. Otherwise mint one. generate() returns a string[] under data.codes.
     if (!code) code = pickCode(await sdk.inviteCodes.generate(1).catch(() => null));
     if (!code) return null;
     return `${SITE_URL}/?ref=${encodeURIComponent(code)}`;
