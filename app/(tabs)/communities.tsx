@@ -70,7 +70,7 @@ export default function CommunitiesScreen() {
             Communities you join show up here. Find ones to join in Discover.
           </Text>
           <Pressable
-            onPress={() => router.push('/(tabs)/discover?tab=communities' as any)}
+            onPress={() => router.push('/(tabs)/discover/communities' as any)}
             style={({ hovered }: any) => ({
               flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
               backgroundColor: hovered ? colors.accentHover : colors.accent,
@@ -90,7 +90,7 @@ export default function CommunitiesScreen() {
           contentContainerStyle={{ paddingVertical: spacing.sm }}
           ListFooterComponent={
             <Pressable
-              onPress={() => router.push('/(tabs)/discover?tab=communities' as any)}
+              onPress={() => router.push('/(tabs)/discover/communities' as any)}
               style={({ hovered }: any) => ({
                 flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
                 paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,

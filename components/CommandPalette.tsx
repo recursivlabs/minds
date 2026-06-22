@@ -111,7 +111,7 @@ export function CommandPalette() {
   const runFind = React.useCallback((q: string) => {
     pushRecent(q);
     close();
-    router.push(`/(tabs)/discover?q=${encodeURIComponent(q)}` as any);
+    router.push(`/(tabs)/discover/posts?q=${encodeURIComponent(q)}` as any);
   }, [router, close]);
 
   const runPost = React.useCallback(() => {

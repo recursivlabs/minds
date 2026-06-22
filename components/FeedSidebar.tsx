@@ -156,7 +156,7 @@ export function FeedSidebar() {
       <SidebarSection
         title="Trending Posts"
         icon="flame-outline"
-        onSeeAll={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'posts' } } as any)}
+        onSeeAll={() => router.push('/(tabs)/discover/posts' as any)}
       >
         {trending.length === 0 ? (
           <Text variant="caption" color={colors.textMuted}>No trending posts yet</Text>
@@ -194,7 +194,7 @@ export function FeedSidebar() {
         <SidebarSection
           title="Trending People"
           icon="person-outline"
-          onSeeAll={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'people' } } as any)}
+          onSeeAll={() => router.push('/(tabs)/discover/people' as any)}
         >
           {topPeople.map((u: any) => {
             const followers = profileFollowerCount(u);
@@ -219,7 +219,7 @@ export function FeedSidebar() {
         <SidebarSection
           title="Trending Communities"
           icon="people-outline"
-          onSeeAll={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'communities' } } as any)}
+          onSeeAll={() => router.push('/(tabs)/discover/communities' as any)}
         >
           {topCommunities.map((c: any) => (
             <SidebarItem
@@ -239,7 +239,7 @@ export function FeedSidebar() {
         <SidebarSection
           title="Trending Agents"
           icon="hardware-chip-outline"
-          onSeeAll={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'agents' } } as any)}
+          onSeeAll={() => router.push('/(tabs)/discover/agents' as any)}
         >
           {visibleAgents.map((a: any) => (
             <SidebarItem

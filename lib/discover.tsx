@@ -1,0 +1,868 @@
+import * as React from 'react';
+import { View, Platform, Pressable, ScrollView, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Text, Avatar, Skeleton } from '../components';
+import { logSignal } from './signals';
+import { spacing, radius, shadows } from '../constants/theme';
+import { useColors } from './theme';
+import { profileFollowerCount, profilePostCount, postScore, postReplyCount, timestampOf } from './models';
+
+// ──────────────────────────────────────────────────────────────────────────
+// Discover shared kit.
+//
+// Every helper + card the Discover tabs render lives here so the master
+// "For You" page and the four entity tabs share one implementation (no
+// duplication, no drift). All ranking is a CLIENT-SIDE SORT over data the
+// existing hooks already load (usePosts('score'), useProfiles,
+// useCommunities, useAgents); every value comes from the shared model
+// accessors so field-name drift can't silently break a sort.
+// ──────────────────────────────────────────────────────────────────────────
+
+// ── Layout profile, resolved from the MEASURED content width (Discover renders
+// beside the sidebar on web, so sizing off the window overshoots). One rich
+// column on phones, wider carousels and a 2-up hero on tablet/desktop.
+export type Layout = {
+  width: number;
+  isWide: boolean;
+  isUltra: boolean;
+  gutter: number;
+};
+
+export function computeLayout(width: number): Layout {
+  const w = width || 360;
+  const isWide = w >= 700;
+  const isUltra = w >= 1040;
+  const gutter = isWide ? spacing['2xl'] : spacing.lg;
+  return { width: w, isWide, isUltra, gutter };
+}
+
+// Cross-platform cover image (RN <Image> covers web + native; the old raw <img>
+// hero painted nothing on native).
+export function CoverImage({ uri, height, radius: r = 0 }: { uri: string; height: number; radius?: number }) {
+  const colors = useColors();
+  return (
+    <Image
+      source={{ uri }}
+      resizeMode="cover"
+      style={{ width: '100%', height, borderRadius: r, backgroundColor: colors.surfaceRaised }}
+    />
+  );
+}
+
+export function formatCount(n: number): string {
+  if (!n || n < 0) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(n);
+}
+
+export function timeAgoShort(dateStr?: string): string {
+  if (!dateStr) return '';
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  if (diff < 2592000) return `${Math.floor(diff / 604800)}w`;
+  if (diff < 31536000) return `${Math.floor(diff / 2592000)}mo`;
+  return `${Math.floor(diff / 31536000)}y`;
+}
+
+// ── Trending topics, derived live from the loaded posts ──
+export type TrendingTopic = { tag: string; count: number };
+
+function extractHashtags(text: string | null | undefined): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  const re = /#([\p{L}\p{N}_]{2,30})/gu;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) out.push(m[1].toLowerCase());
+  return out;
+}
+
+export function computeTrendingTopics(posts: any[], limit = 12): TrendingTopic[] {
+  const counts = new Map<string, { display: string; count: number }>();
+  for (const p of posts || []) {
+    const tags: string[] = [];
+    if (Array.isArray(p?.tags)) {
+      for (const t of p.tags) {
+        const clean = String(t?.name ?? t).replace(/^#/, '').trim();
+        if (clean.length >= 2) tags.push(clean);
+      }
+    }
+    tags.push(...extractHashtags(p?.content));
+    tags.push(...extractHashtags(p?.title));
+    const seen = new Set<string>();
+    for (const raw of tags) {
+      const key = raw.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const prev = counts.get(key);
+      if (prev) prev.count += 1;
+      else counts.set(key, { display: raw, count: 1 });
+    }
+  }
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((t) => ({ tag: t.display, count: t.count }));
+}
+
+export function getDomain(url: string | null | undefined): string {
+  if (!url) return '';
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+export function extractUrl(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = text.match(/https?:\/\/\S+/);
+  return m ? m[0].replace(/[.,;:!?)\]]+$/, '') : null;
+}
+function postSource(post: any): string {
+  if (post.source_name) return String(post.source_name);
+  if (post.sourceName) return String(post.sourceName);
+  const url = post.external_url || post.externalUrl || extractUrl(post.content);
+  return getDomain(url) || 'Minds';
+}
+export function postAuthorName(post: any): string {
+  return post.author?.name || post.author?.username || postSource(post);
+}
+export function postTitle(post: any): string {
+  const own = (post.title || post.content || '').trim();
+  if (own) return own;
+  // Repost rows carry no text of their own — show the reposted original's.
+  const orig = post.reposted_from || post.repostedFrom;
+  if (orig) return ((orig.title || orig.content) || '').trim();
+  return '';
+}
+
+// Card label: real text if present, else a media-aware placeholder (an image
+// post with no caption should read as "Photo", never the ugly "Untitled").
+export function cardLabel(post: any, title: string): string {
+  if (title) return title;
+  const thumb = postThumb(post);
+  if (thumb.url) return thumb.hasVideo ? 'Video' : 'Photo';
+  return 'Untitled';
+}
+
+// Best still for a post thumbnail. Flags video so we can badge it.
+export function postThumb(post: any): { url: string | null; hasVideo: boolean } {
+  const raw = post.media;
+  const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  let imgUrl: string | null = null;
+  let hasVideo = false;
+  for (const m of arr) {
+    const url = typeof m === 'string' ? m : m?.url;
+    const type = typeof m === 'string' ? '' : (m?.type || '');
+    if (!url) continue;
+    if (type.startsWith('video') || /\.m3u8|\/video\//i.test(url)) hasVideo = true;
+    else if (!imgUrl) imgUrl = url;
+  }
+  return { url: imgUrl || post.image || post.previewImage || post.thumbnail || null, hasVideo };
+}
+
+// ── Engagement score for ranking. Real vote score is the spine; replies add a
+// conversation bonus; media gives a small visual-appeal nudge so the page leads
+// with content that actually pulls you in. Pure client sort over loaded posts.
+export function engagementScore(post: any): number {
+  const votes = postScore(post);
+  const replies = postReplyCount(post);
+  const hasMedia = postThumb(post).url || postThumb(post).hasVideo ? 1 : 0;
+  return votes + replies * 2 + hasMedia * 4;
+}
+
+// ── A "gem score" for Rediscover: posts that earned real engagement but aren't
+// fresh, so great older content resurfaces instead of decaying into the
+// archive. We reward score+replies and gate to anything older than ~3 days.
+export function isRediscoverable(post: any): boolean {
+  const ts = timestampOf(post);
+  if (!ts) return false;
+  const ageDays = (Date.now() - new Date(ts).getTime()) / 86_400_000;
+  return ageDays >= 3 && (postScore(post) + postReplyCount(post)) >= 2;
+}
+
+// Activity score for a community: members carry the most signal, post count is
+// the liveliness multiplier. Pure client sort over the loaded list.
+export function communityMemberCount(c: any): number {
+  return c.memberCount || c.member_count || 0;
+}
+export function communityPostCount(c: any): number {
+  return c.postCount || c.post_count || 0;
+}
+export function communityActivity(c: any): number {
+  return communityMemberCount(c) + communityPostCount(c) * 2;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Section scaffolding
+// ──────────────────────────────────────────────────────────────────────────
+
+export function SectionHeader({ title, subtitle, icon, onSeeAll, gutter }: {
+  title: string; subtitle?: string; icon?: keyof typeof Ionicons.glyphMap; onSeeAll?: () => void; gutter: number;
+}) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        paddingHorizontal: gutter,
+        paddingTop: spacing['2xl'],
+        paddingBottom: spacing.md,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          {/* Gold tick — a small accent bar that gives every module a masthead feel. */}
+          <View style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: colors.accent }} />
+          {icon ? <Ionicons name={icon} size={16} color={colors.accent} /> : null}
+          <Text variant="h2">{title}</Text>
+        </View>
+        {subtitle ? (
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2, marginLeft: spacing.sm + 4 }}>{subtitle}</Text>
+        ) : null}
+      </View>
+      {onSeeAll ? (
+        <Pressable
+          onPress={onSeeAll}
+          hitSlop={8}
+          style={Platform.OS === 'web' ? ({ cursor: 'pointer', flexDirection: 'row', alignItems: 'center', gap: 4 } as any) : { flexDirection: 'row', alignItems: 'center', gap: 4 }}
+        >
+          <Text variant="caption" color={colors.accent}>See all</Text>
+          <Ionicons name="arrow-forward" size={12} color={colors.accent} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+export function HorizontalRail({ children, gutter, snap }: { children: React.ReactNode; gutter: number; snap?: number }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      decelerationRate="fast"
+      snapToInterval={snap}
+      contentContainerStyle={{ paddingHorizontal: gutter, paddingBottom: spacing.xs, gap: spacing.md }}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
+export function RailSkeleton({ gutter, width, height }: { gutter: number; width: number; height: number }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: gutter, gap: spacing.md }}
+    >
+      {[1, 2, 3, 4].map((i) => (
+        <Skeleton key={i} width={width} height={height} borderRadius={radius.lg} />
+      ))}
+    </ScrollView>
+  );
+}
+
+// ── Live trending-topics rail. Each chip is a real hashtag counted from the
+// loaded posts; tapping it routes into the existing search path. ──
+export function TrendingTopicsRow({ topics, onPick, gutter }: { topics: TrendingTopic[]; onPick: (tag: string) => void; gutter: number }) {
+  const colors = useColors();
+  if (!topics.length) return null;
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: gutter, paddingTop: spacing.lg, paddingBottom: spacing.xs }}>
+        <Ionicons name="flame" size={13} color={colors.accent} />
+        <Text variant="caption" color={colors.textMuted} style={{ letterSpacing: 1.2, fontSize: 10 }}>TRENDING NOW</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter, paddingVertical: spacing.sm, gap: spacing.sm }}>
+        {topics.map((t) => (
+          <Pressable
+            key={t.tag}
+            onPress={() => onPick(t.tag)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.xs,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 6,
+              borderRadius: radius.full,
+              borderWidth: 1,
+              borderColor: colors.borderSubtle,
+              backgroundColor: pressed ? colors.accentMuted : colors.surface,
+              ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+            })}
+          >
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 12 }}>#</Text>
+            <Text variant="caption" color={colors.text} style={{ fontSize: 12 }}>{t.tag}</Text>
+            {t.count > 1 ? <Text variant="caption" color={colors.textMuted} style={{ fontSize: 10 }}>{t.count}</Text> : null}
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Hot — featured hero + carousel
+// ──────────────────────────────────────────────────────────────────────────
+
+// Big editorial lead card for the #1 hot post. Immersive cover with a scrim
+// when there's art; a typographic card with a gold rule when there isn't.
+export const FeaturedPost = React.memo(function FeaturedPost({ post, onPress, layout }: { post: any; onPress: () => void; layout: Layout }) {
+  const colors = useColors();
+  const { url, hasVideo } = postThumb(post);
+  const title = postTitle(post);
+  const score = postScore(post);
+  const replies = postReplyCount(post);
+  const author = postAuthorName(post);
+  const coverHeight = layout.isUltra ? 360 : layout.isWide ? 300 : 220;
+  React.useEffect(() => { if (post?.id) logSignal('view', { postId: post.id, metadata: { surface: 'discover_featured' } }); }, [post?.id]);
+
+  const stat = (icon: keyof typeof Ionicons.glyphMap, value: string, onImage: boolean) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <Ionicons name={icon} size={13} color={onImage ? '#fff' : colors.accent} />
+      <Text variant="caption" color={onImage ? 'rgba(255,255,255,0.9)' : colors.textSecondary}>{value}</Text>
+    </View>
+  );
+
+  const eyebrow = (onImage: boolean) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: colors.accent, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm }}>
+      <Ionicons name="flame" size={11} color={colors.textOnAccent} />
+      <Text variant="label" color={colors.textOnAccent} style={{ fontSize: 10, letterSpacing: 1 }}>#1 HOT</Text>
+    </View>
+  );
+
+  return (
+    <Pressable
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_featured' } }); onPress(); }}
+      style={({ pressed }) => ({
+        borderRadius: radius.xl,
+        overflow: 'hidden',
+        borderWidth: url ? 0 : 1,
+        borderColor: colors.borderSubtle,
+        backgroundColor: colors.surface,
+        opacity: pressed ? 0.97 : 1,
+        ...shadows.md(colors.shadow),
+        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+      })}
+    >
+      {url ? (
+        <View style={{ position: 'relative' }}>
+          <CoverImage uri={url} height={coverHeight} />
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: '30%', backgroundColor: 'rgba(0,0,0,0.55)' }} />
+          {hasVideo ? (
+            <View style={{ position: 'absolute', top: spacing.md, right: spacing.md, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play" size={15} color="#fff" style={{ marginLeft: 2 }} />
+            </View>
+          ) : null}
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: layout.isWide ? spacing.xl : spacing.lg, gap: spacing.sm }}>
+            {eyebrow(true)}
+            <Text variant={layout.isWide ? 'h1' : 'h2'} color="#fff" numberOfLines={3} style={{ maxWidth: 720 }}>{cardLabel(post, title)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: 2 }}>
+              <Text variant="caption" color="rgba(255,255,255,0.82)" numberOfLines={1} style={{ maxWidth: 200 }}>{author}</Text>
+              {score > 0 ? stat('arrow-up', String(score), true) : null}
+              {replies > 0 ? stat('chatbubble-outline', String(replies), true) : null}
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={{ padding: layout.isWide ? spacing['2xl'] : spacing.xl, gap: spacing.md, borderLeftWidth: 3, borderLeftColor: colors.accent }}>
+          {eyebrow(false)}
+          <Text variant={layout.isWide ? 'h1' : 'h2'} color={colors.text} numberOfLines={4}>{cardLabel(post, title)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: 2 }}>
+            <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ maxWidth: 200 }}>{author}</Text>
+            {score > 0 ? stat('arrow-up', String(score), false) : null}
+            {replies > 0 ? stat('chatbubble-outline', String(replies), false) : null}
+          </View>
+        </View>
+      )}
+    </Pressable>
+  );
+});
+
+export const POST_TILE_W = 260;
+
+// Compact content card for the Hot carousel: media thumb, headline, author +
+// real engagement (votes + replies).
+export const PostTile = React.memo(function PostTile({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const { url, hasVideo } = postThumb(post);
+  const title = postTitle(post);
+  const score = postScore(post);
+  const replies = postReplyCount(post);
+  const author = postAuthorName(post);
+  const hasMedia = !!url || hasVideo;
+  return (
+    <Pressable
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_hot' } }); onPress(); }}
+      style={({ hovered }: any) => ({
+        width,
+        borderRadius: radius.lg,
+        overflow: 'hidden',
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      {url ? (
+        <View style={{ height: 130, position: 'relative' }}>
+          <CoverImage uri={url} height={130} />
+          {hasVideo ? (
+            <View style={{ position: 'absolute', bottom: spacing.xs, right: spacing.xs, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play" size={12} color="#fff" style={{ marginLeft: 1 }} />
+            </View>
+          ) : null}
+        </View>
+      ) : hasVideo ? (
+        <View style={{ height: 130, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="play-circle" size={34} color={colors.accent} />
+        </View>
+      ) : null}
+      <View style={{ padding: spacing.md, gap: spacing.xs, flex: 1 }}>
+        <Text variant="bodyMedium" numberOfLines={hasMedia ? 2 : 4} style={{ lineHeight: 20, minHeight: hasMedia ? 40 : undefined }}>{cardLabel(post, title)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 'auto' as any }}>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
+          {score > 0 ? <Text variant="caption" color={colors.accent}>↑ {score}</Text> : null}
+          {replies > 0 ? <Text variant="caption" color={colors.textMuted}>· {replies}</Text> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+// ── Rediscover card — wider, "from the archive" framing with the post's age so
+// it reads as resurfaced rather than new. ──
+export const REDISCOVER_TILE_W = 300;
+export const RediscoverTile = React.memo(function RediscoverTile({ post, onPress, width }: { post: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const { url } = postThumb(post);
+  const title = postTitle(post);
+  const score = postScore(post);
+  const replies = postReplyCount(post);
+  const author = postAuthorName(post);
+  const age = timeAgoShort(timestampOf(post));
+  return (
+    <Pressable
+      onPress={() => { if (post?.id) logSignal('click', { postId: post.id, metadata: { surface: 'discover_rediscover' } }); onPress(); }}
+      style={({ hovered }: any) => ({
+        width,
+        flexDirection: 'row',
+        gap: spacing.md,
+        padding: spacing.md,
+        borderRadius: radius.lg,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      {url ? (
+        <View style={{ width: 72, height: 72, borderRadius: radius.md, overflow: 'hidden' }}>
+          <CoverImage uri={url} height={72} />
+        </View>
+      ) : (
+        <View style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="bookmark" size={22} color={colors.accent} />
+        </View>
+      )}
+      <View style={{ flex: 1, gap: 3 }}>
+        <Text variant="bodyMedium" numberOfLines={2} style={{ lineHeight: 19 }}>{cardLabel(post, title)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>{author}</Text>
+          {age ? <Text variant="caption" color={colors.textMuted}>{age} ago</Text> : null}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          {score > 0 ? <Text variant="caption" color={colors.accent}>↑ {score}</Text> : null}
+          {replies > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Ionicons name="chatbubble-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{replies}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Entity tiles (people / communities / agents)
+// ──────────────────────────────────────────────────────────────────────────
+
+export const ENTITY_TILE_W = 220;
+
+function FollowPill({ initialActive, onToggle }: { initialActive?: boolean; onToggle: (next: boolean) => void }) {
+  const colors = useColors();
+  const [active, setActive] = React.useState(!!initialActive);
+  return (
+    <Pressable
+      onPress={(e: any) => { e?.stopPropagation?.(); const next = !active; setActive(next); onToggle(next); }}
+      hitSlop={6}
+      style={{
+        paddingVertical: spacing.xs + 2,
+        borderRadius: radius.full,
+        alignItems: 'center',
+        backgroundColor: active ? 'transparent' : colors.accent,
+        borderWidth: active ? 1 : 0,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+      }}
+    >
+      <Text variant="caption" color={active ? colors.text : colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>
+        {active ? 'Following' : 'Follow'}
+      </Text>
+    </Pressable>
+  );
+}
+
+export const PersonTile = React.memo(function PersonTile({ person, onPress, onFollow, isFollowed, width }: {
+  person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean; width: number;
+}) {
+  const colors = useColors();
+  const name = person.name || person.username || 'Someone';
+  const username = person.username;
+  const bio = person.bio || person.description || '';
+  const avatar = person.image || person.avatar;
+  const followers = profileFollowerCount(person);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width,
+        padding: spacing.lg,
+        borderRadius: radius.lg,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        gap: spacing.sm,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ alignItems: 'center', gap: spacing.xs }}>
+        <Avatar uri={avatar} name={name} size="lg" />
+        <Text variant="bodyMedium" numberOfLines={1} align="center" style={{ marginTop: spacing.xs }}>{name}</Text>
+        {username ? <Text variant="caption" color={colors.textMuted} numberOfLines={1}>@{username}</Text> : null}
+      </View>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} align="center" style={{ lineHeight: 17, minHeight: 34 }}>{bio}</Text>
+      ) : <View style={{ minHeight: 34 }} />}
+      {followers > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <Ionicons name="people-outline" size={12} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted}>{formatCount(followers)} followers</Text>
+        </View>
+      ) : null}
+      <FollowPill initialActive={isFollowed} onToggle={() => onFollow()} />
+    </Pressable>
+  );
+});
+
+export const CommunityTile = React.memo(function CommunityTile({ community, onPress, width }: { community: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const name = community.name || 'Community';
+  const description = community.description || community.bio || '';
+  const avatar = community.image || community.avatar;
+  const members = communityMemberCount(community);
+  const postCount = communityPostCount(community);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width,
+        borderRadius: radius.lg,
+        overflow: 'hidden',
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      {/* Gold-tinted banner so communities read as places, not people. */}
+      <View style={{ height: 48, backgroundColor: colors.accentMuted }} />
+      <View style={{ padding: spacing.lg, marginTop: -26, gap: spacing.xs }}>
+        <Avatar uri={avatar} name={name} size="lg" />
+        <Text variant="bodyMedium" numberOfLines={1} style={{ marginTop: spacing.xs }}>{name}</Text>
+        {description ? (
+          <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 17, minHeight: 34 }}>{description}</Text>
+        ) : <View style={{ minHeight: 34 }} />}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="people" size={12} color={colors.textMuted} />
+            <Text variant="caption" color={colors.textMuted}>{formatCount(members)}</Text>
+          </View>
+          {postCount > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{formatCount(postCount)}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+export const AgentTile = React.memo(function AgentTile({ agent, onPress, width }: { agent: any; onPress: () => void; width: number }) {
+  const colors = useColors();
+  const name = agent.name || 'Agent';
+  const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
+  const avatar = agent.image || agent.avatar;
+  const model = agent.model?.split('/').pop() || '';
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered }: any) => ({
+        width,
+        padding: spacing.lg,
+        borderRadius: radius.lg,
+        backgroundColor: hovered ? colors.surfaceHover : colors.surface,
+        borderWidth: 0.5,
+        borderColor: colors.borderSubtle,
+        gap: spacing.sm,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Avatar uri={avatar} name={name} size="md" />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Ionicons name="sparkles" size={10} color={colors.accent} />
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }} numberOfLines={1}>{model || 'AI agent'}</Text>
+          </View>
+        </View>
+      </View>
+      {bio ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ lineHeight: 17, minHeight: 34 }}>{bio}</Text>
+      ) : <View style={{ minHeight: 34 }} />}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.sm, borderRadius: radius.full, backgroundColor: colors.accentMuted }}>
+        <Ionicons name="chatbubble-ellipses" size={13} color={colors.accent} />
+        <Text variant="caption" color={colors.accent}>Chat now</Text>
+      </View>
+    </Pressable>
+  );
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// List-view cards (search results / leaderboard rows) — full-width rows so the
+// directory views stay scannable.
+// ──────────────────────────────────────────────────────────────────────────
+
+function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
+  const colors = useColors();
+  const [toggled, setToggled] = React.useState(!!isFollowed);
+  return (
+    <Pressable
+      onPress={(e) => { setToggled(!toggled); onPress(e); }}
+      style={{
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.xs + 2,
+        borderRadius: radius.full,
+        backgroundColor: toggled ? colors.surface : colors.accentMuted,
+        borderWidth: toggled ? 1 : 0,
+        borderColor: colors.borderSubtle,
+      }}
+    >
+      <Text variant="caption" color={toggled ? colors.textSecondary : colors.accent}>{toggled ? 'Following' : 'Follow'}</Text>
+    </Pressable>
+  );
+}
+
+export function PersonRow({ person, onPress, onFollow, isFollowed }: { person: any; onPress: () => void; onFollow: () => void; isFollowed?: boolean }) {
+  const colors = useColors();
+  const name = person.name || 'Unknown';
+  const username = person.username;
+  const bio = person.bio || person.description || '';
+  const avatar = person.image || person.avatar;
+  const followerCount = profileFollowerCount(person);
+  const postCount = profilePostCount(person);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+        paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyMedium">{name}</Text>
+            {username && <Text variant="caption" color={colors.textMuted}>@{username}</Text>}
+          </View>
+          <FollowUnfollowButton isFollowed={isFollowed} onPress={(e: any) => { e?.stopPropagation?.(); onFollow(); }} />
+        </View>
+        {bio ? <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{bio}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          {followerCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="people-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{followerCount.toLocaleString()}</Text>
+            </View>
+          )}
+          {postCount > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="newspaper-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+export function CommunityRow({ community, onPress }: { community: any; onPress: () => void }) {
+  const colors = useColors();
+  const name = community.name || 'Unnamed';
+  const description = community.description || community.bio || '';
+  const avatar = community.image || community.avatar;
+  const memberCount = communityMemberCount(community);
+  const postCount = communityPostCount(community);
+  const privacy = community.privacy;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+        paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{name}</Text>
+          {privacy === 'private' && <Ionicons name="lock-closed" size={12} color={colors.textMuted} />}
+        </View>
+        {description ? <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{description}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="people-outline" size={11} color={colors.textMuted} />
+            <Text variant="caption" color={colors.textMuted}>{memberCount.toLocaleString()}</Text>
+          </View>
+          {postCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="newspaper-outline" size={11} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
+            </View>
+          )}
+          {postCount >= 50 && (
+            <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: 4 }}>
+              <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>ACTIVE</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+export function AgentRow({ agent, onPress }: { agent: any; onPress: () => void }) {
+  const colors = useColors();
+  const name = agent.name || 'Agent';
+  const bio = agent.bio || agent.description || agent.system_prompt?.slice(0, 120) || '';
+  const avatar = agent.image || agent.avatar;
+  const model = agent.model?.split('/').pop() || '';
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+        paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+        backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+        borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+      })}
+    >
+      <Avatar uri={avatar} name={name} size="lg" />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{name}</Text>
+          <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
+            <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
+          </View>
+        </View>
+        {bio ? <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{bio}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
+          {model && <Text variant="caption" color={colors.textMuted}>Powered by {model}</Text>}
+          <Text variant="caption" color={colors.accent}>Chat now →</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Filter chips — the sort/leaderboard control on every entity tab.
+// ──────────────────────────────────────────────────────────────────────────
+
+export function FilterChips<K extends string>({ chips, active, onChange, gutter }: {
+  chips: { key: K; label: string }[];
+  active: K;
+  onChange: (key: K) => void;
+  gutter?: number;
+}) {
+  const colors = useColors();
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: gutter ?? spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm }}
+    >
+      {chips.map((c) => {
+        const isActive = c.key === active;
+        return (
+          <Pressable
+            key={c.key}
+            onPress={() => onChange(c.key)}
+            style={({ pressed }) => ({
+              paddingHorizontal: spacing.md,
+              paddingVertical: 6,
+              borderRadius: radius.full,
+              borderWidth: 1,
+              borderColor: isActive ? colors.accent : colors.borderSubtle,
+              backgroundColor: isActive ? colors.accentMuted : (pressed ? colors.surfaceHover : colors.surface),
+              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+            })}
+          >
+            <Text variant="caption" color={isActive ? colors.accent : colors.textSecondary} style={{ fontSize: 12 }}>{c.label}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+// ── Full-width list skeleton, shared by every entity tab's loading state. ──
+export function ListSkeleton() {
+  return (
+    <View style={{ padding: spacing.xl, gap: spacing.xl }}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <View key={i} style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+            <Skeleton width={44} height={44} borderRadius={22} />
+            <View style={{ flex: 1, gap: spacing.xs }}>
+              <Skeleton width={160} height={14} />
+              <Skeleton width={100} height={12} />
+            </View>
+          </View>
+          <Skeleton width="100%" height={40} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ── Navigation helpers shared across the tabs ──
+export const DISCOVER_TABS: { key: string; label: string }[] = [
+  { key: 'index', label: 'For You' },
+  { key: 'posts', label: 'Posts' },
+  { key: 'people', label: 'People' },
+  { key: 'communities', label: 'Communities' },
+  { key: 'agents', label: 'Agents' },
+];

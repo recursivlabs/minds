@@ -381,7 +381,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                     // Prevent click from bubbling up to the outer post Pressable
                     // and navigating away from the hashtag filter.
                     e?.stopPropagation?.();
-                    router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts', q: `#${(seg as any).tag}` } } as any);
+                    router.push({ pathname: '/(tabs)/discover/posts', params: { q: `#${(seg as any).tag}` } } as any);
                   }}
                 >
                   {seg.text}
@@ -601,7 +601,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             return (
               <Pressable
                 key={tagName}
-                onPress={() => router.push({ pathname: '/(tabs)/discover', params: { tab: 'posts', q: tagName } } as any)}
+                onPress={() => router.push({ pathname: '/(tabs)/discover/posts', params: { q: tagName } } as any)}
                 style={{
                   paddingHorizontal: spacing.sm + 2,
                   paddingVertical: 2,

@@ -1,0 +1,105 @@
+import * as React from 'react';
+import { View, FlatList, Pressable } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Text } from '../../../components';
+import { useCommunities } from '../../../lib/hooks';
+import { spacing, radius } from '../../../constants/theme';
+import { useColors } from '../../../lib/theme';
+import { timestampOf } from '../../../lib/models';
+import { FilterChips, CommunityRow, ListSkeleton, communityMemberCount, communityActivity } from '../../../lib/discover';
+
+// ──────────────────────────────────────────────────────────────────────────
+// Communities tab — leaderboard + filter chips. There's no community search
+// endpoint, so a query client-filters the loaded list. Chips: Most members /
+// Most active (members + posts) / Newest.
+// ──────────────────────────────────────────────────────────────────────────
+
+type CommSort = 'members' | 'active' | 'newest';
+const CHIPS: { key: CommSort; label: string }[] = [
+  { key: 'members', label: 'Most members' },
+  { key: 'active', label: 'Most active' },
+  { key: 'newest', label: 'Newest' },
+];
+
+export default function DiscoverCommunities() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ q?: string }>();
+  const colors = useColors();
+  const query = (params.q || '').trim();
+  const isSearching = query.length > 0;
+
+  const [sort, setSort] = React.useState<CommSort>('members');
+  const { communities, loading } = useCommunities(60);
+
+  const ranked = React.useMemo(() => {
+    let list = [...(communities || [])];
+    if (isSearching) {
+      const q = query.toLowerCase();
+      list = list.filter((c: any) =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.description || '').toLowerCase().includes(q));
+    }
+    if (sort === 'newest') {
+      return list.sort((a, b) => new Date(timestampOf(b)).getTime() - new Date(timestampOf(a)).getTime());
+    }
+    if (sort === 'active') {
+      return list.sort((a, b) => communityActivity(b) - communityActivity(a));
+    }
+    return list.sort((a, b) => communityMemberCount(b) - communityMemberCount(a));
+  }, [communities, sort, isSearching, query]);
+
+  const toCommunity = (c: any) => router.push(`/(tabs)/community/${c.slug || c.id}` as any);
+
+  if (loading && (communities || []).length === 0) return <ListSkeleton />;
+
+  return (
+    <FlatList
+      data={ranked}
+      keyExtractor={(item: any, i) => `c-${item.id || i}`}
+      renderItem={({ item }) => <CommunityRow community={item} onPress={() => toCommunity(item)} />}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={
+        <>
+          {!isSearching && (
+            <Pressable
+              onPress={() => router.push('/(tabs)/create?mode=community' as any)}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+                borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
+                backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+              })}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="add" size={22} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyMedium" color={colors.accent}>Start a community</Text>
+                <Text variant="caption" color={colors.textMuted}>Gather people around a shared interest</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </Pressable>
+          )}
+          {!isSearching && <FilterChips chips={CHIPS} active={sort} onChange={setSort} />}
+          {ranked.length > 0 && (
+            <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
+              <Text variant="caption" color={colors.textMuted}>
+                {isSearching ? `${ranked.length} result${ranked.length !== 1 ? 's' : ''}` : `${ranked.length} communities to join`}
+              </Text>
+            </View>
+          )}
+        </>
+      }
+      ListEmptyComponent={
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
+          <Ionicons name="people-outline" size={40} color={colors.accent} />
+          <Text variant="h2" color={colors.text} align="center">{isSearching ? 'No Results' : 'Discover Communities'}</Text>
+          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
+            {isSearching ? 'Try a different search term.' : 'Be the first to start one.'}
+          </Text>
+        </View>
+      }
+    />
+  );
+}

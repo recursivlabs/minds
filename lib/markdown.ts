@@ -64,7 +64,7 @@ export function renderMarkdownToHtml(text: string): string {
     })
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/(^|\s)#([a-zA-Z0-9_]+)/g, (_m, lead, tag) => `${lead}${stash(`<a href="/(tabs)/discover?tab=posts&q=%23${tag}" style="color:#d4a844;text-decoration:none">#${tag}</a>`)}`);
+    .replace(/(^|\s)#([a-zA-Z0-9_]+)/g, (_m, lead, tag) => `${lead}${stash(`<a href="/(tabs)/discover/posts?q=%23${tag}" style="color:#d4a844;text-decoration:none">#${tag}</a>`)}`);
 
   // 3. Block pass: walk lines so bullet/numbered lists and headings render as
   //    real <ul>/<ol>/<h*> instead of leaking raw "-", "*", "#" markers.
