@@ -209,6 +209,17 @@ export function communityActivity(c: any): number {
   return communityMemberCount(c) + communityPostCount(c) * 2;
 }
 
+// ── Agent popularity. The agent payload carries no engagement signal yet, so
+// this best-effort reads any usage/chat-count field if one exists; otherwise 0
+// so "Popular" degrades to the server's native featured order. Shared by the
+// Discover Agents tab and the Feed sidebar so both rank agents identically.
+export function agentPopularity(a: any): number {
+  return Number(
+    a?.engagement ?? a?.chatCount ?? a?.chat_count ?? a?.conversationCount ?? a?.conversation_count ??
+    a?.usageCount ?? a?.usage_count ?? a?.followersCount ?? a?.followers_count ?? 0,
+  );
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Section scaffolding
 // ──────────────────────────────────────────────────────────────────────────

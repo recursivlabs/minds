@@ -5,19 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
-import { usePosts, useCommunities, useProfiles, useAgents } from '../lib/hooks';
-import { profileFollowerCount } from '../lib/models';
-import { hotScore, cardLabel, postTitle, dedupePosts } from '../lib/discover';
+import { useDiscoverPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents } from '../lib/hooks';
+import { profileFollowerCount, profilePostCount } from '../lib/models';
+import { hotScore, cardLabel, postTitle, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
-
-// Activity score for a community: members carry the most signal, post count is
-// the liveliness multiplier. Pure client sort over the loaded list.
-function communityActivity(c: any): number {
-  const members = c.memberCount || c.member_count || 0;
-  const posts = c.postCount || c.post_count || 0;
-  return members + posts * 2;
-}
 
 const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
 
@@ -87,16 +79,35 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
 export function FeedSidebar() {
   const router = useRouter();
   const colors = useColors();
-  // Fetch a real pool (not 5) for each list so the client-side ranking has
-  // something to choose from — fetching only 5 means "trending" was just the
-  // server's default order. usePosts('score') is already score-ranked; we
-  // explicitly rank people by followers and communities by activity below, then
-  // take the top 5. (Agents have no engagement signal in the payload yet — see
-  // the note in the discover PR; left in native discoverable order for now.)
-  const { posts } = usePosts('score', 40);
+  // The sidebar is a mini-version of the same engagement-quality system as the
+  // Feed's For You and the Discover tabs — every widget reuses the SAME hook +
+  // ranking the corresponding Discover tab uses, so "popular" means one thing
+  // everywhere. We fetch a real pool (not 5) so the client-side ranking has
+  // something to choose from, then take the top 5.
+
+  // Posts → the Discover Posts "Hot" path: page recency, re-rank by the
+  // time-decayed hotScore (engagement velocity, age-decayed) — identical to the
+  // discover/posts tab so recent high-engagement posts surface, not a stale
+  // all-time top.
+  const { posts } = useDiscoverPosts({ order: 'hot', limit: 40 });
+  // People → directory + engagement leaderboard, ranked by activity. Mirrors the
+  // People tab's "Most active" sort (post engagement, falling back to followers).
   const { profiles } = useProfiles(60);
+  const { byId: engagementById } = useProfileLeaderboard(100);
+  // Communities → members + recent activity (members + posts*2): the Communities
+  // tab's "Most active" sort.
   const { communities } = useCommunities(60);
+  // Agents → "Popular": native featured order lifted by any usage signal.
   const { agents } = useAgents(40);
+
+  // Activity score for a person, identical to the Discover People "Most active"
+  // chip: prefer any post count on the profile payload, else the leaderboard's
+  // engagement/post_count joined by id.
+  const activityScore = (p: any): number => {
+    const own = profilePostCount(p);
+    if (own) return own;
+    return engagementById.get(p?.id)?.engagement ?? engagementById.get(p?.id)?.postCount ?? 0;
+  };
 
   // Dedup first (collapse orphaned reminds sharing one image — the "john
   // Untitled" noise), then rank by the time-decayed HOT score so the rail shows
@@ -104,13 +115,22 @@ export function FeedSidebar() {
   const trending = dedupePosts([...(posts || [])])
     .sort((a: any, b: any) => hotScore(b) - hotScore(a))
     .slice(0, 5);
+  // Rank by engagement (Most active), ties fall back to followers — same as the
+  // People tab so the rail is a mini-leaderboard, not a signup-order list.
   const topPeople = [...(profiles || [])]
-    .sort((a: any, b: any) => profileFollowerCount(b) - profileFollowerCount(a))
+    .sort((a: any, b: any) => {
+      const e = activityScore(b) - activityScore(a);
+      if (e) return e;
+      return profileFollowerCount(b) - profileFollowerCount(a);
+    })
     .slice(0, 5);
   const topCommunities = [...(communities || [])]
     .sort((a: any, b: any) => communityActivity(b) - communityActivity(a))
     .slice(0, 5);
-  const visibleAgents = (agents || []).filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id)).slice(0, 5);
+  const visibleAgents = (agents || [])
+    .filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id))
+    .sort((a: any, b: any) => agentPopularity(b) - agentPopularity(a))
+    .slice(0, 5);
 
   return (
     <ScrollView

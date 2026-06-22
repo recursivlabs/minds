@@ -7,7 +7,7 @@ import { useAgents } from '../../../lib/hooks';
 import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { timestampOf } from '../../../lib/models';
-import { FilterChips, AgentRow, ListSkeleton } from '../../../lib/discover';
+import { FilterChips, AgentRow, ListSkeleton, agentPopularity } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Agents tab — leaderboard by popularity. The agent payload carries no
@@ -24,15 +24,6 @@ const CHIPS: { key: AgentSort; label: string }[] = [
   { key: 'newest', label: 'Newest' },
   { key: 'az', label: 'A–Z' },
 ];
-
-// Best-effort engagement signal if the payload ever carries one; otherwise 0 so
-// "Popular" degrades to the server's native featured order.
-function popularity(a: any): number {
-  return Number(
-    a?.engagement ?? a?.chatCount ?? a?.chat_count ?? a?.conversationCount ?? a?.conversation_count ??
-    a?.usageCount ?? a?.usage_count ?? a?.followersCount ?? a?.followers_count ?? 0,
-  );
-}
 
 export default function DiscoverAgents() {
   const router = useRouter();
@@ -63,7 +54,7 @@ export default function DiscoverAgents() {
       return [...list].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     }
     // popular — native featured order, lifted by any real usage signal.
-    return [...list].sort((a, b) => popularity(b) - popularity(a));
+    return [...list].sort((a, b) => agentPopularity(b) - agentPopularity(a));
   }, [agents, isSearching, query, sort]);
 
   const toAgent = (a: any) => router.push(`/(tabs)/user/${a.username || a.id}` as any);
