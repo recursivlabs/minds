@@ -30,7 +30,7 @@ const KEYS = {
 //    customers to re-auth so their stored key gets reissued with the new binding.
 // 7: added wallet:read/wallet:write so the in-app wallet stops 403-ing
 //    ("Couldn't load your wallet"). Existing keys lack the scope; re-auth reissues.
-const AUTH_VERSION = '7';
+const AUTH_VERSION = '8';
 
 const API_KEY_SCOPES = [
   'posts:read', 'posts:write',
@@ -48,6 +48,12 @@ const API_KEY_SCOPES = [
   'notifications:read', 'notifications:write',
   'wallet:read', 'wallet:write',
   'uploads:write',
+  // Admin dashboard. The scope is necessary-but-not-sufficient: every admin
+  // route also enforces a LIVE admin role (requireLiveAdminRole), so a
+  // non-admin's key carrying this scope still cannot use admin endpoints.
+  // TODO(server hardening): only grant 'admin' at key-mint for admin/owner
+  // roles so non-admin keys don't carry an unusable scope.
+  'admin',
 ] as const;
 
 interface User {
