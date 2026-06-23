@@ -23,12 +23,20 @@ function SidebarSection({ title, icon, children, onSeeAll }: {
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        {/* The whole title (icon + label) deep-links into the matching Discover
+            feed — not just the "See all" affordance — so the header reads as a
+            real window into discovery. */}
+        <Pressable
+          onPress={onSeeAll}
+          disabled={!onSeeAll}
+          hitSlop={8}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, ...(onSeeAll && Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) }}
+        >
           <Ionicons name={icon as any} size={15} color={colors.accent} />
           <Text variant="label" style={{ fontSize: 13 }}>{title}</Text>
-        </View>
+        </Pressable>
         {onSeeAll && (
-          <Pressable onPress={onSeeAll} hitSlop={8}>
+          <Pressable onPress={onSeeAll} hitSlop={8} style={Platform.OS === 'web' ? { cursor: 'pointer' } as any : undefined}>
             <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>See all</Text>
           </Pressable>
         )}
@@ -195,7 +203,10 @@ export function FeedSidebar() {
       <SidebarSection
         title="Trending Posts"
         icon="flame-outline"
-        onSeeAll={() => router.push('/(tabs)/discover/posts' as any)}
+        // The widget re-ranks by the time-decayed hotScore, so deep-link to
+        // ?sort=hot to land on the MATCHING ranking (the discover Posts tab
+        // defaults to 'top'/all-time, which is a different order).
+        onSeeAll={() => router.push('/(tabs)/discover/posts?sort=hot' as any)}
       >
         {trending.length === 0 ? (
           <Text variant="caption" color={colors.textMuted}>No trending posts yet</Text>
