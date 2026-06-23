@@ -55,8 +55,9 @@ export default function DiscoverPosts() {
   // Filter state lives in the URL so deep-links + filters are shareable.
   // Default sort is Top (highest-scoring) — absent param → 'top'.
   const sort: PostSort = (params.sort === 'new' || params.sort === 'hot') ? params.sort : 'top';
+  // Default time range is This Week (fresh content) — absent param → 'week'.
   const range: TimeRange =
-    (params.range === 'today' || params.range === 'week' || params.range === 'month') ? params.range : 'all';
+    (params.range === 'today' || params.range === 'month' || params.range === 'all') ? params.range : 'week';
   const tagId = typeof params.tag === 'string' && params.tag ? params.tag : null;
 
   const setParam = React.useCallback((patch: Record<string, string | undefined>) => {
