@@ -201,6 +201,21 @@ export default function UserProfileScreen() {
   const [followerOffset, setFollowerOffset] = React.useState(0);
   const followerCount = baseFollowerCount + followerOffset;
 
+  // Infinite scroll for the Posts / Replies tabs. The profile lives inside a
+  // single ScrollView (header + tabs + feed), so we detect "near bottom" on
+  // scroll and page the active tab's author feed via its loadMore — same effect
+  // as a FlatList's onEndReached, without restructuring the whole screen.
+  // NOTE: this hook MUST stay above the early returns below (loading / error)
+  // so the hook count is identical on every render — otherwise React throws
+  // #310 ("rendered more hooks than during the previous render").
+  const handleScroll = React.useCallback((e: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    if (distanceFromBottom > 600) return;
+    if (profileTab === 'posts') loadMorePosts();
+    else if (profileTab === 'replies') loadMoreReplies();
+  }, [profileTab, loadMorePosts, loadMoreReplies]);
+
   const handleToggleFollow = async () => {
     if (!sdk || !profile?.id) return;
     setFollowLoading(true);
@@ -293,18 +308,6 @@ export default function UserProfileScreen() {
       </Container>
     );
   }
-
-  // Infinite scroll for the Posts / Replies tabs. The profile lives inside a
-  // single ScrollView (header + tabs + feed), so we detect "near bottom" on
-  // scroll and page the active tab's author feed via its loadMore — same effect
-  // as a FlatList's onEndReached, without restructuring the whole screen.
-  const handleScroll = React.useCallback((e: any) => {
-    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    if (distanceFromBottom > 600) return;
-    if (profileTab === 'posts') loadMorePosts();
-    else if (profileTab === 'replies') loadMoreReplies();
-  }, [profileTab, loadMorePosts, loadMoreReplies]);
 
   return (
     <Container safeTop padded={false}>
