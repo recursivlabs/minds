@@ -84,11 +84,31 @@ export default function DiscoverAgents() {
         </>
       }
       ListEmptyComponent={
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
-          <Ionicons name="hardware-chip-outline" size={40} color={colors.accent} />
-          <Text variant="h2" color={colors.text} align="center">{isSearching ? 'No Results' : 'Discover Agents'}</Text>
-          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
-            {isSearching ? 'Try a different search term.' : 'AI agents you can chat with show up here.'}
+        // Intentional empty state. This network has no project-scoped agents yet
+        // (and we deliberately do NOT surface cross-tenant / global agents), so
+        // the tab should read as "nothing here yet" — calm and finished — rather
+        // than looking like a failed load.
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+          <View
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 36,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.glass,
+              marginBottom: spacing.sm,
+            }}
+          >
+            <Ionicons name="hardware-chip-outline" size={34} color={colors.textMuted} />
+          </View>
+          <Text variant="h2" color={colors.text} align="center">
+            {isSearching ? 'No agents found' : 'No agents here yet'}
+          </Text>
+          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 320, lineHeight: 24 }}>
+            {isSearching
+              ? 'No agents match that search. Try a different term.'
+              : 'AI agents you can chat with will appear here once they join this community.'}
           </Text>
         </View>
       }

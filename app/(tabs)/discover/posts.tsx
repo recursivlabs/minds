@@ -68,6 +68,13 @@ export default function DiscoverPosts() {
   // The server date window — passed as ?since= (and client-filtered as fallback).
   const since = React.useMemo(() => sinceForRange(range), [range]);
 
+  // SEARCH is ALL-TIME. Search is intent-driven: when a user searches "bitcoin"
+  // they want any matching content regardless of recency. The browse Time pill
+  // defaults to "This Week" (fresh content for browsing), but composing that
+  // window into the FTS query windows old legacy posts out and returns 0
+  // results — the "bitcoin → 0" bug. So search IGNORES the browse Time pill
+  // entirely and queries the whole corpus (no ?since).
+
   // All topics for the tag-cloud modal (server returns them ranked by post_count,
   // max 100). ~40 auto-topics exist; the Topics pill hides itself when empty.
   const { tags } = useTags(100);
@@ -83,11 +90,10 @@ export default function DiscoverPosts() {
     limit: 30,
   });
 
-  // Server FTS when searching. The active Time + Topic pills compose into the
-  // FTS query server-side (the search route honors since/until/tag_ids), so a
-  // search respects the same window + topic as the browse feed.
+  // Server FTS when searching. Search is ALL-TIME (no `since`) so old legacy
+  // content still matches — only the Topic pill composes into the query. The
+  // browse Time pill is intentionally NOT applied to search (see SEARCH note above).
   const { results: searchResults, loading: searchLoading } = useSearchPosts(query, {
-    since,
     tagId: tagId || undefined,
   });
 
@@ -159,27 +165,23 @@ export default function DiscoverPosts() {
                 onChange={(k) => setParam({ sort: k === 'top' ? undefined : k })}
               />
             )}
-            <FilterMenu
-              options={TIME_RANGE_CHIPS}
-              value={range}
-              icon="time-outline"
-              onChange={(k) => setParam({ range: k === 'all' ? undefined : k })}
-            />
+            {/* Time pill is a BROWSE control only — search is always all-time
+               (recency-windowing a search returns 0 for legacy content), so we
+               hide it while a query is active. */}
+            {!isSearching && (
+              <FilterMenu
+                options={TIME_RANGE_CHIPS}
+                value={range}
+                icon="time-outline"
+                onChange={(k) => setParam({ range: k === 'all' ? undefined : k })}
+              />
+            )}
             <TopicsPill
               tags={tags as any}
               activeId={tagId}
               onPick={(id) => setParam({ tag: id || undefined })}
             />
           </FilterBar>
-          {data.length > 0 && (
-            <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
-              <Text variant="caption" color={colors.textMuted}>
-                {isSearching
-                  ? `${data.length} result${data.length !== 1 ? 's' : ''}`
-                  : `${data.length}${hasMore ? '+' : ''} post${data.length !== 1 ? 's' : ''}`}
-              </Text>
-            </View>
-          )}
         </>
       }
       ListFooterComponent={showFooter ? (

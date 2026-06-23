@@ -109,12 +109,15 @@ export function FeedSidebar() {
     return engagementById.get(p?.id)?.engagement ?? engagementById.get(p?.id)?.postCount ?? 0;
   };
 
-  // Dedup first (collapse orphaned reminds sharing one image — the "john
-  // Untitled" noise), then rank by the time-decayed HOT score so the rail shows
-  // genuinely current posts, not a years-old all-time top.
-  const trending = dedupePosts([...(posts || [])])
-    .sort((a: any, b: any) => hotScore(b) - hotScore(a))
-    .slice(0, 5);
+  // Rank by the time-decayed HOT score, THEN dedup (dedupePosts keeps the first
+  // occurrence, so it must run on an already-ranked list to keep the best one).
+  // On a legacy corpus every hotScore can collapse toward ~0 (all posts are
+  // ancient), so a pure hot sort can look empty/arbitrary — fall back to the
+  // raw server order (which is already `sort=hot`/recency) whenever ranking
+  // doesn't yield enough rows, so the rail is NEVER empty when posts exist.
+  const pool = posts || [];
+  const ranked = dedupePosts([...pool].sort((a: any, b: any) => hotScore(b) - hotScore(a)));
+  const trending = (ranked.length >= 3 ? ranked : dedupePosts([...pool])).slice(0, 5);
   // Rank by engagement (Most active), ties fall back to followers — same as the
   // People tab so the rail is a mini-leaderboard, not a signup-order list.
   const topPeople = [...(profiles || [])]
@@ -218,7 +221,11 @@ export function FeedSidebar() {
         <SidebarSection
           title="Trending People"
           icon="person-outline"
-          onSeeAll={() => router.push('/(tabs)/discover/people' as any)}
+          // The widget ranks by engagement (activityScore) — the same signal as
+          // the People tab's "Most active" leaderboard — so "See all" deep-links
+          // to ?sort=active to land on the MATCHING ranking (not the default
+          // Most-followers tab, which shows a different order).
+          onSeeAll={() => router.push('/(tabs)/discover/people?sort=active' as any)}
         >
           {topPeople.map((u: any) => {
             const followers = profileFollowerCount(u);
