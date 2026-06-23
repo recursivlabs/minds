@@ -361,6 +361,86 @@ export function useDiscoverPosts(opts: { order: 'new' | 'top' | 'hot'; since?: s
 }
 
 /**
+ * Paginated feed of a single author's posts (or replies).
+ *
+ * The profile screen used to one-shot `posts.list({ author_id, limit: 50 })`
+ * with no offset/has_more tracking and render the result in a ScrollView —
+ * so a profile capped at one page (~the first 10-50 rows) and never loaded
+ * more on scroll, even for users with thousands of posts (e.g. John, 10,405).
+ *
+ * This mirrors useDiscoverPosts: a thin cursor paginator over the raw /posts
+ * list, scoped by `author_id` server-side, with offset + has_more + loadMore
+ * for infinite scroll. Set `replies: true` for the Replies tab (server
+ * returns the author's replies with the parent post hydrated).
+ */
+export function useProfilePosts(authorId: string | undefined, opts?: { replies?: boolean; limit?: number }) {
+  const { sdk } = useAuth();
+  const replies = !!opts?.replies;
+  const limit = opts?.limit ?? 30;
+  const cacheKey = `profile-posts:${authorId || 'none'}:${replies ? 'replies' : 'posts'}:${limit}`;
+  const cached = getCached(cacheKey);
+  const [posts, setPosts] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached && !!authorId);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+  const offsetRef = React.useRef(0);
+  const reqIdRef = React.useRef(0);
+  const inFlightRef = React.useRef(false);
+
+  const fetchPage = React.useCallback(async (refresh: boolean) => {
+    if (!sdk || !authorId) return; // identity-scoped; never fall back to the shared app key
+    if (inFlightRef.current && !refresh) return;
+    const myReq = ++reqIdRef.current;
+    inFlightRef.current = true;
+    const stale = () => reqIdRef.current !== myReq;
+    try {
+      if (refresh) { setRefreshing(true); offsetRef.current = 0; }
+      const offset = refresh ? 0 : offsetRef.current;
+      // NOTE: REST param is snake_case `author_id`; `replies=true` asks the
+      // server for the author's replies with the parent hydrated. Both passed
+      // via `as any` because `replies` isn't on the typed ListPostsParams.
+      const res: any = await fetchDeduped(`req:${cacheKey}:${offset}`, () =>
+        sdk.posts.list({ author_id: authorId, limit, offset, ...(replies ? { replies: true } : {}) } as any));
+      if (stale()) return;
+      const raw = res.data || [];
+      const more = res.meta?.has_more ?? raw.length >= limit;
+      const visible = filterMuted(raw);
+      visible.forEach((p: any) => { if (p.id) setCache(`post:${p.id}`, p); });
+      setPosts((prev) => {
+        const base = refresh ? [] : prev;
+        const seen = new Set(base.map((p: any) => p.id));
+        const merged = [...base, ...visible.filter((p: any) => !seen.has(p.id))];
+        setCache(cacheKey, merged);
+        return merged;
+      });
+      setHasMore(more);
+      offsetRef.current = offset + raw.length;
+    } catch (err: any) {
+      captureException(err, { hook: 'useProfilePosts', replies });
+    } finally {
+      if (!stale()) { inFlightRef.current = false; setLoading(false); setRefreshing(false); }
+    }
+  }, [sdk, authorId, cacheKey, limit, replies]);
+
+  // Refetch from scratch whenever the author (or sdk) changes.
+  React.useEffect(() => {
+    const fresh = getCached(cacheKey);
+    setPosts(fresh || []);
+    setLoading(!fresh && !!authorId);
+    offsetRef.current = 0;
+    setHasMore(true);
+    if (authorId) fetchPage(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, sdk, authorId]);
+
+  const loadMore = React.useCallback(() => {
+    if (hasMore && !loading && !refreshing && !inFlightRef.current) fetchPage(false);
+  }, [fetchPage, hasMore, loading, refreshing]);
+
+  return { posts, loading, refreshing, hasMore, loadMore, refresh: () => fetchPage(true) };
+}
+
+/**
  * Fetch a single post by ID.
  */
 export function usePost(postId: string) {

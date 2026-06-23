@@ -4,12 +4,13 @@ import { showToast } from '../../../components/Toast';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator } from 'react-native';
 import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TabBar } from '../../../components/TabBar';
 import { useAuth } from '../../../lib/auth';
-import { useProfile, useMyProfile, useCommunities } from '../../../lib/hooks';
+import { useProfile, useMyProfile, useCommunities, useProfilePosts } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { getFollowRelationship } from '../../../lib/moderation';
 import { getBookmarks } from '../../../lib/bookmarks';
@@ -91,9 +92,22 @@ export default function UserProfileScreen() {
 
   const [followLoading, setFollowLoading] = React.useState(false);
   const [followsYou, setFollowsYou] = React.useState(false);
-  const [userPosts, setUserPosts] = React.useState<any[]>([]);
-  const [userReplies, setUserReplies] = React.useState<any[]>([]);
-  const [postsLoading, setPostsLoading] = React.useState(true);
+  // Paginated author feeds (posts + replies). These infinite-scroll through ALL
+  // the user's posts via author_id + offset + has_more, mirroring useDiscoverPosts —
+  // replacing the old one-shot `posts.list({ author_id, limit: 50 })` that capped a
+  // profile at a single page no matter how many posts the user had.
+  const {
+    posts: userPosts,
+    loading: postsLoading,
+    hasMore: postsHasMore,
+    loadMore: loadMorePosts,
+  } = useProfilePosts(profile?.id, { limit: 30 });
+  const {
+    posts: userReplies,
+    loading: repliesLoading,
+    hasMore: repliesHasMore,
+    loadMore: loadMoreReplies,
+  } = useProfilePosts(profile?.id, { replies: true, limit: 30 });
   const [followersList, setFollowersList] = React.useState<any[] | null>(null);
   const [followingList, setFollowingList] = React.useState<any[] | null>(null);
   const [relationsLoading, setRelationsLoading] = React.useState(false);
@@ -109,10 +123,9 @@ export default function UserProfileScreen() {
 
   const { communities } = useCommunities(isOwnProfile ? 50 : 0);
 
-  // Reset local state on username change
+  // Reset local state on username change. (Post/reply feeds reset themselves
+  // inside useProfilePosts when profile.id changes.)
   React.useEffect(() => {
-    setUserPosts([]);
-    setPostsLoading(true);
     setFollowLoading(false);
     setFollowersList(null);
     setFollowingList(null);
@@ -157,32 +170,6 @@ export default function UserProfileScreen() {
     getFollowRelationship(profile.id).then((r) => { if (alive) setFollowsYou(r.follows_you); });
     return () => { alive = false; };
   }, [profile?.id, isOwnProfile]);
-
-  // User's posts (for posts / replies / blogs tabs)
-  React.useEffect(() => {
-    if (!profile?.id || !sdk) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        // Query the author's posts server-side instead of fetching org-wide
-        // recents + client-filtering — the latter returns ~0 for any given
-        // profile on a populated network. NOTE: the REST param is snake_case
-        // `author_id`; camelCase is silently dropped → leaks the whole network.
-        // Posts tab = top-level posts; Replies tab = the author's replies with
-        // the parent post hydrated (server `replies=true`). Fetch both in parallel.
-        const [postsRes, repliesRes] = await Promise.all([
-          sdk.posts.list({ author_id: profile.id, limit: 50 } as any),
-          sdk.posts.list({ author_id: profile.id, replies: true, limit: 50 } as any),
-        ]);
-        if (!cancelled) {
-          setUserPosts(postsRes.data || []);
-          setUserReplies(repliesRes.data || []);
-        }
-      } catch {}
-      finally { if (!cancelled) setPostsLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [profile?.id, sdk, username]);
 
   // Counts via the centralized, unit-tested accessors (handles the
   // followers_count vs follower_count drift that caused a real bug).
@@ -284,11 +271,23 @@ export default function UserProfileScreen() {
     );
   }
 
+  // Infinite scroll for the Posts / Replies tabs. The profile lives inside a
+  // single ScrollView (header + tabs + feed), so we detect "near bottom" on
+  // scroll and page the active tab's author feed via its loadMore — same effect
+  // as a FlatList's onEndReached, without restructuring the whole screen.
+  const handleScroll = React.useCallback((e: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    if (distanceFromBottom > 600) return;
+    if (profileTab === 'posts') loadMorePosts();
+    else if (profileTab === 'replies') loadMoreReplies();
+  }, [profileTab, loadMorePosts, loadMoreReplies]);
+
   return (
     <Container safeTop padded={false}>
       <ScreenHeader title={`@${profile.username || username}`} />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
         <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
           {/* Top row: avatar + owner action buttons */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -511,43 +510,57 @@ export default function UserProfileScreen() {
               <Text variant="body" color={colors.textMuted}>No posts yet</Text>
             </View>
           ) : (
-            userPosts.filter((p: any) => !p.reply_to_id && !p.replyToId && !p.title).map((post: any) => (
-              <PostCard key={post.id} post={post} compact />
-            ))
+            <>
+              {userPosts.filter((p: any) => !p.reply_to_id && !p.replyToId && !p.title).map((post: any) => (
+                <PostCard key={post.id} post={post} compact />
+              ))}
+              {postsHasMore && (
+                <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                  <ActivityIndicator color={colors.accent} />
+                </View>
+              )}
+            </>
           )
         )}
 
         {/* Replies — X-style: each reply shows "Replying to @x" (clickable to the
             parent) above the reply card. */}
         {profileTab === 'replies' && (
-          postsLoading ? (
+          repliesLoading ? (
             <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={60} />)}</View>
           ) : userReplies.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
               <Text variant="body" color={colors.textMuted}>No replies yet</Text>
             </View>
           ) : (
-            userReplies.map((post: any) => {
-              const parent = post.reply_to;
-              const parentHandle = parent?.author?.username;
-              return (
-                <View key={post.id}>
-                  {parentHandle ? (
-                    <Pressable
-                      onPress={() => { if (parent?.id) router.push(`/post/${parent.id}` as any); }}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}
-                    >
-                      <Ionicons name="arrow-undo-outline" size={13} color={colors.textMuted} />
-                      <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
-                        Replying to <Text variant="caption" color={colors.accent}>@{parentHandle}</Text>
-                        {parent?.content ? `  ${parent.content.slice(0, 50)}` : ''}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  <PostCard post={post} compact />
+            <>
+              {userReplies.map((post: any) => {
+                const parent = post.reply_to;
+                const parentHandle = parent?.author?.username;
+                return (
+                  <View key={post.id}>
+                    {parentHandle ? (
+                      <Pressable
+                        onPress={() => { if (parent?.id) router.push(`/post/${parent.id}` as any); }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}
+                      >
+                        <Ionicons name="arrow-undo-outline" size={13} color={colors.textMuted} />
+                        <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
+                          Replying to <Text variant="caption" color={colors.accent}>@{parentHandle}</Text>
+                          {parent?.content ? `  ${parent.content.slice(0, 50)}` : ''}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    <PostCard post={post} compact />
+                  </View>
+                );
+              })}
+              {repliesHasMore && (
+                <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                  <ActivityIndicator color={colors.accent} />
                 </View>
-              );
-            })
+              )}
+            </>
           )
         )}
 

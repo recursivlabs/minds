@@ -171,7 +171,13 @@ function CharCounterRing({
 
 export default function CreateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ communityId?: string; communityName?: string; quote?: string; mode?: string; quotePostId?: string; quoteAuthor?: string; quoteContent?: string }>();
+  // X-style quote post: when launched from a post's "Quote Post" action, the
+  // composer is pre-seeded with the quoted post id (set as reposted_from_id on
+  // submit) + a light author/content snippet to render the embedded card.
+  const quotePostId = typeof params.quotePostId === 'string' ? params.quotePostId : undefined;
+  const quoteAuthor = typeof params.quoteAuthor === 'string' ? params.quoteAuthor : '';
+  const quoteContent = typeof params.quoteContent === 'string' ? params.quoteContent : '';
   const { sdk, user } = useAuth();
   const colors = useColors();
   const initialMode: Mode = (params.mode === 'community' || params.mode === 'blog' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
@@ -186,7 +192,9 @@ export default function CreateScreen() {
   const restoredContentRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     const draft = getLatestDraft();
-    if (draft && !params.communityId) {
+    // Skip draft restore when quoting — the composer is intentionally a fresh
+    // comment on the quoted post, not a continuation of an old draft.
+    if (draft && !params.communityId && !quotePostId) {
       setContent(draft.content);
       restoredContentRef.current = draft.content;
       if (draft.communityId) setSelectedCommunity({ id: draft.communityId, name: draft.communityName });
@@ -397,7 +405,9 @@ export default function CreateScreen() {
         // matching legacy Minds behavior and modern social conventions
         // (Twitter, TikTok don't require communities). If a community
         // is selected, post goes there; otherwise it's public.
-        if (!content.trim() && !mediaUri) {
+        // A quote post is valid even with empty content (the quoted post is the
+        // payload); a normal post still needs content or media.
+        if (!content.trim() && !mediaUri && !quotePostId) {
           setSubmitting(false);
           return;
         }
@@ -453,7 +463,11 @@ export default function CreateScreen() {
           setVideoPct(null);
         }
         await sdk.posts.create({
-          content: content.trim() || ' ',
+          // Quote posts may carry empty content (the embedded post is the
+          // payload); only pad to a space for plain posts where the server
+          // historically required non-empty content.
+          content: content.trim() || (quotePostId ? '' : ' '),
+          reposted_from_id: quotePostId || undefined,
           organization_id: ORG_ID || undefined,
           community_id: selectedCommunity?.id || undefined,
           media_urls: mediaUrls,
@@ -574,7 +588,7 @@ export default function CreateScreen() {
     }
   };
 
-  const canSubmit = mode === 'post' ? (content.trim().length > 0 || !!mediaUri)
+  const canSubmit = mode === 'post' ? (content.trim().length > 0 || !!mediaUri || !!quotePostId)
     : mode === 'blog' ? (blogTitle.trim().length > 0 && blogContent.trim().length > 0)
     : mode === 'agent' ? (agentName.trim().length > 0 && agentBio.trim().length > 0)
     : mode === 'app' ? (appName.trim().length > 0 && appDesc.trim().length > 0)
@@ -893,7 +907,7 @@ export default function CreateScreen() {
               paddingTop: mode === 'post' ? 6 : 0,
             }}>
               <TextInput
-                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : "What's happening?"}
+                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : quotePostId ? 'Add a comment' : "What's happening?"}
                 placeholderTextColor={colors.textMuted}
                 value={mode === 'blog' ? blogContent : content}
                 onChangeText={mode === 'blog' ? setBlogContent : setContent}
@@ -919,6 +933,33 @@ export default function CreateScreen() {
               />
             </View>
           </View>
+
+          {/* Embedded quoted post preview (X-style quote-tweet card). Shown when
+              the composer is launched from a post's "Quote Post" action so the
+              user sees exactly what they're quoting while they type. */}
+          {mode === 'post' && quotePostId && (
+            <View
+              style={{
+                marginTop: spacing.md,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.lg,
+                padding: spacing.md,
+                gap: spacing.xs,
+              }}
+            >
+              {quoteAuthor ? (
+                <Text variant="bodyMedium" numberOfLines={1} style={{ fontSize: 13 }}>{quoteAuthor}</Text>
+              ) : null}
+              {quoteContent ? (
+                <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ lineHeight: 20 }}>
+                  {quoteContent}
+                </Text>
+              ) : (
+                <Text variant="caption" color={colors.textMuted}>Quoting a post</Text>
+              )}
+            </View>
+          )}
 
           {mediaUris.length > 0 && (
             <View style={{ marginTop: spacing.lg }}>

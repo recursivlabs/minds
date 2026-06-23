@@ -44,6 +44,78 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 604800)}w`;
 }
 
+// ── Embedded quote card (X "quote tweet"). A bordered, tappable card showing
+// the quoted post's author + a truncated preview of its content, with a small
+// media thumbnail when present. Tapping opens the quoted post.
+function QuoteEmbed({
+  quoted,
+  colors,
+  onPress,
+}: {
+  quoted: any;
+  colors: ReturnType<typeof useColors>;
+  onPress: (e?: any) => void;
+}) {
+  const qAuthor = quoted.author || quoted.user || {};
+  const qName = qAuthor.name || qAuthor.username || 'Anonymous';
+  const qUsername = qAuthor.username;
+  const qAvatar = qAuthor.image || qAuthor.avatar || null;
+  const qText = (quoted.content || quoted.body || quoted.title || '').trim();
+  const qCreatedAt = quoted.created_at || quoted.createdAt;
+  const rawMedia = quoted.media;
+  const qThumb =
+    (Array.isArray(rawMedia) ? rawMedia[0]?.url : rawMedia?.url || rawMedia) ||
+    quoted.image ||
+    quoted.thumbnail ||
+    null;
+  const preview = qText.length > 200 ? qText.slice(0, 200).trimEnd() + '…' : qText;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ hovered, pressed }: any) => ({
+        marginTop: spacing.md,
+        borderWidth: borders.thin,
+        borderColor: colors.border,
+        borderRadius: radius.lg,
+        padding: spacing.md,
+        backgroundColor: pressed ? colors.surfaceHover : hovered ? colors.glass : 'transparent',
+        ...(Platform.OS === 'web' ? ({ transition: 'background-color 0.15s ease', cursor: 'pointer' } as any) : {}),
+      })}
+    >
+      {/* Quoted byline: small avatar · name · @handle · time */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minWidth: 0 }}>
+        <Avatar uri={qAvatar} name={qName} size="xs" />
+        <Text variant="bodyMedium" numberOfLines={1} style={{ flexShrink: 1, fontSize: 13 }}>{qName}</Text>
+        {qUsername ? (
+          <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flexShrink: 0 }}>@{qUsername}</Text>
+        ) : null}
+        {qCreatedAt ? (
+          <Text variant="caption" color={colors.textMuted} style={{ flexShrink: 0 }}>· {timeAgo(qCreatedAt)}</Text>
+        ) : null}
+      </View>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+        {preview ? (
+          <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ flex: 1, lineHeight: 20 }}>
+            {preview}
+          </Text>
+        ) : (
+          <Text variant="body" color={colors.textMuted} style={{ flex: 1, fontStyle: 'italic' }}>
+            View post
+          </Text>
+        )}
+        {qThumb ? (
+          <Image
+            source={{ uri: qThumb }}
+            style={{ width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.surfaceHover }}
+            resizeMode="cover"
+          />
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPostDeleted, compact = false, canModerate = false }: Props) {
   const router = useRouter();
   const { sdk, user } = useAuth();
@@ -53,6 +125,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [score, setScore] = React.useState(postScore(post));
   const [showMenu, setShowMenu] = React.useState(false);
   const [menuPos, setMenuPos] = React.useState<{ x: number; y: number } | null>(null);
+  // Repost action sheet (X-style: "Repost" + "Quote Post"). Opens on tapping
+  // the repost icon; `repostMenuPos` anchors it next to the icon.
+  const [showRepostMenu, setShowRepostMenu] = React.useState(false);
+  const [repostMenuPos, setRepostMenuPos] = React.useState<{ x: number; y: number } | null>(null);
   // Measured menu height — the position clamp needs the REAL height (the old
   // fixed 220px estimate let taller menus, e.g. own-post + admin actions, spill
   // off the bottom of the screen). Reset on each open so it re-measures.
@@ -65,9 +141,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [isDeleted, setIsDeleted] = React.useState(false);
   // Long feed posts show a preview + "Show more" that expands inline.
   const [expanded, setExpanded] = React.useState(false);
-  // Bookmark state is keyed by the original (non-repost) post id so a repost
-  // and the original share a single saved-state.
-  const bookmarkedId = (post.reposted_from || post.repostedFrom)?.id || post.id;
+  // Bookmark state is keyed by the original post id for a BARE repost so a
+  // repost and the original share a single saved-state. A quote post has its
+  // own voice/engagement, so it bookmarks itself.
+  const _repostedOriginal = post.reposted_from || post.repostedFrom;
+  const _isQuote = !!_repostedOriginal && (post.content || post.body || '').trim().length > 0;
+  const bookmarkedId = (!_isQuote && _repostedOriginal?.id) || post.id;
   const [saved, setSaved] = React.useState(isBookmarked(bookmarkedId));
 
   // Repost-by-me toggle: tracks the id of the viewer's own repost of
@@ -80,9 +159,9 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [myRepostId, setMyRepostId] = React.useState<string | null>(
     (post as any).reposted_by_viewer_id ?? (post as any).repostedByViewerId ?? null
   );
-  // Repost count (X/Bluesky parity). Sourced from the original post's
-  // reposts_count and adjusted optimistically as the viewer reposts/undoes.
-  const _repostSource = post.reposted_from || post.repostedFrom || post;
+  // Repost count (X/Bluesky parity). For a bare repost, source the ORIGINAL's
+  // count (the repost row is just a pointer); a quote post counts its own.
+  const _repostSource = (!_isQuote && _repostedOriginal) || post;
   const [repostCount, setRepostCount] = React.useState<number>(postRepostCount(_repostSource));
 
   // Sync ALL state when post prop changes (prevents content mixing between posts)
@@ -102,15 +181,21 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
     setScore(serverScore);
   }, [post.id, post.userReaction, post.user_reaction, post.score]);
 
-  // X-style repost: when post.reposted_from is present, display the original
-  // as the card body with a small "@<reposter> reposted" header above. The
-  // repost row itself owns the share/delete actions and its author is shown
-  // only in the header. All other interactions (vote, reply, save, report)
-  // target the original post.
+  // X-style repost vs quote post. Both carry `reposted_from` (the original).
+  // The distinguisher is the repost row's OWN content:
+  //   • empty own content  → BARE REPOST: render the original as the card body
+  //     with a small "@<reposter> reposted" header above it.
+  //   • non-empty content  → QUOTE POST: render the reposter's own content as
+  //     the body (their voice), with the original embedded as a tappable card
+  //     beneath it (X "quote tweet"). The reposter is the byline author here.
   const repostedFrom = post.reposted_from || post.repostedFrom || null;
-  const reposter = repostedFrom ? (post.author || post.user || {}) : null;
+  const ownContent = (post.content || post.body || '').trim();
+  const isQuotePost = !!repostedFrom && ownContent.length > 0;
+  // Bare repost: original supplies the body. Quote post: the post itself is the
+  // body and the original is shown only as the embedded card.
+  const reposter = repostedFrom && !isQuotePost ? (post.author || post.user || {}) : null;
   const reposterName = reposter ? (reposter.name || reposter.username || 'Someone') : null;
-  const displayPost = repostedFrom || post;
+  const displayPost = (repostedFrom && !isQuotePost) ? repostedFrom : post;
 
   const author = displayPost.author || displayPost.user || {};
   const authorName = author.name || author.username || 'Anonymous';
@@ -158,7 +243,9 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const bylineFaviconUrl = isAgentCurated && sourceFromUrl
     ? `https://www.google.com/s2/favicons?domain=${sourceFromUrl.host}&sz=64`
     : null;
-  const rawContent = repostedFrom ? (displayPost.content || '') : (currentContent || '');
+  // When the displayed body IS this post (own post or quote post), use the
+  // edit-aware `currentContent`; for a bare repost the body is the original's.
+  const rawContent = displayPost === post ? (currentContent || '') : (displayPost.content || '');
   const externalUrl: string | undefined = displayPost.external_url || displayPost.externalUrl;
   // Strip lines that contain just the external_url — the LinkPreview
   // card already shows it, so it's noise in the body. Tolerates minor
@@ -186,8 +273,9 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const createdAt = displayPost.createdAt || displayPost.created_at || new Date().toISOString();
   const isOwnPost = user?.id && (author.id === user.id);
   // The ID used for all actions that target the content — vote, reply, nav.
-  // Reposts forward these to the original post.
-  const actionPostId = repostedFrom ? displayPost.id : post.id;
+  // Bare reposts forward these to the original; a quote post targets itself
+  // (it's a real post with its own engagement), as do non-repost posts.
+  const actionPostId = displayPost === post ? post.id : displayPost.id;
 
   // Log a view once per session for any post that mounts inside a
   // feed. Dedup in logSignal keeps this from double-counting when
@@ -302,6 +390,58 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         { text: 'Delete', style: 'destructive', onPress: doDelete },
       ]);
     }
+  };
+
+  // Instant reshare (no own content). Toggles undo when the viewer already
+  // reposted this in-session. Extracted so the repost action sheet can call it.
+  const doRepost = () => {
+    if (!sdk) return;
+    if (myRepostId) {
+      const idToDelete = myRepostId;
+      setMyRepostId(null);
+      setRepostCount((c) => Math.max(0, c - 1));
+      sdk.posts.delete(idToDelete)
+        .then(() => toast.show('Repost removed', 'success'))
+        .catch(() => {
+          setMyRepostId(idToDelete);
+          setRepostCount((c) => c + 1);
+          toast.show('Could not undo repost', 'error');
+        });
+      return;
+    }
+    setRepostCount((c) => c + 1);
+    sdk.posts.create({
+      content: '',
+      reposted_from_id: actionPostId,
+      organization_id: ORG_ID || undefined,
+    } as any)
+      .then((res: any) => {
+        const newId = res?.data?.id || res?.id;
+        if (newId) setMyRepostId(newId);
+        toast.show('Reposted', 'success');
+      })
+      .catch(() => {
+        setRepostCount((c) => Math.max(0, c - 1));
+        toast.show('Repost failed', 'error');
+      });
+  };
+
+  // Quote post: open the composer pre-seeded with the quoted post embedded.
+  // The composer (app/(tabs)/create) reads `quotePostId` and renders the
+  // embedded quoted card; on submit it creates a post with reposted_from_id +
+  // the typed content. We pass the quoted post id (the action target) plus a
+  // light author/content snippet so the composer can render the embed without a
+  // round-trip.
+  const openQuoteComposer = () => {
+    const quoted = displayPost; // the post being quoted (original for bare repost view, else this post)
+    router.push({
+      pathname: '/(tabs)/create',
+      params: {
+        quotePostId: actionPostId,
+        quoteAuthor: (quoted.author || quoted.user || {})?.name || (quoted.author || quoted.user || {})?.username || '',
+        quoteContent: (quoted.content || quoted.body || '').slice(0, 280),
+      },
+    } as any);
   };
 
   const handleEditSave = async () => {
@@ -573,6 +713,16 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           <View>
             {renderMarkdownContent()}
             <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} />
+            {isQuotePost && repostedFrom && (
+              <QuoteEmbed
+                quoted={repostedFrom}
+                colors={colors}
+                onPress={(e: any) => {
+                  e?.stopPropagation?.();
+                  if (repostedFrom.id) router.push(`/(tabs)/post/${repostedFrom.id}` as any);
+                }}
+              />
+            )}
           </View>
         </NSFWOverlay>
       ) : (
@@ -589,6 +739,17 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           {renderMarkdownContent()}
           <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} />
           <LinkPreview url={externalUrl} content={content} />
+          {/* Quote post: the embedded original, X-style. Tappable → original. */}
+          {isQuotePost && repostedFrom && (
+            <QuoteEmbed
+              quoted={repostedFrom}
+              colors={colors}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                if (repostedFrom.id) router.push(`/(tabs)/post/${repostedFrom.id}` as any);
+              }}
+            />
+          )}
         </View>
       )}
 
@@ -653,37 +814,12 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <Pressable
           onPress={(e: any) => {
             e?.stopPropagation?.();
-            if (!sdk) return;
-            // Toggle: if the viewer already reposted this post in the
-            // current session, undo it. Otherwise create the repost.
-            if (myRepostId) {
-              const idToDelete = myRepostId;
-              setMyRepostId(null);
-              setRepostCount(c => Math.max(0, c - 1));
-              sdk.posts.delete(idToDelete)
-                .then(() => toast.show('Repost removed', 'success'))
-                .catch(() => {
-                  setMyRepostId(idToDelete);
-                  setRepostCount(c => c + 1);
-                  toast.show('Could not undo repost', 'error');
-                });
-              return;
-            }
-            setRepostCount(c => c + 1);
-            sdk.posts.create({
-              content: '',
-              reposted_from_id: actionPostId,
-              organization_id: ORG_ID || undefined,
-            } as any)
-              .then((res: any) => {
-                const newId = res?.data?.id || res?.id;
-                if (newId) setMyRepostId(newId);
-                toast.show('Reposted', 'success');
-              })
-              .catch(() => {
-                setRepostCount(c => Math.max(0, c - 1));
-                toast.show('Repost failed', 'error');
-              });
+            // X-style: tapping the repost icon opens a small action sheet with
+            // "Repost" + "Quote Post" instead of an instant reshare.
+            const pageX = e?.nativeEvent?.pageX ?? 0;
+            const pageY = e?.nativeEvent?.pageY ?? 0;
+            setRepostMenuPos({ x: pageX, y: pageY });
+            setShowRepostMenu(true);
           }}
           hitSlop={8}
           style={({ hovered }: any) => ({
@@ -928,6 +1064,76 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                   style={{ padding: spacing.md }}
                 >
                   <Text variant="body">Share</Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+        </Pressable>
+      </Modal>
+
+      {/* Repost action sheet — X-style two-option menu anchored to the repost
+          icon: "Repost" (instant reshare / undo) and "Quote Post" (opens the
+          composer pre-seeded with this post embedded). */}
+      <Modal
+        visible={showRepostMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRepostMenu(false)}
+      >
+        <Pressable
+          onPress={() => setShowRepostMenu(false)}
+          style={{ flex: 1, backgroundColor: colors.scrim }}
+        >
+          {(() => {
+            const MENU_WIDTH = 200;
+            const screen = Dimensions.get('window');
+            const menuHeight = 110;
+            const x = Math.min(
+              Math.max(8, (repostMenuPos?.x ?? 16) - MENU_WIDTH / 2),
+              screen.width - MENU_WIDTH - 8,
+            );
+            const y = Math.min(
+              Math.max(8, (repostMenuPos?.y ?? 16) + 8),
+              Math.max(8, screen.height - menuHeight - 8),
+            );
+            return (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: y,
+                  left: x,
+                  width: MENU_WIDTH,
+                  backgroundColor: colors.surfaceRaised,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  padding: spacing.xs,
+                  ...(Platform.OS === 'web' ? { boxShadow: '0 12px 48px rgba(0,0,0,0.9)' } as any : { elevation: 12 }),
+                }}
+              >
+                <Pressable
+                  onPress={(e: any) => { e?.stopPropagation?.(); setShowRepostMenu(false); doRepost(); }}
+                  style={({ hovered }: any) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md,
+                    borderRadius: radius.sm,
+                    backgroundColor: hovered ? colors.surfaceHover : 'transparent',
+                    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                  })}
+                >
+                  <Ionicons name={myRepostId ? 'repeat' : 'repeat-outline'} size={18} color={myRepostId ? colors.accent : colors.text} />
+                  <Text variant="body" color={myRepostId ? colors.accent : colors.text}>{myRepostId ? 'Undo repost' : 'Repost'}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={(e: any) => { e?.stopPropagation?.(); setShowRepostMenu(false); openQuoteComposer(); }}
+                  style={({ hovered }: any) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md,
+                    borderRadius: radius.sm,
+                    backgroundColor: hovered ? colors.surfaceHover : 'transparent',
+                    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                  })}
+                >
+                  <Ionicons name="create-outline" size={18} color={colors.text} />
+                  <Text variant="body">Quote Post</Text>
                 </Pressable>
               </View>
             );
