@@ -46,9 +46,27 @@ export default function CommunitiesScreen() {
     </Pressable>
   );
 
+  // "+ New Community" header button — matches the discover/communities directory
+  // button styling (accent pill, caption + add icon). Routes into the create flow.
+  const newCommunityButton = (
+    <Pressable
+      onPress={() => router.push('/(tabs)/create?mode=community' as any)}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        paddingLeft: spacing.md, paddingRight: spacing.md, paddingVertical: 7,
+        borderRadius: radius.full, backgroundColor: colors.accent,
+        opacity: pressed ? 0.85 : 1,
+        ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+      })}
+    >
+      <Ionicons name="add" size={16} color={colors.textOnAccent} />
+      <Text variant="caption" color={colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>New Community</Text>
+    </Pressable>
+  );
+
   return (
     <Container safeTop padded={false}>
-      <ScreenHeader title="Communities" />
+      <ScreenHeader title="Communities" right={newCommunityButton} />
 
       {loading && mine.length === 0 ? (
         <View style={{ padding: spacing.xl, gap: spacing.lg }}>

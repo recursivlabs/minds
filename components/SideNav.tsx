@@ -618,42 +618,71 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           // New-DM compose affordance. Two flavours opening the SAME modal:
           //   - prominent: the cold/empty state (no conversations yet) — keeps
           //     the accent-bordered, centered CTA that invites the first DM.
-          //   - subtle (default): a small, low-emphasis "+ New message" pinned
-          //     at the bottom of an existing conversation list. Muted/secondary
-          //     so it stays reachable without competing with the inbox.
-          const SendMessageCTA = ({ prominent }: { prominent?: boolean }) => (
-            <Pressable
-              onPress={() => setShowNewChat(true)}
-              style={({ pressed, hovered }: any) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: prominent ? 'center' : 'flex-start',
-                gap: prominent ? spacing.sm : spacing.xs,
-                paddingVertical: prominent ? spacing.sm + 2 : spacing.xs,
-                paddingHorizontal: spacing.sm,
-                marginTop: prominent ? spacing.sm : spacing.xs,
-                borderRadius: radius.md,
-                ...(prominent
-                  ? { borderWidth: 1, borderColor: `${colors.accent}55`, backgroundColor: hovered ? colors.accentSubtle : 'transparent' }
-                  : { backgroundColor: pressed ? colors.surfaceHover : hovered ? colors.glass : 'transparent' }),
-                opacity: pressed ? 0.8 : 1,
-                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-              })}
-            >
-              <Ionicons
-                name={prominent ? 'create-outline' : 'add'}
-                size={prominent ? 16 : 15}
-                color={prominent ? colors.accent : colors.textMuted}
-              />
-              <Text
-                variant="caption"
-                color={prominent ? colors.accent : colors.textMuted}
-                style={{ fontFamily: 'Roboto-Medium', fontSize: prominent ? 13 : 12 }}
+          //   - subtle (default): a near-invisible muted text link at the bottom
+          //     of an existing conversation list. No background, no border, no
+          //     bold — a tiny faint "+ New message" that blends into the list and
+          //     only firms up slightly on hover, so the inbox stays the focus.
+          const SendMessageCTA = ({ prominent }: { prominent?: boolean }) => {
+            if (!prominent) {
+              return (
+                <Pressable
+                  onPress={() => setShowNewChat(true)}
+                  style={({ pressed }: any) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingVertical: spacing.xs,
+                    paddingHorizontal: spacing.sm,
+                    marginTop: 2,
+                    opacity: pressed ? 0.6 : 1,
+                    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                  })}
+                >
+                  {({ hovered }: any) => (
+                    <>
+                      <Ionicons name="add" size={12} color={hovered ? colors.textSecondary : colors.textMuted} />
+                      <Text
+                        variant="caption"
+                        color={hovered ? colors.textSecondary : colors.textMuted}
+                        style={{ fontSize: 11 }}
+                      >
+                        New message
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              );
+            }
+            return (
+              <Pressable
+                onPress={() => setShowNewChat(true)}
+                style={({ pressed, hovered }: any) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: spacing.sm,
+                  paddingVertical: spacing.sm + 2,
+                  paddingHorizontal: spacing.sm,
+                  marginTop: spacing.sm,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: `${colors.accent}55`,
+                  backgroundColor: hovered ? colors.accentSubtle : 'transparent',
+                  opacity: pressed ? 0.8 : 1,
+                  ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                })}
               >
-                {prominent ? 'Send a message' : 'New message'}
-              </Text>
-            </Pressable>
-          );
+                <Ionicons name="create-outline" size={16} color={colors.accent} />
+                <Text
+                  variant="caption"
+                  color={colors.accent}
+                  style={{ fontFamily: 'Roboto-Medium', fontSize: 13 }}
+                >
+                  Send a message
+                </Text>
+              </Pressable>
+            );
+          };
           return (
             <View style={{ flex: 1, minHeight: 0 as any, paddingHorizontal: spacing.lg }}>
               {/* MESSAGES — the sidebar inbox is just DMs now; Communities moved

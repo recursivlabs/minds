@@ -55,17 +55,13 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
         offsetRef.current = 0;
       }
 
-      if (sort === 'following' && user?.id && !followingIdsRef.current) {
-        try {
-          const followingRes = await fetchDeduped(`req:following:${user.id}`, () => s.profiles.following(user.id, { limit: 500 }));
-          const ids = new Set((followingRes.data || []).map((p: any) => p.id));
-          ids.add(user.id); // your own posts belong in your Following feed
-          followingIdsRef.current = ids;
-        } catch {
-          // Fall back to a set with just you, so at minimum your own posts show.
-          followingIdsRef.current = new Set([user.id]);
-        }
-      }
+      // The Following feed is now served by the server's follow-graph path
+      // (following=true → posts from everyone you follow, network-scoped,
+      // reverse-chron, reposts included). The old client-side approach fetched
+      // the follow set (capped at 500) and filtered locally, which both missed
+      // followees beyond the cap and broke entirely for imported/multi-network
+      // accounts whose followees' posts are org_id NULL. No local follow set
+      // needed anymore.
 
       // Load user's communities for personalized "For You" feed
       if (sort === 'score' && user?.id && !myCommunityIdsRef.current) {
@@ -86,9 +82,19 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
       // Imported legacy posts are project-scoped with org_id NULL. Org-scoping
       // the discovery/trending fetch ('score') hides them, leaving only the few
       // native org posts (looked like "all one user"). Network scope includes
-      // the imported content. Other sorts keep org scope.
-      if (ORG_ID && sort !== 'score') {
+      // the imported content. The 'following' feed is ALSO network-scoped: it is
+      // a raw reverse-chron stream of everyone the user follows (served by the
+      // server's follow-graph path), and a followed author's imported posts have
+      // org_id NULL — org-scoping the fetch would hide them, leaving the feed
+      // empty for imported/multi-network accounts. Other sorts keep org scope.
+      if (ORG_ID && sort !== 'score' && sort !== 'following') {
         baseParams.organization_id = ORG_ID;
+      }
+      // Server-authoritative Following feed: the server filters to the caller's
+      // follow graph (network-scoped, reverse-chron, reposts included). The
+      // client-side follow filter below stays as a harmless secondary pass.
+      if (sort === 'following') {
+        baseParams.following = 'true';
       }
       // Server-side engagement ordering for discovery/trending, so high-voted
       // imported posts surface instead of only the most-recent (which one active
@@ -122,12 +128,12 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
         rawCount += raw.length;
         more = res.meta?.has_more ?? raw.length >= limit;
         let visible = raw;
-        if (sort === 'following' && followingIdsRef.current) {
-          visible = visible.filter((p: any) => {
-            const authorId = p.author?.id || p.userId || p.user_id;
-            return followingIdsRef.current?.has(authorId);
-          });
-        }
+        // The server's follow-graph path (following=true) is authoritative and
+        // already returns only followed authors' posts — and it covers the FULL
+        // follow graph, not the client's 500-cap sample. Re-applying the
+        // client-side follow filter here would wrongly DROP posts from followees
+        // beyond that 500-cap (jack follows ~3k). So skip it for 'following'.
+        // (followingIdsRef is still fetched for other uses; harmless if unused.)
         visible = filterMuted(visible);
         data = data.concat(visible);
         if (data.length > 0 || raw.length === 0 || stale()) break;
@@ -1006,6 +1012,48 @@ export function useProfiles(limit = 20) {
   }, [sdk, limit, cacheKey]);
 
   return { profiles, loading, error };
+}
+
+/**
+ * The signed-in viewer's set of followed user ids — the real source of truth for
+ * "am I following this person".
+ *
+ * The /profiles directory + /profiles/leaderboard payloads carry NO per-row
+ * follow flag, so seeding a "Following" pill from `is_following` on those rows is
+ * always false. Instead we fetch the viewer's OWN following list once
+ * (sdk.profiles.following — the same call the Following feed uses) and expose it
+ * as a Set, so any directory/leaderboard row can be checked for membership.
+ */
+export function useFollowingIds() {
+  const { sdk, user } = useAuth();
+  const cacheKey = user?.id ? `following-ids:${user.id}` : null;
+  const cached = cacheKey ? getCached(cacheKey) : null;
+  const [ids, setIds] = React.useState<Set<string>>(() => new Set<string>(cached || []));
+  const [loading, setLoading] = React.useState(!cached);
+
+  React.useEffect(() => {
+    if (!sdk || !user?.id || !cacheKey) { setLoading(false); return; }
+    if (isFresh(cacheKey) && cached) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchDeduped(`req:following:${user.id}`, () => sdk.profiles.following(user.id, { limit: 500 }));
+        const list: string[] = (res.data || []).map((p: any) => p.id).filter(Boolean);
+        if (!cancelled) {
+          setIds(new Set(list));
+          setCache(cacheKey, list);
+        }
+      } catch {
+        // Leave whatever we have (empty or cached) — a failed fetch must not
+        // wipe a working set.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, user?.id, cacheKey]);
+
+  return { followingIds: ids, loading };
 }
 
 /**

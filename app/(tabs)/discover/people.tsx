@@ -3,7 +3,7 @@ import { View, FlatList } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../components';
-import { useProfiles, useProfileLeaderboard } from '../../../lib/hooks';
+import { useProfiles, useProfileLeaderboard, useFollowingIds } from '../../../lib/hooks';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
 import { spacing } from '../../../constants/theme';
@@ -58,6 +58,10 @@ export default function DiscoverPeople() {
   // each is the true top-N across the WHOLE corpus, not a re-sort of a page.
   const { entries: activeBoard, byId: engagementById, loading: activeLoading } = useProfileLeaderboard(100, 'engagement');
   const { entries: followerBoard, byId: followerById, loading: followerLoading } = useProfileLeaderboard(100, 'followers');
+  // The viewer's REAL following set — the directory/leaderboard payloads carry no
+  // per-row follow flag, so this is the only reliable source for the "Following"
+  // pill state. Seeds followedIds below so already-followed creators render filled.
+  const { followingIds } = useFollowingIds();
 
   // Profile fields (bio, image, website…) the leaderboard rows don't carry,
   // joined by id from the directory so the rows render richly.
@@ -133,11 +137,22 @@ export default function DiscoverPeople() {
   const baseLoading = sort === 'followers' ? followerLoading : sort === 'active' ? activeLoading : profilesLoading;
   const loading = (isSearching ? searchLoading : baseLoading) && data.length === 0;
 
-  // Follow state, keyed by user id. Seeded from any is_following/isFollowing
-  // flag the payload carries (search + leaderboard rows may include it), then
-  // toggled optimistically on tap. A Set means the Following pill stays correct
-  // across re-renders without re-fetching per row.
+  // Follow state, keyed by user id. The real source of truth is the viewer's
+  // OWN following list (useFollowingIds) — the /profiles + leaderboard payloads
+  // DON'T carry a per-row follow flag, so seeding only from is_following/etc.
+  // left every pill stuck on "Follow". We seed from the viewer's following set
+  // (so already-followed creators render the filled "Following" pill), still
+  // honour any payload flag if present, then toggle optimistically on tap. A Set
+  // means the pill stays correct across re-renders without re-fetching per row.
   const [followedIds, setFollowedIds] = React.useState<Set<string>>(new Set());
+  React.useEffect(() => {
+    if (!followingIds || followingIds.size === 0) return;
+    setFollowedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of followingIds) next.add(id);
+      return next;
+    });
+  }, [followingIds]);
   React.useEffect(() => {
     setFollowedIds((prev) => {
       const next = new Set(prev);

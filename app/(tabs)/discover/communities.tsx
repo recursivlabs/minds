@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, Platform, TextInput } from 'react-native';
+import { View, FlatList, Pressable, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../components';
 import { useCommunities } from '../../../lib/hooks';
-import { spacing, radius, typography } from '../../../constants/theme';
+import { spacing, radius } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { timestampOf } from '../../../lib/models';
 import { FilterMenu, FilterBar, CommunityRow, ListSkeleton, communityMemberCount, communityActivity } from '../../../lib/discover';
@@ -59,23 +59,6 @@ export default function DiscoverCommunities() {
 
   const toCommunity = (c: any) => router.push(`/(tabs)/community/${c.slug || c.id}` as any);
 
-  // Local search text, mirrored to the ?q URL param (the same param the shared
-  // Discover header writes and `ranked` reads). Keeping it in the URL means the
-  // dedicated tab search, the shared header search, and deep-links all stay in
-  // sync. Debounced so typing doesn't push a history entry per keystroke.
-  const [searchText, setSearchText] = React.useState(query);
-  React.useEffect(() => { setSearchText(query); }, [query]);
-  React.useEffect(() => {
-    if (searchText.trim() === query) return;
-    const t = setTimeout(() => router.setParams({ q: searchText.trim() || undefined } as any), 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText]);
-
-  // Whether the user has any communities to show at all (independent of the
-  // active search) — gates the search box so it's hidden in the true empty state.
-  const hasAnyCommunities = (communities || []).length > 0;
-
   // New Community button — lives in a FIXED header row (NOT the FlatList's
   // ListHeaderComponent), so it's always visible top-right regardless of scroll
   // position or whether the list is empty. Routes to the create-community flow.
@@ -107,39 +90,6 @@ export default function DiscoverCommunities() {
         <Text variant="h3">Communities</Text>
         {newCommunityButton}
       </View>
-
-      {/* Dedicated community search — only when there are communities to filter.
-         Matches the shared Discover search box styling. Writes ?q so it filters
-         the loaded list (no community search endpoint exists server-side). */}
-      {hasAnyCommunities && (
-        <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}>
-          <View
-            style={{
-              flexDirection: 'row', alignItems: 'center',
-              backgroundColor: colors.surface, borderRadius: radius.full,
-              borderWidth: 0.5, borderColor: colors.glassBorder,
-              paddingHorizontal: spacing.md, gap: spacing.sm,
-            }}
-          >
-            <Ionicons name="search" size={18} color={colors.textMuted} />
-            <TextInput
-              placeholder="Search communities…"
-              placeholderTextColor={colors.textMuted}
-              value={searchText}
-              onChangeText={setSearchText}
-              style={{
-                flex: 1, color: colors.text, ...typography.body, paddingVertical: 11,
-                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
-              }}
-            />
-            {searchText.length > 0 && (
-              <Pressable onPress={() => setSearchText('')} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-              </Pressable>
-            )}
-          </View>
-        </View>
-      )}
 
       {loading && (communities || []).length === 0 ? (
         <ListSkeleton />
