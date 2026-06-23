@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
-import { useDiscoverPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents } from '../lib/hooks';
+import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents } from '../lib/hooks';
 import { profileFollowerCount, profilePostCount } from '../lib/models';
 import { hotScore, cardLabel, postTitle, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
 import { spacing, radius } from '../constants/theme';
@@ -85,11 +85,12 @@ export function FeedSidebar() {
   // everywhere. We fetch a real pool (not 5) so the client-side ranking has
   // something to choose from, then take the top 5.
 
-  // Posts → the Discover Posts "Hot" path: page recency, re-rank by the
-  // time-decayed hotScore (engagement velocity, age-decayed) — identical to the
-  // discover/posts tab so recent high-engagement posts surface, not a stale
-  // all-time top.
-  const { posts } = useDiscoverPosts({ order: 'hot', limit: 40 });
+  // Posts → useTrendingPosts: fetches the Hot path (recency-aware engagement)
+  // with a guaranteed fallback to the all-time Top list when Hot returns empty,
+  // so the rail is NEVER silently empty when posts exist (the root cause of the
+  // blank widget — Hot was the sole source). We still re-rank by the
+  // time-decayed hotScore client-side so the order favors recent, engaged posts.
+  const { posts } = useTrendingPosts(5);
   // People → directory + engagement leaderboard, ranked by activity. Mirrors the
   // People tab's "Most active" sort (post engagement, falling back to followers).
   const { profiles } = useProfiles(60);
@@ -109,22 +110,33 @@ export function FeedSidebar() {
     return engagementById.get(p?.id)?.engagement ?? engagementById.get(p?.id)?.postCount ?? 0;
   };
 
-  // Rank by the time-decayed HOT score, THEN dedup (dedupePosts keeps the first
-  // occurrence, so it must run on an already-ranked list to keep the best one).
-  // On a legacy corpus every hotScore can collapse toward ~0 (all posts are
-  // ancient), so a pure hot sort can look empty/arbitrary — fall back to the
-  // raw server order (which is already `sort=hot`/recency) whenever ranking
-  // doesn't yield enough rows, so the rail is NEVER empty when posts exist.
+  // Follower signal for the tie-break. The /profiles directory list returns
+  // identity columns only (no follower counts), so a raw profileFollowerCount
+  // is 0 for everyone and the tie-break degrades to array (signup) order — join
+  // the leaderboard's follower_count by id so equally-active creators still sort
+  // by reach, keeping the rail relevant rather than chronological.
+  const followerSignal = (p: any): number => {
+    const own = profileFollowerCount(p);
+    if (own) return own;
+    return engagementById.get(p?.id)?.followerCount ?? 0;
+  };
+
+  // useTrendingPosts already returns a non-empty pool whenever any posts exist
+  // (hot, with a score fallback). Re-rank by the time-decayed HOT score, THEN
+  // dedup (dedupePosts keeps the first occurrence, so it must run on an
+  // already-ranked list to keep the best one). On a legacy corpus every hotScore
+  // can collapse toward ~0 (all posts are ancient), so guard against a degenerate
+  // ranking by falling back to the raw server order whenever ranking thins out.
   const pool = posts || [];
   const ranked = dedupePosts([...pool].sort((a: any, b: any) => hotScore(b) - hotScore(a)));
   const trending = (ranked.length >= 3 ? ranked : dedupePosts([...pool])).slice(0, 5);
-  // Rank by engagement (Most active), ties fall back to followers — same as the
-  // People tab so the rail is a mini-leaderboard, not a signup-order list.
+  // Rank by engagement (Most active), ties fall back to follower reach — same as
+  // the People tab so the rail is a mini-leaderboard, not a signup-order list.
   const topPeople = [...(profiles || [])]
     .sort((a: any, b: any) => {
       const e = activityScore(b) - activityScore(a);
       if (e) return e;
-      return profileFollowerCount(b) - profileFollowerCount(a);
+      return followerSignal(b) - followerSignal(a);
     })
     .slice(0, 5);
   const topCommunities = [...(communities || [])]

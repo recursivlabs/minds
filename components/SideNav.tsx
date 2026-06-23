@@ -615,9 +615,12 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               </Pressable>
             </View>
           );
-          // "+ Send a message" — opens the new-DM compose modal. Shown both at
-          // the bottom of the inbox (always reachable) and prominently in the
-          // cold/empty state (no conversations yet).
+          // New-DM compose affordance. Two flavours opening the SAME modal:
+          //   - prominent: the cold/empty state (no conversations yet) — keeps
+          //     the accent-bordered, centered CTA that invites the first DM.
+          //   - subtle (default): a small, low-emphasis "+ New message" pinned
+          //     at the bottom of an existing conversation list. Muted/secondary
+          //     so it stays reachable without competing with the inbox.
           const SendMessageCTA = ({ prominent }: { prominent?: boolean }) => (
             <Pressable
               onPress={() => setShowNewChat(true)}
@@ -625,8 +628,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: prominent ? 'center' : 'flex-start',
-                gap: spacing.sm,
-                paddingVertical: spacing.sm + (prominent ? 2 : 0),
+                gap: prominent ? spacing.sm : spacing.xs,
+                paddingVertical: prominent ? spacing.sm + 2 : spacing.xs,
                 paddingHorizontal: spacing.sm,
                 marginTop: prominent ? spacing.sm : spacing.xs,
                 borderRadius: radius.md,
@@ -637,9 +640,17 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                 ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
               })}
             >
-              <Ionicons name="create-outline" size={16} color={colors.accent} />
-              <Text variant="caption" color={colors.accent} style={{ fontFamily: 'Roboto-Medium', fontSize: 13 }}>
-                Send a message
+              <Ionicons
+                name={prominent ? 'create-outline' : 'add'}
+                size={prominent ? 16 : 15}
+                color={prominent ? colors.accent : colors.textMuted}
+              />
+              <Text
+                variant="caption"
+                color={prominent ? colors.accent : colors.textMuted}
+                style={{ fontFamily: 'Roboto-Medium', fontSize: prominent ? 13 : 12 }}
+              >
+                {prominent ? 'Send a message' : 'New message'}
               </Text>
             </Pressable>
           );

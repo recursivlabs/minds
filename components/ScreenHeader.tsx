@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { View, Pressable, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { spacing } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { useSmartBack } from '../lib/navigation';
 
 interface Props {
   title: string;
@@ -17,7 +17,7 @@ interface Props {
  * Same height, same padding, same border treatment.
  */
 export const ScreenHeader = React.memo(function ScreenHeader({ title, showBack = true, right }: Props) {
-  const router = useRouter();
+  const goBack = useSmartBack();
   const colors = useColors();
   return (
     <View
@@ -34,7 +34,7 @@ export const ScreenHeader = React.memo(function ScreenHeader({ title, showBack =
     >
       {showBack && (
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           hitSlop={12}
           style={({ pressed }) => ({
             opacity: pressed ? 0.5 : 1,

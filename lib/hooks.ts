@@ -361,6 +361,86 @@ export function useDiscoverPosts(opts: { order: 'new' | 'top' | 'hot'; since?: s
 }
 
 /**
+ * Trending posts for the right-rail sidebar widget — a SELF-CONTAINED,
+ * never-silently-empty source for "what's hot right now".
+ *
+ * Why this exists (root cause of the empty Trending Posts widget):
+ * The sidebar previously used useDiscoverPosts({ order: 'hot' }) as its ONLY
+ * source. `sort=hot` is the right ranking (Reddit-style engagement decayed by
+ * age — recency-aware, not all-time bangers), but it is a SINGLE point of
+ * failure: if that one request returns 0 rows (a transient server error, an
+ * empty hot window, or a deploy where the hot path misbehaves) the widget has
+ * NOTHING to fall back to and renders the empty state — exactly the reported
+ * bug, which a pure client-side rank/dedup tweak could never fix because the
+ * fetched pool itself was empty.
+ *
+ * The fix is a two-tier fetch with a guaranteed fallback:
+ *   1. PRIMARY  → /posts?sort=hot  (engagement-weighted + age-decayed: a fresh,
+ *                 modestly-engaged post out-ranks a years-old all-time banger,
+ *                 so the rail feels current over a mostly-historical corpus).
+ *   2. FALLBACK → /posts?sort=score (all-time top — the same discovery path the
+ *                 For-You feed leans on, which is known to populate) — used ONLY
+ *                 when hot returns nothing, then re-ranked client-side by the
+ *                 same hotScore so the order still favors recency.
+ * Either way the widget shows ~limit genuinely-good posts whenever ANY exist,
+ * and only shows its empty state when the corpus is truly empty.
+ *
+ * Network-scoped (no organization_id, like usePosts('score')) so imported
+ * legacy posts — project-scoped with org_id NULL — are included rather than
+ * leaving only the handful of native org posts. The server's /posts route
+ * already applies the Minds-tenant + discover quality filters (original posts
+ * only, non-blank, viewer-accessible), so this never shows cross-tenant or
+ * pollution rows.
+ */
+export function useTrendingPosts(limit = 5) {
+  const { sdk } = useAuth();
+  const cacheKey = `trending-posts:${limit}`;
+  const cached = getCached(cacheKey);
+  const [posts, setPosts] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached);
+
+  React.useEffect(() => {
+    const fresh = getCached(cacheKey);
+    if (fresh && fresh.length) { setPosts(fresh); setLoading(false); }
+    let cancelled = false;
+    (async () => {
+      if (!sdk) return; // identity-scoped; never fall back to the shared app key
+      const s = sdk;
+      // Over-fetch a real pool so the client ranker + dedup have something to
+      // choose from, then the caller slices to `limit`.
+      const pool = Math.max(limit * 6, 30);
+      const fetchSort = (sort: 'hot' | 'score') =>
+        fetchDeduped(`req:trending-posts:${sort}:${pool}`, () =>
+          s.posts.list({ limit: pool, sort } as any) as Promise<any>);
+      try {
+        // PRIMARY: hot (recency-aware engagement).
+        let res: any = await fetchSort('hot');
+        let data: any[] = filterMuted(res?.data || []);
+        // FALLBACK: if hot yields nothing, pull the all-time top so the widget
+        // is populated whenever any posts exist at all.
+        if (data.length === 0) {
+          res = await fetchSort('score');
+          data = filterMuted(res?.data || []);
+        }
+        if (cancelled) return;
+        data.forEach((p: any) => { if (p.id) setCache(`post:${p.id}`, p); });
+        setPosts(data);
+        setCache(cacheKey, data);
+      } catch (err: any) {
+        // Non-fatal — keep whatever cache we have; the widget renders its empty
+        // state only if there was never any data.
+        captureException(err, { hook: 'useTrendingPosts' });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, limit, cacheKey]);
+
+  return { posts, loading };
+}
+
+/**
  * Paginated feed of a single author's posts (or replies).
  *
  * The profile screen used to one-shot `posts.list({ author_id, limit: 50 })`
@@ -487,6 +567,57 @@ export function usePost(postId: string) {
   }, [postId, sdk]);
 
   return { post, setPost, loading, error };
+}
+
+/**
+ * "More like this" — semantically related posts for the post-detail page so it
+ * never dead-ends.
+ *
+ * Uses the existing server endpoint `GET /posts/:id/similar` (kNN over post
+ * embeddings). The typed SDK has no `posts.similar()` method yet, so we reach
+ * the resource's underlying HttpClient directly (same `(s as any)` escape hatch
+ * the rest of this file uses for endpoints ahead of the SDK types). Returns []
+ * gracefully when the seed has no embedding or the endpoint is unavailable.
+ */
+export function useSimilarPosts(postId: string | undefined, limit = 10) {
+  const { sdk } = useAuth();
+  const cacheKey = `similar-posts:${postId || 'none'}:${limit}`;
+  const cached = getCached(cacheKey);
+  const [posts, setPosts] = React.useState<any[]>(cached || []);
+  const [loading, setLoading] = React.useState(!cached && !!postId);
+
+  React.useEffect(() => {
+    if (!postId) { setPosts([]); setLoading(false); return; }
+    const fresh = getCached(cacheKey);
+    setPosts(fresh || []);
+    setLoading(!fresh);
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!sdk) return; // identity-scoped; never fall back to the shared app key
+        // The HttpClient lives on every resource as `client`; use the posts
+        // resource's to hit the un-typed similar endpoint.
+        const http = (sdk.posts as any)?.client;
+        if (!http?.get) { if (!cancelled) setLoading(false); return; }
+        const res: any = await fetchDeduped(`req:similar:${postId}:${limit}`, () =>
+          http.get(`/posts/${postId}/similar`, { limit, organization_id: ORG_ID || undefined }));
+        if (!cancelled) {
+          const data = filterMuted(res?.data || []);
+          data.forEach((p: any) => { if (p.id) setCache(`post:${p.id}`, p); });
+          setPosts(data);
+          setCache(cacheKey, data);
+        }
+      } catch (err: any) {
+        // Non-fatal — the section just renders its empty state.
+        captureException(err, { hook: 'useSimilarPosts', postId });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [postId, sdk, limit, cacheKey]);
+
+  return { posts, loading };
 }
 
 /**

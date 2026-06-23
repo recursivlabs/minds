@@ -6,6 +6,7 @@ import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
 import { spacing } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { useSmartBack } from '../lib/navigation';
 
 interface Props {
   showBack?: boolean;
@@ -14,6 +15,7 @@ interface Props {
 
 export function Header({ showBack, title }: Props) {
   const router = useRouter();
+  const goBack = useSmartBack();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
   const colors = useColors();
@@ -41,7 +43,7 @@ export function Header({ showBack, title }: Props) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           {showBack && (
             <Pressable
-              onPress={() => router.back()}
+              onPress={goBack}
               hitSlop={12}
               style={{ marginRight: spacing.xs }}
             >
@@ -76,7 +78,7 @@ export function Header({ showBack, title }: Props) {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         {showBack && (
           <Pressable
-            onPress={() => router.back()}
+            onPress={goBack}
             hitSlop={12}
             style={{ marginRight: spacing.xs }}
           >

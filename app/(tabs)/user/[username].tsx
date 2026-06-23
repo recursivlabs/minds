@@ -27,10 +27,14 @@ const OWNER_TABS = ['posts', 'replies', 'communities', 'saved', 'followers', 'fo
 const OTHER_TABS = ['posts', 'replies', 'communities', 'followers', 'following'] as const;
 type ProfileTab = typeof OWNER_TABS[number];
 
-function SavedPostsTab() {
+function SavedPostsTab({ query = '' }: { query?: string }) {
   const colors = useColors();
   const bookmarkIds = getBookmarks();
-  const savedPosts = bookmarkIds.map(id => getCached(`post:${id}`)).filter(Boolean);
+  const q = query.trim().toLowerCase();
+  const allSaved = bookmarkIds.map(id => getCached(`post:${id}`)).filter(Boolean) as any[];
+  const savedPosts = q
+    ? allSaved.filter((p: any) => typeof p?.content === 'string' && p.content.toLowerCase().includes(q))
+    : allSaved;
   if (savedPosts.length === 0) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
@@ -89,6 +93,25 @@ export default function UserProfileScreen() {
     ? (initialTab as ProfileTab)
     : 'posts';
   const [profileTab, setProfileTab] = React.useState<ProfileTab>(validInitialTab);
+
+  // Per-tab search (own profile only). One input that adapts to the active tab
+  // and filters that tab's list client-side — there's no server search for a
+  // user's own posts/replies/communities/saved/followers/following, so each is
+  // filtered over the already-loaded list. Resets when the active tab changes.
+  const [tabSearch, setTabSearch] = React.useState('');
+  React.useEffect(() => { setTabSearch(''); }, [profileTab]);
+  const searchQ = tabSearch.trim().toLowerCase();
+  const isTabSearching = searchQ.length > 0;
+  const matchText = React.useCallback((...vals: any[]) =>
+    !searchQ || vals.some((v) => typeof v === 'string' && v.toLowerCase().includes(searchQ)),
+    [searchQ]);
+  const searchPlaceholder =
+    profileTab === 'posts' ? 'Search your posts…'
+    : profileTab === 'replies' ? 'Search your replies…'
+    : profileTab === 'communities' ? 'Search communities…'
+    : profileTab === 'saved' ? 'Search saved…'
+    : profileTab === 'followers' ? 'Search followers…'
+    : 'Search following…';
 
   const [followLoading, setFollowLoading] = React.useState(false);
   const [followsYou, setFollowsYou] = React.useState(false);
@@ -501,40 +524,81 @@ export default function UserProfileScreen() {
           />
         </View>
 
+        {/* Per-tab search — own profile only. One input that filters the active
+            tab's list (posts/replies by text, communities by name, saved by text,
+            followers/following by name/handle). Matches the app's search styling. */}
+        {isOwnProfile && (
+          <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+            <View
+              style={{
+                flexDirection: 'row', alignItems: 'center',
+                backgroundColor: colors.surface, borderRadius: radius.full,
+                borderWidth: 0.5, borderColor: colors.glassBorder,
+                paddingHorizontal: spacing.md, gap: spacing.sm,
+              }}
+            >
+              <Ionicons name="search" size={18} color={colors.textMuted} />
+              <TextInput
+                placeholder={searchPlaceholder}
+                placeholderTextColor={colors.textMuted}
+                value={tabSearch}
+                onChangeText={setTabSearch}
+                autoCapitalize="none"
+                style={{
+                  flex: 1, color: colors.text, ...typography.body, paddingVertical: 9,
+                  ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+                }}
+              />
+              {tabSearch.length > 0 && (
+                <Pressable onPress={() => setTabSearch('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* Posts */}
-        {profileTab === 'posts' && (
+        {profileTab === 'posts' && (() => {
+          const visiblePosts = userPosts
+            .filter((p: any) => !p.reply_to_id && !p.replyToId && !p.title)
+            .filter((p: any) => matchText(p.content, p.title));
+          return (
           postsLoading ? (
             <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={60} />)}</View>
-          ) : userPosts.filter((p: any) => !p.reply_to_id && !p.replyToId && !p.title).length === 0 ? (
+          ) : visiblePosts.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-              <Text variant="body" color={colors.textMuted}>No posts yet</Text>
+              <Text variant="body" color={colors.textMuted}>{isTabSearching ? 'No matching posts' : 'No posts yet'}</Text>
             </View>
           ) : (
             <>
-              {userPosts.filter((p: any) => !p.reply_to_id && !p.replyToId && !p.title).map((post: any) => (
+              {visiblePosts.map((post: any) => (
                 <PostCard key={post.id} post={post} compact />
               ))}
-              {postsHasMore && (
+              {!isTabSearching && postsHasMore && (
                 <View style={{ padding: spacing.xl, alignItems: 'center' }}>
                   <ActivityIndicator color={colors.accent} />
                 </View>
               )}
             </>
           )
-        )}
+          );
+        })()}
 
         {/* Replies — X-style: each reply shows "Replying to @x" (clickable to the
             parent) above the reply card. */}
-        {profileTab === 'replies' && (
+        {profileTab === 'replies' && (() => {
+          const visibleReplies = userReplies.filter((p: any) => matchText(p.content, p.reply_to?.content, p.reply_to?.author?.username));
+          return (
           repliesLoading ? (
             <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={60} />)}</View>
-          ) : userReplies.length === 0 ? (
+          ) : visibleReplies.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-              <Text variant="body" color={colors.textMuted}>No replies yet</Text>
+              <Text variant="body" color={colors.textMuted}>{isTabSearching ? 'No matching replies' : 'No replies yet'}</Text>
             </View>
           ) : (
             <>
-              {userReplies.map((post: any) => {
+              {visibleReplies.map((post: any) => {
                 const parent = post.reply_to;
                 const parentHandle = parent?.author?.username;
                 return (
@@ -562,45 +626,56 @@ export default function UserProfileScreen() {
               )}
             </>
           )
-        )}
+          );
+        })()}
 
         {/* Blogs */}
         {/* Followers */}
-        {profileTab === 'followers' && (
+        {profileTab === 'followers' && (() => {
+          const visible = (followersList || []).filter((u: any) => matchText(u.name, u.username, u.bio));
+          return (
           relationsLoading && followersList === null ? (
             <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2, 3].map(i => <Skeleton key={i} height={60} />)}</View>
-          ) : !followersList || followersList.length === 0 ? (
+          ) : !followersList || visible.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-              <Text variant="body" color={colors.textMuted}>No followers yet</Text>
+              <Text variant="body" color={colors.textMuted}>{isTabSearching ? 'No matching followers' : 'No followers yet'}</Text>
             </View>
           ) : (
-            followersList.map((u: any) => <UserRow key={u.id} u={u} onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)} />)
+            visible.map((u: any) => <UserRow key={u.id} u={u} onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)} />)
           )
-        )}
+          );
+        })()}
 
         {/* Following */}
-        {profileTab === 'following' && (
+        {profileTab === 'following' && (() => {
+          const visible = (followingList || []).filter((u: any) => matchText(u.name, u.username, u.bio));
+          return (
           relationsLoading && followingList === null ? (
             <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2, 3].map(i => <Skeleton key={i} height={60} />)}</View>
-          ) : !followingList || followingList.length === 0 ? (
+          ) : !followingList || visible.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-              <Text variant="body" color={colors.textMuted}>Not following anyone yet</Text>
+              <Text variant="body" color={colors.textMuted}>{isTabSearching ? 'No matching accounts' : 'Not following anyone yet'}</Text>
             </View>
           ) : (
-            followingList.map((u: any) => <UserRow key={u.id} u={u} onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)} />)
+            visible.map((u: any) => <UserRow key={u.id} u={u} onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)} />)
           )
-        )}
+          );
+        })()}
 
         {/* Communities (owner only for now) */}
-        {profileTab === 'communities' && (
+        {profileTab === 'communities' && (() => {
+          const myComms = communities
+            .filter((c: any) => c.is_member || c.isMember)
+            .filter((c: any) => matchText(c.name, c.description));
+          return (
           isOwnProfile ? (
-            communities.filter((c: any) => c.is_member || c.isMember).length === 0 ? (
+            myComms.length === 0 ? (
               <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
-                <Text variant="body" color={colors.textMuted}>Not in any communities yet</Text>
+                <Text variant="body" color={colors.textMuted}>{isTabSearching ? 'No matching communities' : 'Not in any communities yet'}</Text>
               </View>
             ) : (
               <View style={{ padding: spacing.xl, gap: spacing.md }}>
-                {communities.filter((c: any) => c.is_member || c.isMember).slice(0, 20).map((c: any) => (
+                {myComms.slice(0, 20).map((c: any) => (
                   <Pressable
                     key={c.id}
                     onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
@@ -624,10 +699,11 @@ export default function UserProfileScreen() {
               <Text variant="body" color={colors.textMuted}>Communities this user has joined</Text>
             </View>
           )
-        )}
+          );
+        })()}
 
         {/* Saved (owner only) */}
-        {profileTab === 'saved' && isOwnProfile && <SavedPostsTab />}
+        {profileTab === 'saved' && isOwnProfile && <SavedPostsTab query={tabSearch} />}
 
         <View style={{ height: spacing['4xl'] }} />
       </ScrollView>

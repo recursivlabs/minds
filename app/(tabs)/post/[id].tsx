@@ -8,7 +8,7 @@ import { Text, PostCard, Avatar, Skeleton } from '../../../components';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
-import { usePost } from '../../../lib/hooks';
+import { usePost, useSimilarPosts } from '../../../lib/hooks';
 import { ORG_ID } from '../../../lib/recursiv';
 import { setCache, invalidate } from '../../../lib/cache';
 import { captureException } from '../../../lib/monitoring';
@@ -22,6 +22,8 @@ export default function PostDetailScreen() {
   const { sdk, user } = useAuth();
   const colors = useColors();
   const { post, setPost, loading, error } = usePost(id);
+  // "More like this" — semantically related posts so the page never dead-ends.
+  const { posts: similar, loading: similarLoading } = useSimilarPosts(id, 10);
   const [replies, setReplies] = React.useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = React.useState(true);
   const [replyText, setReplyText] = React.useState('');
@@ -168,6 +170,32 @@ export default function PostDetailScreen() {
           </View>
         }
         renderItem={({ item }) => <PostCard post={item} compact />}
+        ListFooterComponent={
+          // "More like this" — a clearly-differentiated section below the
+          // replies so the post page cascades into related content instead of
+          // dead-ending. Hidden until we have results (graceful empty state).
+          !similarLoading && similar.length > 0 ? (
+            <View style={{ marginTop: spacing.md }}>
+              <View
+                style={{
+                  paddingHorizontal: spacing.xl,
+                  paddingVertical: spacing.md,
+                  backgroundColor: colors.surface,
+                  borderTopWidth: 0.5,
+                  borderBottomWidth: 0.5,
+                  borderColor: colors.borderSubtle,
+                }}
+              >
+                <Text variant="bodyMedium" color={colors.textSecondary}>
+                  More like this
+                </Text>
+              </View>
+              {similar.map((p: any) => (
+                <PostCard key={p.id} post={p} compact />
+              ))}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           !repliesLoading ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
