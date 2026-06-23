@@ -19,6 +19,7 @@ import { useActiveConvoId } from '../lib/activeConvo';
 import { subscribeLocalChat } from '../lib/chatEvents';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
 import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
+import { NewChatModal } from './NewChatModal';
 
 const COLLAPSED_WIDTH = 68;
 const EXPANDED_WIDTH = 264;
@@ -94,6 +95,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   // The refetch then reconciles with server truth (same message, no conflict).
   const [livePreviews, setLivePreviews] = React.useState<Map<string, { content: string; createdAt: string }>>(new Map());
   const [unreadNotifs, setUnreadNotifs] = React.useState(0);
+  // New-DM compose modal (search a person or agent → opens the thread).
+  const [showNewChat, setShowNewChat] = React.useState(false);
 
   // Fetch unread notification count + subscribe to live updates.
   const refreshNotifs = React.useCallback(async () => {
@@ -612,6 +615,34 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               </Pressable>
             </View>
           );
+          // "+ Send a message" — opens the new-DM compose modal. Shown both at
+          // the bottom of the inbox (always reachable) and prominently in the
+          // cold/empty state (no conversations yet).
+          const SendMessageCTA = ({ prominent }: { prominent?: boolean }) => (
+            <Pressable
+              onPress={() => setShowNewChat(true)}
+              style={({ pressed, hovered }: any) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: prominent ? 'center' : 'flex-start',
+                gap: spacing.sm,
+                paddingVertical: spacing.sm + (prominent ? 2 : 0),
+                paddingHorizontal: spacing.sm,
+                marginTop: prominent ? spacing.sm : spacing.xs,
+                borderRadius: radius.md,
+                ...(prominent
+                  ? { borderWidth: 1, borderColor: `${colors.accent}55`, backgroundColor: hovered ? colors.accentSubtle : 'transparent' }
+                  : { backgroundColor: pressed ? colors.surfaceHover : hovered ? colors.glass : 'transparent' }),
+                opacity: pressed ? 0.8 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name="create-outline" size={16} color={colors.accent} />
+              <Text variant="caption" color={colors.accent} style={{ fontFamily: 'Roboto-Medium', fontSize: 13 }}>
+                Send a message
+              </Text>
+            </Pressable>
+          );
           return (
             <View style={{ flex: 1, minHeight: 0 as any, paddingHorizontal: spacing.lg }}>
               {/* MESSAGES — the sidebar inbox is just DMs now; Communities moved
@@ -620,9 +651,17 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                 <SectionHeader label="Messages" onSeeAll={() => router.push('/(tabs)/chat' as any)} />
                 <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
                   {recentDMs.length === 0 ? (
-                    <Text variant="caption" color={colors.textMuted} style={{ paddingVertical: spacing.sm }}>No recent activity</Text>
+                    // Cold/empty state: lead with the compose CTA, not just "no activity".
+                    <View style={{ paddingVertical: spacing.sm, gap: spacing.xs }}>
+                      <Text variant="caption" color={colors.textMuted}>No messages yet</Text>
+                      <SendMessageCTA prominent />
+                    </View>
                   ) : (
-                    recentDMs.map(renderInboxRow)
+                    <>
+                      {recentDMs.map(renderInboxRow)}
+                      {/* Bottom-of-list affordance to start a new DM. */}
+                      <SendMessageCTA />
+                    </>
                   )}
                 </ScrollView>
               </View>
@@ -736,6 +775,9 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             </Pressable>
           )}
         </View>
+
+        {/* New-message compose: search a person OR agent, one tap opens the DM. */}
+        <NewChatModal visible={showNewChat} onClose={() => setShowNewChat(false)} />
     </View>
   );
 }

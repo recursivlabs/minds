@@ -124,23 +124,51 @@ export default function CommunityDetailScreen() {
     if (community?.id) fetchPosts();
   }, [community?.id, fetchPosts]));
 
-  const handleJoinLeave = async () => {
+  // True while the membership button is hovered (web) so a "Joined" pill can
+  // flip to a red "Leave" affordance — the Signal/Discord pattern. On native
+  // (no hover) the press itself routes through a confirm dialog.
+  const [leaveHover, setLeaveHover] = React.useState(false);
+
+  const doLeaveOrJoin = React.useCallback(async () => {
     if (!sdk || !community?.id) return;
     setJoinLoading(true);
     const wasMember = isMember;
-    setIsMember(!wasMember);
+    setIsMember(!wasMember); // optimistic
     try {
       if (wasMember) await sdk.communities.leave(community.id);
       else await sdk.communities.join(community.id);
+      // Reflect the new membership on the cached community record so a back-nav
+      // (which re-seeds from cache) doesn't show the stale Join/Joined state.
+      setCommunity((prev: any) => prev ? { ...prev, is_member: !wasMember, isMember: !wasMember } : prev);
+      setCache(`community:${community.id}`, { ...(getCached(`community:${community.id}`) || community), is_member: !wasMember, isMember: !wasMember });
       // Invalidate cached community lists so the SideNav "Recents" picks up
       // the new membership state on its next mount / refresh. Without this,
       // re-joining a community wouldn't add it back to the sidebar until
       // the next cache TTL or a full logout/login cycle.
       invalidatePrefix('communities:');
     } catch {
-      setIsMember(wasMember);
+      setIsMember(wasMember); // revert on failure
+      showToast(wasMember ? 'Could not leave community' : 'Could not join community', 'error');
     }
     setJoinLoading(false);
+  }, [sdk, community, isMember]);
+
+  const handleJoinLeave = () => {
+    if (!sdk || !community?.id) return;
+    // Joining is a low-stakes, instant action. Leaving is destructive (you lose
+    // the community from your sidebar + feed boost), so gate it behind a confirm.
+    if (!isMember) { doLeaveOrJoin(); return; }
+    const title = `Leave ${community.name || 'this community'}?`;
+    const message = "You'll stop seeing its posts in your feed. You can rejoin anytime.";
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if (typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`)) doLeaveOrJoin();
+    } else {
+      Alert.alert(title, message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => doLeaveOrJoin() },
+      ]);
+    }
   };
 
   // Unified loading: hold ONE cohesive skeleton (header + post rows) until BOTH
@@ -230,14 +258,24 @@ export default function CommunityDetailScreen() {
 
             {/* Actions */}
             <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
-              <Button
-                onPress={handleJoinLeave}
-                loading={joinLoading}
-                variant={isMember ? 'secondary' : 'primary'}
-                size="sm"
+              {/* Members see a "Joined" pill that flips to a red "Leave" on
+                  hover (web) — and always confirms before leaving. Non-members
+                  see a primary "Join". */}
+              <View
+                {...(Platform.OS === 'web'
+                  ? { onMouseEnter: () => setLeaveHover(true), onMouseLeave: () => setLeaveHover(false) }
+                  : {})}
               >
-                {isMember ? 'Joined' : 'Join'}
-              </Button>
+                <Button
+                  onPress={handleJoinLeave}
+                  loading={joinLoading}
+                  variant={isMember ? (leaveHover ? 'primary' : 'secondary') : 'primary'}
+                  size="sm"
+                  accentColor={isMember && leaveHover ? colors.error : undefined}
+                >
+                  {isMember ? (leaveHover ? 'Leave' : 'Joined') : 'Join'}
+                </Button>
+              </View>
               <Button
                 onPress={() => router.push({ pathname: '/(tabs)/create', params: { communityId: community.id, communityName: community.name } } as any)}
                 variant="secondary"
