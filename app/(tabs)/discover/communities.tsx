@@ -3,19 +3,18 @@ import { View, FlatList, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../components';
-import { useCommunities, useTags } from '../../../lib/hooks';
+import { useCommunities } from '../../../lib/hooks';
 import { spacing, radius } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { timestampOf } from '../../../lib/models';
-import { FilterMenu, FilterBar, TopicChips, CommunityRow, ListSkeleton, communityMemberCount, communityActivity } from '../../../lib/discover';
+import { FilterMenu, FilterBar, CommunityRow, ListSkeleton, communityMemberCount, communityActivity } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Communities tab — leaderboard + filter chips. There's no community search
 // endpoint, so a query client-filters the loaded list. Chips: Most members /
-// Most active (members + posts*2) / Newest (created_at). The list payload
-// carries member_count + created_at but not post_count, so "Most active"
-// currently tracks membership — it gains the post weighting for free the moment
-// the list endpoint starts returning post_count (no client change needed).
+// Most active (members + posts*2) / Newest (created_at). The list payload now
+// carries member_count + post_count + created_at, so "Most active" is a
+// genuinely distinct ordering from "Most members" (it weights post volume).
 // ──────────────────────────────────────────────────────────────────────────
 
 type CommSort = 'members' | 'active' | 'newest';
@@ -27,7 +26,7 @@ const CHIPS: { key: CommSort; label: string }[] = [
 
 export default function DiscoverCommunities() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ q?: string; sort?: string; tag?: string }>();
+  const params = useLocalSearchParams<{ q?: string; sort?: string }>();
   const colors = useColors();
   const query = (params.q || '').trim();
   const isSearching = query.length > 0;
@@ -35,8 +34,8 @@ export default function DiscoverCommunities() {
   // Sort lives in the URL so it deep-links + survives back/forward.
   const sort: CommSort = (params.sort === 'active' || params.sort === 'newest') ? params.sort : 'members';
   const setSort = React.useCallback((k: CommSort) => router.setParams({ sort: k === 'members' ? undefined : k } as any), [router]);
-  const tagId = typeof params.tag === 'string' && params.tag ? params.tag : null;
-  const { tags } = useTags(50);
+  // No topic filter on Communities: the /communities payload + server route carry
+  // no tag field, so a topic control would be a dead chip here (it lives on Posts).
   // 100 is the server's max for /communities — fetch the whole set (~95 live) so
   // the count is accurate and the chips re-sort the FULL corpus, not a page.
   const { communities, loading } = useCommunities(100);
@@ -49,14 +48,6 @@ export default function DiscoverCommunities() {
         (c.name || '').toLowerCase().includes(q) ||
         (c.description || '').toLowerCase().includes(q));
     }
-    // Topic filter: no-op until community payloads carry tag ids, then filters
-    // for free (communities with the picked tag in their `tags` array).
-    if (tagId) {
-      list = list.filter((c: any) => {
-        const ids = Array.isArray(c.tags) ? c.tags.map((t: any) => t?.id ?? t) : null;
-        return ids ? ids.includes(tagId) : true;
-      });
-    }
     if (sort === 'newest') {
       return list.sort((a, b) => new Date(timestampOf(b)).getTime() - new Date(timestampOf(a)).getTime());
     }
@@ -64,7 +55,7 @@ export default function DiscoverCommunities() {
       return list.sort((a, b) => communityActivity(b) - communityActivity(a));
     }
     return list.sort((a, b) => communityMemberCount(b) - communityMemberCount(a));
-  }, [communities, sort, isSearching, query, tagId]);
+  }, [communities, sort, isSearching, query]);
 
   const toCommunity = (c: any) => router.push(`/(tabs)/community/${c.slug || c.id}` as any);
 
@@ -98,7 +89,6 @@ export default function DiscoverCommunities() {
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
           )}
-          <TopicChips tags={tags as any} activeId={tagId} onPick={(id) => router.setParams({ tag: id || undefined } as any)} />
           {!isSearching && (
             <FilterBar>
               <FilterMenu options={CHIPS} value={sort} icon="swap-vertical" onChange={setSort} />

@@ -10,7 +10,7 @@ import { postScore, postReplyCount, timestampOf, dedupePosts } from '../../../li
 import {
   FilterMenu,
   FilterBar,
-  TopicChips,
+  TopicsPill,
   hotScore,
   withinRange,
   sinceForRange,
@@ -23,18 +23,19 @@ import {
 // Posts tab — the master search console's default. ALL posts, paginated
 // (infinite scroll), with filters that change the SERVER query:
 //
-//   sort chips:  New  → recency (server default order)
-//                Top  → ?sort=score (all-time)
-//                Hot  → recency pages, re-ranked client-side by hotScore
-//   time range:  Today / This week / This month / All time
-//                → computes a `since` ISO passed as ?since= (server filter,
-//                  coming soon) AND client-filters created_at as the fallback
-//   topic chips: a row of tag chips → ?tag_ids=<id> (lights up once tags
-//                backfill; renders nothing while the tags table is empty)
+//   sort menu:   New  → recency (server default order)
+//                Top  → ?sort=score (all-time top)
+//                Hot  → ?sort=hot (SQL engagement/age decay over the corpus)
+//   time menu:   Today / This week / This month / All time
+//                → computes a `since` ISO passed as ?since= (server filters
+//                  created_at; a client withinRange() pass stays as defense)
+//   topics pill: opens a weighted tag-cloud modal → ?tag_ids=<id> (server
+//                filters via the post_tag join). Hides when no tags exist.
 //
 // When the shared search box has a query, server FTS (/posts/search?q=) takes
-// over and results render in the same list. All of sort/range/tag/q live in
-// the URL so deep-links + back/forward work.
+// over and results render in the same list — and the Time + Topics pills compose
+// into that search (the FTS route honors since/tag_ids). All of sort/range/tag/q
+// live in the URL so deep-links + back/forward work.
 // ──────────────────────────────────────────────────────────────────────────
 
 type PostSort = 'new' | 'top' | 'hot';
@@ -67,11 +68,14 @@ export default function DiscoverPosts() {
   // The server date window — passed as ?since= (and client-filtered as fallback).
   const since = React.useMemo(() => sinceForRange(range), [range]);
 
-  // Available topic tags (empty until backfilled → TopicChips renders nothing).
-  const { tags } = useTags(50);
+  // All topics for the tag-cloud modal (server returns them ranked by post_count,
+  // max 100). ~40 auto-topics exist; the Topics pill hides itself when empty.
+  const { tags } = useTags(100);
 
-  // The paginated feed. 'hot' pages recency just like 'new' (it re-ranks
-  // client-side), so they share a server query; only 'top' asks for ?sort=score.
+  // The paginated feed. Each order maps to a real server sort: 'new' → recency,
+  // 'top' → ?sort=score (all-time), 'hot' → ?sort=hot (SQL engagement/age decay
+  // over the WHOLE corpus). 'since' windows server-side. So the pages come back
+  // already correctly ordered + windowed — the caller only dedups + stabilizes.
   const { posts, loading, hasMore, loadMore } = useDiscoverPosts({
     order: sort,
     since,
@@ -79,13 +83,21 @@ export default function DiscoverPosts() {
     limit: 30,
   });
 
-  // Server FTS when searching. Topic filter narrows the search too (?tag_ids).
-  const { results: searchResults, loading: searchLoading } = useSearchPosts(query);
+  // Server FTS when searching. The active Time + Topic pills compose into the
+  // FTS query server-side (the search route honors since/until/tag_ids), so a
+  // search respects the same window + topic as the browse feed.
+  const { results: searchResults, loading: searchLoading } = useSearchPosts(query, {
+    since,
+    tagId: tagId || undefined,
+  });
 
   // Rank + window the fetched pages. Dedup collapses repost/remind noise.
+  // The server already applied the sort (hot/score/recency) + the time window
+  // (?since) + topic (?tag_ids) — this client pass is a stabilizer over the
+  // merged pages (consistent order as pages append) plus cheap date defense.
   const ranked = React.useMemo(() => {
     let list = dedupePosts([...(posts || [])]);
-    // Client-side time window (fallback until the server honors ?since).
+    // Client-side time window — defensive; the server already filtered by ?since.
     if (range !== 'all') list = list.filter((p: any) => withinRange(p, range));
     if (sort === 'hot') {
       list.sort((a, b) => hotScore(b) - hotScore(a));
@@ -98,18 +110,14 @@ export default function DiscoverPosts() {
     return list;
   }, [posts, sort, range]);
 
-  // Search results honor the topic filter + the same dedup.
+  // Search results: the topic + time filters are applied server-side (the FTS
+  // route honors tag_ids + since), so here we only dedup. We must NOT re-filter
+  // by tagId client-side — the server strips auto-topic tags from each post's
+  // `tags` array, so a client `tags.includes(tagId)` check would wrongly zero
+  // out every result when a topic is selected.
   const searched = React.useMemo(() => {
-    let list = dedupePosts([...(searchResults || [])]);
-    if (tagId) {
-      list = list.filter((p: any) => {
-        const ids = Array.isArray(p.tags) ? p.tags.map((t: any) => t?.id ?? t) : [];
-        return ids.includes(tagId);
-      });
-    }
-    if (range !== 'all') list = list.filter((p: any) => withinRange(p, range));
-    return list;
-  }, [searchResults, tagId, range]);
+    return dedupePosts([...(searchResults || [])]);
+  }, [searchResults]);
 
   const data = isSearching ? searched : ranked;
   const firstLoad = (isSearching ? searchLoading : loading) && data.length === 0;
@@ -142,27 +150,27 @@ export default function DiscoverPosts() {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <>
-          <TopicChips
-            tags={tags as any}
-            activeId={tagId}
-            onPick={(id) => setParam({ tag: id || undefined })}
-          />
-          {!isSearching && (
-            <FilterBar>
+          <FilterBar>
+            {!isSearching && (
               <FilterMenu
                 options={SORT_CHIPS}
                 value={sort}
                 icon="swap-vertical"
                 onChange={(k) => setParam({ sort: k === 'top' ? undefined : k })}
               />
-              <FilterMenu
-                options={TIME_RANGE_CHIPS}
-                value={range}
-                icon="time-outline"
-                onChange={(k) => setParam({ range: k === 'all' ? undefined : k })}
-              />
-            </FilterBar>
-          )}
+            )}
+            <FilterMenu
+              options={TIME_RANGE_CHIPS}
+              value={range}
+              icon="time-outline"
+              onChange={(k) => setParam({ range: k === 'all' ? undefined : k })}
+            />
+            <TopicsPill
+              tags={tags as any}
+              activeId={tagId}
+              onPick={(id) => setParam({ tag: id || undefined })}
+            />
+          </FilterBar>
           {data.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>

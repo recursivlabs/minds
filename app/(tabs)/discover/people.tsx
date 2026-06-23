@@ -3,26 +3,30 @@ import { View, FlatList } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../components';
-import { useProfiles, useProfileLeaderboard, useTags } from '../../../lib/hooks';
+import { useProfiles, useProfileLeaderboard } from '../../../lib/hooks';
 import { useAuth } from '../../../lib/auth';
 import { ORG_ID } from '../../../lib/recursiv';
 import { spacing } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { profileFollowerCount, profilePostCount } from '../../../lib/models';
-import { FilterMenu, FilterBar, TopicChips, PersonRow, ListSkeleton } from '../../../lib/discover';
+import { FilterMenu, FilterBar, PersonRow, ListSkeleton } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
-// People tab — leaderboard + filter chips, or search results when the shared
-// search box has a query. Chips: Most followers / Most active (post count) /
-// Suggested (network-closeness when the payload carries it, else followers).
+// People tab — server-ranked leaderboards + filter chips, or search results when
+// the shared search box has a query. Chips: Most followers / Most active /
+// Suggested — each a GENUINELY distinct ordering:
 //
-// Data note: the /profiles list (server max 200) returns identity columns only
-// — NO follower/post counts — ordered by signup date. So "Most active" can't
-// rank on the list payload; we enrich it with the /profiles/leaderboard
-// endpoint (server-ranked post_count + engagement) joined by user id. A TRUE
-// cross-corpus follower leaderboard would need a server sort the list endpoint
-// doesn't expose (and can't ship right now), so "Most followers" ranks whatever
-// follower signal individual profiles carry, falling back to the active order.
+//   Most active     → /profiles/leaderboard?sort=engagement (post_count +
+//                     reactions, true top-N across the whole corpus)
+//   Most followers  → /profiles/leaderboard?sort=followers (network follower
+//                     count, true top-N) — a real signal, not all-zeros
+//   Suggested       → a directory-wide blend (active, then followed) since the
+//                     payload carries no closeness signal
+//
+// The /profiles directory list (server max 200) returns identity columns only —
+// no counts — so it can't rank these on its own. We present the leaderboard rows
+// directly (they carry the real counts) and hydrate bio/image from the directory
+// join by id. Both leaderboards now return follower_count + post_count + engagement.
 // ──────────────────────────────────────────────────────────────────────────
 
 type PeopleSort = 'followers' | 'active' | 'suggested';
@@ -34,7 +38,7 @@ const CHIPS: { key: PeopleSort; label: string }[] = [
 
 export default function DiscoverPeople() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ q?: string; sort?: string; tag?: string }>();
+  const params = useLocalSearchParams<{ q?: string; sort?: string }>();
   const colors = useColors();
   const { sdk } = useAuth();
   const query = (params.q || '').trim();
@@ -43,16 +47,32 @@ export default function DiscoverPeople() {
   // Sort lives in the URL so it deep-links + survives back/forward.
   const sort: PeopleSort = (params.sort === 'active' || params.sort === 'suggested') ? params.sort : 'followers';
   const setSort = React.useCallback((k: PeopleSort) => router.setParams({ sort: k === 'followers' ? undefined : k } as any), [router]);
-  const tagId = typeof params.tag === 'string' && params.tag ? params.tag : null;
-  // Topic chips light up once tags backfill; profiles carry no tag field yet, so
-  // a picked tag narrows nothing today — wired so it filters for free the moment
-  // profiles return tag ids (graceful no-op until then).
-  const { tags } = useTags(50);
+  // No topic filter on People: the /profiles payload + server route carry no tag
+  // field, so a topic control would be a dead chip here (it lives on Posts).
   // 200 is the server's max for /profiles — fetch the largest pool it allows so
   // the directory + leaderboard re-rank the whole corpus, not just ~60.
   const { profiles, loading: profilesLoading } = useProfiles(200);
-  // Engagement signal (post_count) joined by id, so "Most active" really ranks.
-  const { byId: engagementById } = useProfileLeaderboard(100);
+  // Two server-ranked leaderboards give the authoritative ordering + real counts
+  // (the /profiles directory carries no follower/post counts). "Most active" uses
+  // the engagement-ranked board; "Most followers" uses the follower-ranked board —
+  // each is the true top-N across the WHOLE corpus, not a re-sort of a page.
+  const { entries: activeBoard, byId: engagementById, loading: activeLoading } = useProfileLeaderboard(100, 'engagement');
+  const { entries: followerBoard, byId: followerById, loading: followerLoading } = useProfileLeaderboard(100, 'followers');
+
+  // Profile fields (bio, image, website…) the leaderboard rows don't carry,
+  // joined by id from the directory so the rows render richly.
+  const profileById = React.useMemo(() => {
+    const m = new Map<string, any>();
+    for (const p of profiles || []) if (p?.id) m.set(p.id, p);
+    return m;
+  }, [profiles]);
+
+  // Merge a leaderboard row with its directory profile (counts win from the
+  // board; identity/bio win from whichever has them).
+  const hydrate = React.useCallback((row: any) => {
+    const p = profileById.get(row?.id);
+    return p ? { ...p, ...row } : row;
+  }, [profileById]);
 
   // Search people via the SDK (the same path the old discover used).
   const [searchedPeople, setSearchedPeople] = React.useState<any[]>([]);
@@ -74,48 +94,44 @@ export default function DiscoverPeople() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query, isSearching, sdk]);
 
-  // Post count for "Most active": prefer any count on the profile payload, else
-  // the leaderboard's post_count joined by id.
+  // Activity score: leaderboard engagement (post_count + reactions) joined by id,
+  // falling back to any count on the directory payload.
   const activityScore = React.useCallback((p: any): number => {
-    const own = profilePostCount(p);
-    if (own) return own;
-    return engagementById.get(p?.id)?.engagement ?? engagementById.get(p?.id)?.postCount ?? 0;
+    const board = engagementById.get(p?.id);
+    if (board?.engagement) return board.engagement;
+    return profilePostCount(p) || board?.postCount || 0;
   }, [engagementById]);
 
+  // Follower score: real network follower count from the follower-ranked board.
+  const followerScore = React.useCallback((p: any): number => {
+    return followerById.get(p?.id)?.followerCount ?? profileFollowerCount(p) ?? 0;
+  }, [followerById]);
+
   const ranked = React.useMemo(() => {
-    let list = [...(profiles || [])];
-    // Topic filter: no-op until profile payloads carry tag ids, then filters
-    // for free (profiles with the picked tag in their `tags` array).
-    if (tagId) {
-      list = list.filter((p: any) => {
-        const ids = Array.isArray(p.tags) ? p.tags.map((t: any) => t?.id ?? t) : null;
-        return ids ? ids.includes(tagId) : true;
-      });
-    }
     if (sort === 'active') {
-      return list.sort((a, b) => activityScore(b) - activityScore(a));
+      // Present the engagement board directly (already server-ranked, real counts).
+      const board = (activeBoard || []).map(hydrate);
+      return board.length ? board : [...(profiles || [])].sort((a, b) => activityScore(b) - activityScore(a));
     }
-    if (sort === 'suggested') {
-      // No closeness signal in the directory payload, so "Suggested" surfaces the
-      // most active+followed first (a sensible fallback): engagement, then
-      // followers, then signup recency (newest, which is the list's native order).
-      return list.sort((a, b) => {
-        const e = activityScore(b) - activityScore(a);
-        if (e) return e;
-        return profileFollowerCount(b) - profileFollowerCount(a);
-      });
+    if (sort === 'followers') {
+      // Present the follower board directly (true top-N by network followers).
+      const board = (followerBoard || []).map(hydrate);
+      return board.length ? board : [...(profiles || [])].sort((a, b) => followerScore(b) - followerScore(a));
     }
-    // Most followers — ranks the follower signal profiles carry; ties fall back
-    // to activity so the list still orders meaningfully when followers are 0.
-    return list.sort((a, b) => {
-      const f = profileFollowerCount(b) - profileFollowerCount(a);
+    // Suggested — a blend over the full directory: most active + followed first.
+    // (No closeness signal in the payload; this is the sensible fallback.)
+    return [...(profiles || [])].sort((a, b) => {
+      const e = activityScore(b) - activityScore(a);
+      if (e) return e;
+      const f = followerScore(b) - followerScore(a);
       if (f) return f;
-      return activityScore(b) - activityScore(a);
+      return 0;
     });
-  }, [profiles, sort, activityScore, tagId]);
+  }, [sort, activeBoard, followerBoard, profiles, hydrate, activityScore, followerScore]);
 
   const data = isSearching ? searchedPeople : ranked;
-  const loading = (isSearching ? searchLoading : profilesLoading) && data.length === 0;
+  const baseLoading = sort === 'followers' ? followerLoading : sort === 'active' ? activeLoading : profilesLoading;
+  const loading = (isSearching ? searchLoading : baseLoading) && data.length === 0;
 
   const handleFollow = async (userId: string) => {
     if (!sdk) return;
@@ -135,7 +151,6 @@ export default function DiscoverPeople() {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <>
-          <TopicChips tags={tags as any} activeId={tagId} onPick={(id) => router.setParams({ tag: id || undefined } as any)} />
           {!isSearching && (
             <FilterBar>
               <FilterMenu options={CHIPS} value={sort} icon="swap-vertical" onChange={setSort} />
@@ -144,7 +159,13 @@ export default function DiscoverPeople() {
           {data.length > 0 && (
             <View style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.sm }}>
               <Text variant="caption" color={colors.textMuted}>
-                {isSearching ? `${data.length} result${data.length !== 1 ? 's' : ''}` : `${data.length}${data.length >= 200 ? '+' : ''} people on the network`}
+                {isSearching
+                  ? `${data.length} result${data.length !== 1 ? 's' : ''}`
+                  : sort === 'followers'
+                    ? `Top ${data.length} by followers`
+                    : sort === 'active'
+                      ? `Top ${data.length} most active`
+                      : `${data.length}${data.length >= 200 ? '+' : ''} people on the network`}
               </Text>
             </View>
           )}

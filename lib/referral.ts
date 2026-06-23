@@ -39,11 +39,18 @@ function pickCode(res: any): string | null {
       const firstString = list.find((c: any) => typeof c === 'string' && c.length > 0);
       return firstString ?? null;
     }
-    // myCodes() shape: array of InviteCode objects. Prefer an active, unused code.
+    // myCodes() shape: array of InviteCode objects. Only an active, unused,
+    // unexpired code is a valid *shareable* link — returning a used/expired
+    // code (e.g. for a user whose only codes are spent) yields a dead ?ref=
+    // link, so fall through to generate() instead by returning null here.
+    const now = Date.now();
     const active = list.find(
-      (c: any) => (c?.status ?? 'active') === 'active' && !c?.used_by,
+      (c: any) =>
+        (c?.status ?? 'active') === 'active' &&
+        !c?.used_by &&
+        (!c?.expires_at || new Date(c.expires_at).getTime() > now),
     );
-    return (active?.code || list[0]?.code) ?? null;
+    return active?.code ?? null;
   }
   // Fallbacks for any single-object shape.
   return d?.code ?? null;

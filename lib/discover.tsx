@@ -1020,45 +1020,186 @@ export function withinRange(post: any, range: TimeRange): boolean {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Topic chips — a horizontal row of tag chips wired to the tags backfill.
+// Topic tag cloud — a modal "see them all in one screen" topic picker.
 //
-// Reads the available tags from useTags() (sdk.tags.list). The tags table is
-// empty today, so this renders NOTHING until tags are backfilled — at which
-// point it lights up automatically. Picking a chip drives a server query
-// (?tag_ids=<id>) in the consuming tab.
+// Replaces the old horizontal TopicChips bar. A `TopicsPill` (styled like the
+// Sort/Time FilterMenu pills) opens a full-screen `TagCloudModal` showing ALL
+// topics as a weighted cloud: each chip's font size + weight scales with its
+// post_count (from GET /tags), so the big topics pop and the page feels alive.
+// Tapping a topic selects it (drives ?tag_ids=<id> in the consuming tab) and
+// closes the modal; "All topics" clears the filter.
+//
+// Reads tags from useTags() (sdk.tags.list). The /tags route returns every
+// auto-topic with a real post_count, so the cloud lights up with live volume.
 // ──────────────────────────────────────────────────────────────────────────
-export function TopicChips({ tags, activeId, onPick, gutter }: {
-  tags: { id: string; name: string; slug?: string; color?: string | null }[];
+
+export type TopicTag = { id: string; name: string; slug?: string; color?: string | null; post_count?: number; postCount?: number };
+
+export function topicPostCount(t: TopicTag): number {
+  const n = Number(t?.post_count ?? t?.postCount ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// Map a tag's post_count onto a font-size weight within [min,max]. Uses a sqrt
+// compression of the count's position between the corpus min/max so a single
+// mega-topic doesn't dwarf everything (linear scaling makes the long tail
+// unreadably tiny). Tags with no/equal counts land at the midpoint.
+function cloudWeight(count: number, minCount: number, maxCount: number): { fontSize: number; weight: '400' | '500' | '600' | '700'; opacity: number } {
+  const MIN = 13, MAX = 30;
+  let frac = 0.5;
+  if (maxCount > minCount) {
+    const lo = Math.sqrt(Math.max(0, minCount));
+    const hi = Math.sqrt(Math.max(0, maxCount));
+    const v = Math.sqrt(Math.max(0, count));
+    frac = hi > lo ? (v - lo) / (hi - lo) : 0.5;
+  }
+  frac = Math.max(0, Math.min(1, frac));
+  const fontSize = Math.round(MIN + frac * (MAX - MIN));
+  const weight = frac > 0.78 ? '700' : frac > 0.5 ? '600' : frac > 0.25 ? '500' : '400';
+  const opacity = 0.62 + frac * 0.38; // smaller topics recede a touch
+  return { fontSize, weight, opacity };
+}
+
+/** The pill that lives in the FilterBar and opens the tag-cloud modal. Shows the
+ *  active topic name when one is selected, else "Topics". */
+export function TopicsPill({ tags, activeId, onPick }: {
+  tags: TopicTag[];
   activeId?: string | null;
   onPick: (id: string | null) => void;
-  gutter?: number;
 }) {
   const colors = useColors();
+  const [open, setOpen] = React.useState(false);
   if (!tags || tags.length === 0) return null;
-  const Chip = ({ id, label, active }: { id: string | null; label: string; active: boolean }) => (
-    <Pressable
-      onPress={() => onPick(id)}
-      style={({ pressed }) => ({
-        flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-        paddingHorizontal: spacing.md, paddingVertical: 6,
-        borderRadius: radius.full, borderWidth: 1,
-        borderColor: active ? colors.accent : colors.borderSubtle,
-        backgroundColor: active ? colors.accentMuted : (pressed ? colors.surfaceHover : colors.surface),
-        ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
-      })}
-    >
-      <Text variant="caption" color={active ? colors.accent : colors.textMuted} style={{ fontSize: 12 }}>#</Text>
-      <Text variant="caption" color={active ? colors.accent : colors.textSecondary} style={{ fontSize: 12 }}>{label}</Text>
-    </Pressable>
-  );
-  // Primary filter bar now — a clean horizontal scroll of topic chips, no row
-  // label (the chevron dropdowns below carry the secondary sort/time filters).
+  const active = activeId ? tags.find((t) => t.id === activeId) : null;
+  const label = active?.name ?? 'Topics';
+  const isActive = !!active;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter ?? spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm }}>
-      <Chip id={null} label="All" active={!activeId} />
-      {tags.map((t) => (
-        <Chip key={t.id} id={t.id} label={t.name} active={activeId === t.id} />
-      ))}
-    </ScrollView>
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => ({
+          flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+          paddingLeft: spacing.md, paddingRight: spacing.sm, paddingVertical: 6,
+          borderRadius: radius.full, borderWidth: 1,
+          borderColor: isActive ? colors.accent : colors.borderSubtle,
+          backgroundColor: isActive ? colors.accentMuted : (pressed ? colors.surfaceHover : colors.surface),
+          maxWidth: 200,
+          ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+        })}
+      >
+        <Ionicons name="pricetags-outline" size={12} color={isActive ? colors.accent : colors.textMuted} />
+        <Text variant="caption" numberOfLines={1} color={isActive ? colors.accent : colors.textSecondary} style={{ fontSize: 12 }}>{label}</Text>
+        <Ionicons name="chevron-down" size={12} color={isActive ? colors.accent : colors.textMuted} />
+      </Pressable>
+
+      <TagCloudModal
+        visible={open}
+        tags={tags}
+        activeId={activeId}
+        onClose={() => setOpen(false)}
+        onPick={(id) => { onPick(id); setOpen(false); }}
+      />
+    </>
+  );
+}
+
+/** Full-screen weighted tag cloud. Glanceable: all topics on one screen, sized
+ *  by post volume, gold accent for the active topic. */
+export function TagCloudModal({ visible, tags, activeId, onPick, onClose }: {
+  visible: boolean;
+  tags: TopicTag[];
+  activeId?: string | null;
+  onPick: (id: string | null) => void;
+  onClose: () => void;
+}) {
+  const colors = useColors();
+  // Rank by volume so the biggest topics read first (top-left), and compute the
+  // corpus min/max once for the weighting.
+  const { sorted, minCount, maxCount } = React.useMemo(() => {
+    const withCounts = (tags || []).map((t) => ({ t, c: topicPostCount(t) }));
+    const counts = withCounts.map((x) => x.c);
+    const max = counts.length ? Math.max(...counts) : 0;
+    const min = counts.length ? Math.min(...counts) : 0;
+    const s = [...withCounts].sort((a, b) => b.c - a.c).map((x) => x.t);
+    return { sorted: s, minCount: min, maxCount: max };
+  }, [tags]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: colors.scrimStrong, justifyContent: 'flex-end' }}>
+        {/* Tap the scrim above the sheet to dismiss. */}
+        <Pressable onPress={onClose} style={{ flex: 1 }} />
+        <View
+          style={{
+            backgroundColor: colors.bg,
+            borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+            maxHeight: '82%',
+            borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
+            borderColor: colors.border,
+            ...shadows.lg(colors.shadow),
+          }}
+        >
+          {/* Grabber + header */}
+          <View style={{ alignItems: 'center', paddingTop: spacing.sm }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.borderSubtle }} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <View style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: colors.accent }} />
+              <Text variant="h2">Topics</Text>
+            </View>
+            <Pressable
+              onPress={() => onPick(null)}
+              hitSlop={8}
+              disabled={!activeId}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full,
+                borderWidth: 1, borderColor: activeId ? colors.accent : colors.borderSubtle,
+                backgroundColor: activeId ? (pressed ? colors.accentMuted : 'transparent') : 'transparent',
+                opacity: activeId ? 1 : 0.5,
+                ...(Platform.OS === 'web' ? { cursor: activeId ? 'pointer' : 'default' } as any : {}),
+              })}
+            >
+              <Ionicons name="close-circle-outline" size={13} color={activeId ? colors.accent : colors.textMuted} />
+              <Text variant="caption" color={activeId ? colors.accent : colors.textMuted}>{activeId ? 'Clear' : 'All topics'}</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing['3xl'] }} showsVerticalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
+              {sorted.map((t) => {
+                const count = topicPostCount(t);
+                const { fontSize, weight, opacity } = cloudWeight(count, minCount, maxCount);
+                const isActive = activeId === t.id;
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => onPick(t.id)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'baseline', gap: 4,
+                      paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+                      borderRadius: radius.full, borderWidth: 1,
+                      borderColor: isActive ? colors.accent : colors.borderSubtle,
+                      backgroundColor: isActive ? colors.accentMuted : (pressed ? colors.surfaceHover : colors.surface),
+                      opacity: isActive ? 1 : opacity,
+                      ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color .15s ease' } as any : {}),
+                    })}
+                  >
+                    <Text style={{ fontSize: Math.round(fontSize * 0.72), color: colors.accent, fontFamily: 'Roboto-Medium' }}>#</Text>
+                    <Text style={{ fontSize, fontWeight: weight, color: isActive ? colors.accent : colors.text }}>{t.name}</Text>
+                    {count > 0 ? (
+                      <Text style={{ fontSize: Math.max(10, Math.round(fontSize * 0.5)), color: isActive ? colors.accent : colors.textMuted }}>
+                        {formatCount(count)}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }

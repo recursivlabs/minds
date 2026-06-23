@@ -265,23 +265,26 @@ export function usePosts(sort: 'score' | 'latest' | 'following' | 'personal' = '
  * personalization), this is a THIN paginator over the raw /posts list with the
  * server params the console exposes as filters:
  *   - order: 'new'  → recency (no sort param, server default)
- *            'top'  → sort=score (all-time)
- *            'hot'  → recency (pages recent posts; the CALLER re-ranks by
- *                     hotScore client-side — recent × engagement)
- *   - since:  ISO string → ?since= (server date filter; not honored yet, so the
- *             caller ALSO client-filters created_at as a fallback)
- *   - tagId:  string → ?tag_ids= (topic filter; lights up once tags backfill)
+ *            'top'  → sort=score (all-time top, server ORDER BY score)
+ *            'hot'  → sort=hot (Reddit-style engagement/age decay computed in
+ *                     SQL across the WHOLE corpus — not a client window)
+ *   - since:  ISO string → ?since= (server filters created_at >= since; honored)
+ *   - until:  ISO string → ?until= (server filters created_at <= until; honored)
+ *   - tagId:  string → ?tag_ids= (topic filter via post_tag join; honored)
  *
- * Returns the raw fetched pages deduped; ranking/time-window filtering is the
- * caller's job so the hook stays a dumb pager. Infinite scroll via loadMore.
+ * Every filter here maps to a server param the /posts route honors (verified in
+ * packages/server/.../rest/routes/posts.ts), so the returned pages are ALREADY
+ * the right sort + window — the caller only needs dedup. A light client re-sort
+ * stays in the caller as defense (stable ordering across merged pages), but the
+ * server is the source of truth. Infinite scroll via loadMore.
  */
-export function useDiscoverPosts(opts: { order: 'new' | 'top' | 'hot'; since?: string; tagId?: string; limit?: number }) {
-  const { order, since, tagId, limit = 30 } = opts;
+export function useDiscoverPosts(opts: { order: 'new' | 'top' | 'hot'; since?: string; until?: string; tagId?: string; limit?: number }) {
+  const { order, since, until, tagId, limit = 30 } = opts;
   const { sdk } = useAuth();
-  // Server order: 'new' and 'hot' both page recency (hot re-ranks client-side);
-  // only 'top' asks the server for the all-time score sort.
-  const serverSort = order === 'top' ? 'score' : undefined;
-  const cacheKey = `discover-posts:${serverSort || 'recent'}:${since || ''}:${tagId || ''}:${limit}`;
+  // Server sort: 'top' → score (all-time), 'hot' → SQL hot decay over the whole
+  // corpus, 'new' → server default (recency). All three are real server orders.
+  const serverSort = order === 'top' ? 'score' : order === 'hot' ? 'hot' : undefined;
+  const cacheKey = `discover-posts:${serverSort || 'recent'}:${since || ''}:${until || ''}:${tagId || ''}:${limit}`;
   const cached = getCached(cacheKey);
   const [posts, setPosts] = React.useState<any[]>(cached || []);
   const [loading, setLoading] = React.useState(!cached);
@@ -297,12 +300,15 @@ export function useDiscoverPosts(opts: { order: 'new' | 'top' | 'hot'; since?: s
     // usePosts('score'): org-scoping the discovery fetch hides imported content.
     if (serverSort) p.sort = serverSort;
     else if (ORG_ID) p.organization_id = ORG_ID;
-    // Date window. The server doesn't honor ?since yet; we pass it so it lights
-    // up for free once it does, AND the caller client-filters as the fallback.
+    // Date window — server filters created_at by these (honored). The caller
+    // keeps a withinRange() client filter as cheap defense, but the server has
+    // already windowed the rows so the feed is accurate over the FULL corpus
+    // (not just whatever the first page happened to contain).
     if (since) p.since = since;
+    if (until) p.until = until;
     if (tagId) p.tag_ids = tagId;
     return p;
-  }, [serverSort, since, tagId, limit]);
+  }, [serverSort, since, until, tagId, limit]);
 
   const fetchPage = React.useCallback(async (refresh: boolean) => {
     if (!sdk) return; // identity-scoped; never fall back to the shared app key
@@ -481,7 +487,16 @@ export function useAgents(limit = 20) {
       try {
         if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
         const s = sdk;
-        const res = await fetchDeduped(`req:agents:${limit}`, () => s.agents.listDiscoverable({ limit, organization_id: ORG_ID || undefined }));
+        // Discover Agents = agents BOUND to this app (agent_project_access), not
+        // every agent of the owning org. The session key is project-bound
+        // (projectId=Minds), so the server's /agents/discoverable scopes to the
+        // project's granted agents automatically WHEN organization_id is absent.
+        // Passing organization_id forces the org-scoped path instead, which
+        // surfaces operator/personal agents (aiOrganizationId === ORG) that
+        // aren't part of the curated discover set — the cross-tenant-looking
+        // bug. Omit it so an app with zero project agents returns [] and the
+        // widget hides cleanly (no global/cross-tenant fallback).
+        const res = await fetchDeduped(`req:agents:${limit}`, () => s.agents.listDiscoverable({ limit }));
         if (!cancelled) {
           const data = res.data || [];
           setAgents(data);
@@ -793,9 +808,9 @@ export function useProfiles(limit = 20) {
  * a real signal without a server change. Returns a Map id -> {post_count,
  * engagement} so callers can enrich their own list.
  */
-export function useProfileLeaderboard(limit = 100) {
+export function useProfileLeaderboard(limit = 100, sort: 'engagement' | 'followers' = 'engagement') {
   const { sdk } = useAuth();
-  const cacheKey = `profile-leaderboard:${limit}`;
+  const cacheKey = `profile-leaderboard:${sort}:${limit}`;
   const cached = getCached(cacheKey);
   const [entries, setEntries] = React.useState<any[]>(cached || []);
   const [loading, setLoading] = React.useState(!cached && limit > 0);
@@ -808,8 +823,8 @@ export function useProfileLeaderboard(limit = 100) {
       try {
         if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key
         const s = sdk;
-        const res: any = await fetchDeduped(`req:profile-leaderboard:${limit}`, () =>
-          (s as any).profiles.leaderboard({ limit, organization_id: ORG_ID || undefined }));
+        const res: any = await fetchDeduped(`req:profile-leaderboard:${sort}:${limit}`, () =>
+          (s as any).profiles.leaderboard({ limit, sort, organization_id: ORG_ID || undefined }));
         if (!cancelled) {
           const data = res.data || [];
           setEntries(data);
@@ -822,24 +837,36 @@ export function useProfileLeaderboard(limit = 100) {
       }
     })();
     return () => { cancelled = true; };
-  }, [sdk, limit, cacheKey]);
+  }, [sdk, limit, sort, cacheKey]);
 
   const byId = React.useMemo(() => {
-    const m = new Map<string, { postCount: number; engagement: number }>();
+    const m = new Map<string, { postCount: number; engagement: number; followerCount: number }>();
     for (const e of entries) {
-      if (e?.id) m.set(e.id, { postCount: Number(e.post_count ?? e.postCount ?? 0) || 0, engagement: Number(e.engagement ?? 0) || 0 });
+      if (e?.id) m.set(e.id, {
+        postCount: Number(e.post_count ?? e.postCount ?? 0) || 0,
+        engagement: Number(e.engagement ?? 0) || 0,
+        followerCount: Number(e.follower_count ?? e.followerCount ?? 0) || 0,
+      });
     }
     return m;
   }, [entries]);
 
-  return { entries, byId, loading };
+  // The server-ranked order of ids (top-N for this sort), so a caller can present
+  // the leaderboard's exact ordering even when joining onto another list.
+  const orderedIds = React.useMemo(() => entries.map((e: any) => e?.id).filter(Boolean) as string[], [entries]);
+
+  return { entries, byId, orderedIds, loading };
 }
 
 /**
- * Search posts scoped to Minds org.
+ * Search posts scoped to Minds org. Optionally composes the same time-window
+ * (since/until) + topic (tag_ids) filters the Discover Posts tab exposes, so a
+ * search honors the active Time + Topic pills server-side (the FTS route honors
+ * since/until/tag_ids) instead of the caller client-filtering the top-N.
  */
-export function useSearchPosts(query: string) {
+export function useSearchPosts(query: string, opts?: { since?: string; until?: string; tagId?: string }) {
   const { sdk } = useAuth();
+  const { since, until, tagId } = opts || {};
   const [results, setResults] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
 
@@ -857,8 +884,15 @@ export function useSearchPosts(query: string) {
       try {
         if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
         const s = sdk;
-        // Search posts
-        const res = await s.posts.search({ q: query, limit: 20, organization_id: ORG_ID || undefined });
+        // Search posts — compose the active time/topic filters into the FTS query.
+        const res = await s.posts.search({
+          q: query,
+          limit: 20,
+          organization_id: ORG_ID || undefined,
+          ...(since ? { since } : {}),
+          ...(until ? { until } : {}),
+          ...(tagId ? { tag_ids: tagId } : {}),
+        } as any);
         if (!cancelled) setResults(res.data || []);
       } catch {
         // If posts.search fails, fall back to listing and client-side filtering
@@ -880,7 +914,7 @@ export function useSearchPosts(query: string) {
       finally { if (!cancelled) setLoading(false); }
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [query, sdk]);
+  }, [query, sdk, since, until, tagId]);
 
   return { results, loading };
 }
