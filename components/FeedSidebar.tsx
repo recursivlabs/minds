@@ -219,7 +219,7 @@ export function FeedSidebar() {
       {/* Trending People — ranked by follower count */}
       {topPeople.length > 0 && (
         <SidebarSection
-          title="Trending People"
+          title="Trending Creators"
           icon="person-outline"
           // The widget ranks by engagement (activityScore) — the same signal as
           // the People tab's "Most active" leaderboard — so "See all" deep-links
@@ -235,7 +235,7 @@ export function FeedSidebar() {
                 avatar={u.image}
                 name={u.name || 'User'}
                 subtitle={followers > 0
-                  ? `${followers.toLocaleString()} followers`
+                  ? `${followers.toLocaleString()} ${followers === 1 ? 'follower' : 'followers'}`
                   : (u.username ? `@${u.username}` : undefined)}
                 description={u.bio || u.description}
                 onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
@@ -257,7 +257,7 @@ export function FeedSidebar() {
               key={c.id}
               avatar={c.image}
               name={c.name || 'Community'}
-              subtitle={`${(c.memberCount || c.member_count || 0).toLocaleString()} members`}
+              subtitle={`${(c.memberCount || c.member_count || 0).toLocaleString()} ${(c.memberCount || c.member_count || 0) === 1 ? 'member' : 'members'}`}
               description={c.description || c.bio}
               onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
             />

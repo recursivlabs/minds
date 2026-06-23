@@ -521,24 +521,26 @@ export const RediscoverTile = React.memo(function RediscoverTile({ post, onPress
 
 export const ENTITY_TILE_W = 220;
 
-function FollowPill({ initialActive, onToggle }: { initialActive?: boolean; onToggle: (next: boolean) => void }) {
+function FollowPill({ active, onToggle }: { active?: boolean; onToggle: (next: boolean) => void }) {
   const colors = useColors();
-  const [active, setActive] = React.useState(!!initialActive);
+  // Controlled by the parent's known follow state. FOLLOWING = filled gold
+  // accent (accent bg + textOnAccent, legible in light + dark); FOLLOW =
+  // outline/secondary.
   return (
     <Pressable
-      onPress={(e: any) => { e?.stopPropagation?.(); const next = !active; setActive(next); onToggle(next); }}
+      onPress={(e: any) => { e?.stopPropagation?.(); onToggle(!active); }}
       hitSlop={6}
       style={{
         paddingVertical: spacing.xs + 2,
         borderRadius: radius.full,
         alignItems: 'center',
-        backgroundColor: active ? 'transparent' : colors.accent,
-        borderWidth: active ? 1 : 0,
+        backgroundColor: active ? colors.accent : 'transparent',
+        borderWidth: active ? 0 : 1,
         borderColor: colors.borderSubtle,
         ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
       }}
     >
-      <Text variant="caption" color={active ? colors.text : colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>
+      <Text variant="caption" color={active ? colors.textOnAccent : colors.textSecondary} style={{ fontFamily: 'Roboto-Medium' }}>
         {active ? 'Following' : 'Follow'}
       </Text>
     </Pressable>
@@ -579,10 +581,10 @@ export const PersonTile = React.memo(function PersonTile({ person, onPress, onFo
       {followers > 0 ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{formatCount(followers)} followers</Text>
+          <Text variant="caption" color={colors.textMuted}>{formatCount(followers)} {followers === 1 ? 'follower' : 'followers'}</Text>
         </View>
       ) : null}
-      <FollowPill initialActive={isFollowed} onToggle={() => onFollow()} />
+      <FollowPill active={isFollowed} onToggle={() => onFollow()} />
     </Pressable>
   );
 });
@@ -618,12 +620,12 @@ export const CommunityTile = React.memo(function CommunityTile({ community, onPr
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Ionicons name="people" size={12} color={colors.textMuted} />
-            <Text variant="caption" color={colors.textMuted}>{formatCount(members)}</Text>
+            <Text variant="caption" color={colors.textMuted}>{formatCount(members)} {members === 1 ? 'member' : 'members'}</Text>
           </View>
           {postCount > 0 ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="newspaper-outline" size={12} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{formatCount(postCount)}</Text>
+              <Text variant="caption" color={colors.textMuted}>{formatCount(postCount)} {postCount === 1 ? 'post' : 'posts'}</Text>
             </View>
           ) : null}
         </View>
@@ -680,20 +682,24 @@ export const AgentTile = React.memo(function AgentTile({ agent, onPress, width }
 
 function FollowUnfollowButton({ isFollowed, onPress }: { isFollowed?: boolean; onPress: (e?: any) => void }) {
   const colors = useColors();
-  const [toggled, setToggled] = React.useState(!!isFollowed);
+  // Controlled by the parent's known follow state so the button reflects the
+  // viewer's real relationship (and stays correct after an optimistic toggle in
+  // the list), rather than holding its own divergent local state.
+  // FOLLOWING = filled gold accent (legible in both light + dark: accent bg +
+  // textOnAccent), FOLLOW = outline/secondary.
   return (
     <Pressable
-      onPress={(e) => { setToggled(!toggled); onPress(e); }}
+      onPress={(e) => onPress(e)}
       style={{
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.xs + 2,
         borderRadius: radius.full,
-        backgroundColor: toggled ? colors.surface : colors.accentMuted,
-        borderWidth: toggled ? 1 : 0,
+        backgroundColor: isFollowed ? colors.accent : 'transparent',
+        borderWidth: isFollowed ? 0 : 1,
         borderColor: colors.borderSubtle,
       }}
     >
-      <Text variant="caption" color={toggled ? colors.textSecondary : colors.accent}>{toggled ? 'Following' : 'Follow'}</Text>
+      <Text variant="caption" color={isFollowed ? colors.textOnAccent : colors.textSecondary} style={{ fontFamily: 'Roboto-Medium' }}>{isFollowed ? 'Following' : 'Follow'}</Text>
     </Pressable>
   );
 }
@@ -730,13 +736,13 @@ export function PersonRow({ person, onPress, onFollow, isFollowed }: { person: a
           {followerCount > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="people-outline" size={11} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{followerCount.toLocaleString()}</Text>
+              <Text variant="caption" color={colors.textMuted}>{followerCount.toLocaleString()} {followerCount === 1 ? 'follower' : 'followers'}</Text>
             </View>
           )}
           {postCount > 0 ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="newspaper-outline" size={11} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
+              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()} {postCount === 1 ? 'post' : 'posts'}</Text>
             </View>
           ) : null}
         </View>
@@ -773,12 +779,12 @@ export function CommunityRow({ community, onPress }: { community: any; onPress: 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Ionicons name="people-outline" size={11} color={colors.textMuted} />
-            <Text variant="caption" color={colors.textMuted}>{memberCount.toLocaleString()}</Text>
+            <Text variant="caption" color={colors.textMuted}>{memberCount.toLocaleString()} {memberCount === 1 ? 'member' : 'members'}</Text>
           </View>
           {postCount > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="newspaper-outline" size={11} color={colors.textMuted} />
-              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()}</Text>
+              <Text variant="caption" color={colors.textMuted}>{postCount.toLocaleString()} {postCount === 1 ? 'post' : 'posts'}</Text>
             </View>
           )}
           {postCount >= 50 && (
@@ -977,7 +983,7 @@ export function ListSkeleton() {
 // console that defaults to Posts.
 export const DISCOVER_TABS: { key: string; label: string }[] = [
   { key: 'posts', label: 'Posts' },
-  { key: 'people', label: 'People' },
+  { key: 'people', label: 'Creators' },
   { key: 'communities', label: 'Communities' },
   { key: 'agents', label: 'Agents' },
 ];

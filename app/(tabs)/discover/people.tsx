@@ -133,9 +133,42 @@ export default function DiscoverPeople() {
   const baseLoading = sort === 'followers' ? followerLoading : sort === 'active' ? activeLoading : profilesLoading;
   const loading = (isSearching ? searchLoading : baseLoading) && data.length === 0;
 
+  // Follow state, keyed by user id. Seeded from any is_following/isFollowing
+  // flag the payload carries (search + leaderboard rows may include it), then
+  // toggled optimistically on tap. A Set means the Following pill stays correct
+  // across re-renders without re-fetching per row.
+  const [followedIds, setFollowedIds] = React.useState<Set<string>>(new Set());
+  React.useEffect(() => {
+    setFollowedIds((prev) => {
+      const next = new Set(prev);
+      for (const p of data || []) {
+        const known = p?.is_following ?? p?.isFollowing ?? p?.following;
+        if (known === true && p?.id) next.add(p.id);
+      }
+      return next;
+    });
+  }, [data]);
+
   const handleFollow = async (userId: string) => {
-    if (!sdk) return;
-    try { await sdk.profiles.follow(userId); } catch {}
+    if (!sdk || !userId) return;
+    const wasFollowing = followedIds.has(userId);
+    // Optimistic toggle.
+    setFollowedIds((prev) => {
+      const next = new Set(prev);
+      if (wasFollowing) next.delete(userId); else next.add(userId);
+      return next;
+    });
+    try {
+      if (wasFollowing) await sdk.profiles.unfollow(userId);
+      else await sdk.profiles.follow(userId);
+    } catch {
+      // Revert on failure.
+      setFollowedIds((prev) => {
+        const next = new Set(prev);
+        if (wasFollowing) next.add(userId); else next.delete(userId);
+        return next;
+      });
+    }
   };
   const toUser = (u: any) => router.push(`/(tabs)/user/${u.username || u.id}` as any);
 
@@ -146,7 +179,7 @@ export default function DiscoverPeople() {
       data={data}
       keyExtractor={(item: any, i) => `u-${item.id || i}`}
       renderItem={({ item }) => (
-        <PersonRow person={item} onPress={() => toUser(item)} onFollow={() => handleFollow(item.id)} />
+        <PersonRow person={item} onPress={() => toUser(item)} onFollow={() => handleFollow(item.id)} isFollowed={followedIds.has(item.id)} />
       )}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
@@ -165,7 +198,7 @@ export default function DiscoverPeople() {
                     ? `Top ${data.length} by followers`
                     : sort === 'active'
                       ? `Top ${data.length} most active`
-                      : `${data.length}${data.length >= 200 ? '+' : ''} people on the network`}
+                      : `${data.length}${data.length >= 200 ? '+' : ''} creators on the network`}
               </Text>
             </View>
           )}
@@ -174,9 +207,9 @@ export default function DiscoverPeople() {
       ListEmptyComponent={
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing['2xl'] }}>
           <Ionicons name="person-outline" size={40} color={colors.accent} />
-          <Text variant="h2" color={colors.text} align="center">{isSearching ? 'No Results' : 'Discover People'}</Text>
+          <Text variant="h2" color={colors.text} align="center">{isSearching ? 'No Results' : 'Discover Creators'}</Text>
           <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300, lineHeight: 24 }}>
-            {isSearching ? 'Try a different search term.' : 'As people join, they show up here.'}
+            {isSearching ? 'Try a different search term.' : 'As creators join, they show up here.'}
           </Text>
         </View>
       }

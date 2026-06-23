@@ -114,7 +114,7 @@ export default function DiscoverLayout() {
   };
 
   const placeholder =
-    activeKey === 'people' ? 'Search people…'
+    activeKey === 'people' ? 'Search creators…'
     : activeKey === 'communities' ? 'Search communities…'
     : activeKey === 'agents' ? 'Search agents…'
     : 'Search posts…';

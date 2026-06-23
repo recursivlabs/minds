@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, Pressable } from 'react-native';
+import { View, FlatList, Pressable, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../components';
@@ -69,25 +69,32 @@ export default function DiscoverCommunities() {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <>
+          {/* Top-right "New Community" action, aligned right in the tab's own
+             header row (the shared Discover header above carries the search box;
+             this row is the Communities-tab-specific header). Routes to the same
+             create-community flow the old banner linked to. */}
           {!isSearching && (
-            <Pressable
-              onPress={() => router.push('/(tabs)/create?mode=community' as any)}
-              style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-                borderBottomWidth: 0.5, borderBottomColor: colors.borderSubtle,
-                backgroundColor: pressed ? colors.surfaceHover : colors.surface,
-              })}
+            <View
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.sm,
+              }}
             >
-              <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="add" size={22} color={colors.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyMedium" color={colors.accent}>Start a community</Text>
-                <Text variant="caption" color={colors.textMuted}>Gather people around a shared interest</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </Pressable>
+              <Text variant="h3">Communities</Text>
+              <Pressable
+                onPress={() => router.push('/(tabs)/create?mode=community' as any)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row', alignItems: 'center', gap: 4,
+                  paddingLeft: spacing.md, paddingRight: spacing.md, paddingVertical: 7,
+                  borderRadius: radius.full, backgroundColor: colors.accent,
+                  opacity: pressed ? 0.85 : 1,
+                  ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                })}
+              >
+                <Ionicons name="add" size={16} color={colors.textOnAccent} />
+                <Text variant="caption" color={colors.textOnAccent} style={{ fontFamily: 'Roboto-Medium' }}>New Community</Text>
+              </Pressable>
+            </View>
           )}
           {!isSearching && (
             <FilterBar>
