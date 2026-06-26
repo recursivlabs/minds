@@ -542,6 +542,20 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                   {seg.text}
                 </Text>
               );
+            case 'mention':
+              return (
+                <Text
+                  key={i}
+                  variant="body"
+                  color={colors.accent}
+                  onPress={(e: any) => {
+                    e?.stopPropagation?.();
+                    router.push(`/(tabs)/user/${(seg as any).username}` as any);
+                  }}
+                >
+                  {seg.text}
+                </Text>
+              );
             case 'link':
               return (
                 <Text

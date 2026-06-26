@@ -17,14 +17,14 @@ import { getBookmarks } from '../../../lib/bookmarks';
 import { getCached, invalidate, fetchDeduped } from '../../../lib/cache';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
-import { profileFollowerCount, profileFollowingCount } from '../../../lib/models';
+import { profileFollowerCount, profileFollowingCount, isArticlePost } from '../../../lib/models';
 
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 
 // Owner gets a Saved tab (private bookmarks). Visitors don't. Both
 // share the same primary tab order so the IA reads the same way.
-const OWNER_TABS = ['posts', 'replies', 'communities', 'saved', 'followers', 'following'] as const;
-const OTHER_TABS = ['posts', 'replies', 'communities', 'followers', 'following'] as const;
+const OWNER_TABS = ['posts', 'articles', 'replies', 'communities', 'saved', 'followers', 'following'] as const;
+const OTHER_TABS = ['posts', 'articles', 'replies', 'communities', 'followers', 'following'] as const;
 type ProfileTab = typeof OWNER_TABS[number];
 
 function SavedPostsTab({ query = '' }: { query?: string }) {
@@ -107,6 +107,7 @@ export default function UserProfileScreen() {
     [searchQ]);
   const searchPlaceholder =
     profileTab === 'posts' ? 'Search your posts…'
+    : profileTab === 'articles' ? 'Search your articles…'
     : profileTab === 'replies' ? 'Search your replies…'
     : profileTab === 'communities' ? 'Search communities…'
     : profileTab === 'saved' ? 'Search saved…'
@@ -212,7 +213,7 @@ export default function UserProfileScreen() {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
     const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
     if (distanceFromBottom > 600) return;
-    if (profileTab === 'posts') loadMorePosts();
+    if (profileTab === 'posts' || profileTab === 'articles') loadMorePosts();
     else if (profileTab === 'replies') loadMoreReplies();
   }, [profileTab, loadMorePosts, loadMoreReplies]);
 
@@ -576,6 +577,34 @@ export default function UserProfileScreen() {
           ) : (
             <>
               {visiblePosts.map((post: any) => (
+                <PostCard key={post.id} post={post} compact />
+              ))}
+              {!isTabSearching && postsHasMore && (
+                <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                  <ActivityIndicator color={colors.accent} />
+                </View>
+              )}
+            </>
+          )
+          );
+        })()}
+
+        {/* Articles — long-form posts (title + markdown). PostCard renders them
+            as the article card; the 'posts' tab already excludes titled posts. */}
+        {profileTab === 'articles' && (() => {
+          const visibleArticles = userPosts
+            .filter((p: any) => isArticlePost(p))
+            .filter((p: any) => matchText(p.content, p.title));
+          return (
+          postsLoading ? (
+            <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={80} />)}</View>
+          ) : visibleArticles.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>
+              <Text variant="body" color={colors.textMuted}>{isTabSearching ? 'No matching articles' : 'No articles yet'}</Text>
+            </View>
+          ) : (
+            <>
+              {visibleArticles.map((post: any) => (
                 <PostCard key={post.id} post={post} compact />
               ))}
               {!isTabSearching && postsHasMore && (

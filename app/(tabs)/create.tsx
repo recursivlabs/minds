@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { uploadVideo, VideoNotEntitledError } from '../../lib/video';
 import { VideoPlayer } from '../../components/VideoPlayer';
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
+const getDocumentPicker = () => Platform.OS !== 'web' ? require('expo-document-picker') : null;
 import { Text, Button, Input } from '../../components';
 import { Container } from '../../components/Container';
 import { TabBar } from '../../components/TabBar';
@@ -221,6 +222,12 @@ export default function CreateScreen() {
   // preview shows the whole image (X-style) instead of a cropped fixed box.
   const [media1Aspect, setMedia1Aspect] = React.useState<number | null>(null);
   const [mediaIsVideo, setMediaIsVideo] = React.useState(false);
+  // Audio attachment (voice posts / "confessionals"). Mutually exclusive with
+  // image/video; uploaded via the same media path (the .mp3/.m4a extension makes
+  // the server store it as type='audio' → renders as the inline audio player).
+  const [mediaIsAudio, setMediaIsAudio] = React.useState(false);
+  const [audioMime, setAudioMime] = React.useState('audio/mpeg');
+  const [audioName, setAudioName] = React.useState<string | null>(null);
   // Duration of the selected video, in seconds, for the X-style duration pill.
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
   const mediaUri = mediaUris[0] ?? null; // first item — used for video + article cover
@@ -352,6 +359,8 @@ export default function CreateScreen() {
         });
         if (!result.canceled && result.assets?.length) {
           const assets = result.assets;
+          setMediaIsAudio(false);
+          setAudioName(null);
           const vid = assets.find((a: any) => a.type === 'video');
           if (vid) {
             setMediaUris([vid.uri]);
@@ -372,6 +381,8 @@ export default function CreateScreen() {
         input.onchange = (e: any) => {
           const files: File[] = Array.from(e.target?.files || []);
           if (!files.length) return;
+          setMediaIsAudio(false);
+          setAudioName(null);
           const vid = files.find((f) => (f.type || '').startsWith('video/'));
           if (vid) {
             const url = URL.createObjectURL(vid);
@@ -390,6 +401,42 @@ export default function CreateScreen() {
             setMediaIsVideo(false);
             setVideoDuration(null);
           }
+        };
+        input.click();
+      }
+    } catch {}
+  };
+
+  // Attach an audio file (voice post). Native uses the document picker; web a
+  // file input. The audio mime drives the upload content-type so the stored URL
+  // gets an audio extension (→ server type='audio' → inline audio player).
+  const handlePickAudio = async () => {
+    try {
+      const dp = getDocumentPicker();
+      if (dp) {
+        const res = await dp.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true, multiple: false });
+        const asset = res?.assets?.[0];
+        if (asset) {
+          setMediaUris([asset.uri]);
+          setMediaIsAudio(true);
+          setMediaIsVideo(false);
+          setVideoDuration(null);
+          setAudioMime(asset.mimeType || 'audio/mpeg');
+          setAudioName(asset.name || 'Audio');
+        }
+      } else if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'audio/*';
+        input.onchange = (e: any) => {
+          const file: File | undefined = e.target?.files?.[0];
+          if (!file) return;
+          setMediaUris([URL.createObjectURL(file)]);
+          setMediaIsAudio(true);
+          setMediaIsVideo(false);
+          setVideoDuration(null);
+          setAudioMime(file.type || 'audio/mpeg');
+          setAudioName(file.name || 'Audio');
         };
         input.click();
       }
@@ -418,7 +465,9 @@ export default function CreateScreen() {
             try {
               const response = await fetch(uri);
               const blob = await response.blob();
-              const contentType = blob.type || 'image/jpeg';
+              // Audio: use the picked mime (native blobs often have an empty
+              // type) so the upload key gets a .mp3/.m4a extension → type='audio'.
+              const contentType = mediaIsAudio ? audioMime : (blob.type || 'image/jpeg');
               const uploadRes = await sdk.uploads.getMediaUploadUrl({
                 content_type: contentType,
                 content_length: blob.size,
@@ -478,6 +527,8 @@ export default function CreateScreen() {
         setContent('');
         setMediaUris([]);
         setMediaIsVideo(false);
+        setMediaIsAudio(false);
+        setAudioName(null);
         setVideoDuration(null);
         setVideoPct(null);
         setIsNsfw(false);
@@ -963,7 +1014,19 @@ export default function CreateScreen() {
 
           {mediaUris.length > 0 && (
             <View style={{ marginTop: spacing.lg }}>
-              {mediaIsVideo ? (
+              {mediaIsAudio ? (
+                // Audio: a compact chip (music glyph + filename + remove). The
+                // full inline player renders once the post is published.
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 0.5, borderColor: colors.borderSubtle, backgroundColor: colors.surface }}>
+                  <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="musical-notes" size={22} color={colors.accent} />
+                  </View>
+                  <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{audioName || 'Audio'}</Text>
+                  <Pressable onPress={() => { setMediaUris([]); setMediaIsAudio(false); setAudioName(null); }} hitSlop={8}>
+                    <Ionicons name="close-circle" size={22} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+              ) : mediaIsVideo ? (
                 // Video: one rounded frame (matching the image grid) holding the
                 // player, a centered round play glyph, a duration pill bottom-left,
                 // and the × remove control top-right — X-style.
@@ -1024,7 +1087,7 @@ export default function CreateScreen() {
                       </Text>
                     </View>
                   )}
-                  <RemoveMediaButton onPress={() => { setMediaUris([]); setMediaIsVideo(false); setVideoDuration(null); }} />
+                  <RemoveMediaButton onPress={() => { setMediaUris([]); setMediaIsVideo(false); setMediaIsAudio(false); setAudioName(null); setVideoDuration(null); }} />
                 </View>
               ) : (
                 // Image grid — X-style, clipped into one rounded frame so the
@@ -1298,8 +1361,15 @@ export default function CreateScreen() {
           />
           <ToolbarIconButton
             icon="add"
-            active={!!mediaUri}
+            active={!!mediaUri && !mediaIsAudio}
             onPress={handlePickImage}
+            colors={colors}
+          />
+          {/* Attach audio (voice post). */}
+          <ToolbarIconButton
+            icon="musical-notes-outline"
+            active={mediaIsAudio}
+            onPress={handlePickAudio}
             colors={colors}
           />
           <ToolbarIconButton

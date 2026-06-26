@@ -64,7 +64,8 @@ export function renderMarkdownToHtml(text: string): string {
     })
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/(^|\s)#([a-zA-Z0-9_]+)/g, (_m, lead, tag) => `${lead}${stash(`<a href="/(tabs)/discover/posts?q=%23${tag}" style="color:#d4a844;text-decoration:none">#${tag}</a>`)}`);
+    .replace(/(^|\s)#([a-zA-Z0-9_]+)/g, (_m, lead, tag) => `${lead}${stash(`<a href="/(tabs)/discover/posts?q=%23${tag}" style="color:#d4a844;text-decoration:none">#${tag}</a>`)}`)
+    .replace(/(^|\s)@([a-zA-Z0-9_]+)/g, (_m, lead, name) => `${lead}${stash(`<a href="/(tabs)/user/${name}" style="color:#d4a844;text-decoration:none">@${name}</a>`)}`);
 
   // 3. Block pass: walk lines so bullet/numbered lists and headings render as
   //    real <ul>/<ol>/<h*> instead of leaking raw "-", "*", "#" markers.
@@ -125,6 +126,7 @@ export type MarkdownSegment =
   | { type: 'code'; text: string }
   | { type: 'link'; text: string; url: string }
   | { type: 'hashtag'; text: string; tag: string }
+  | { type: 'mention'; text: string; username: string }
   | { type: 'break' };
 
 export function parseMarkdownSegments(text: string): MarkdownSegment[] {
@@ -136,7 +138,7 @@ export function parseMarkdownSegments(text: string): MarkdownSegment[] {
   // Simple regex-based tokenizer.
   // Order matters: markdown link `[text](url)` is matched before the bare URL
   // pattern so that URLs inside markdown brackets aren't double-linkified.
-  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(?:^|\s)(#([a-zA-Z0-9_]+))|(\n)|(\bhttps?:\/\/[^\s<>()\[\]"']+)/g;
+  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(?:^|\s)(#([a-zA-Z0-9_]+))|(\n)|(\bhttps?:\/\/[^\s<>()\[\]"']+)|((?:^|\s))(@([a-zA-Z0-9_]+))/g;
   let lastIndex = 0;
   let match;
 
@@ -180,6 +182,11 @@ export function parseMarkdownSegments(text: string): MarkdownSegment[] {
       }
       segments.push({ type: 'link', text: url, url });
       if (trailing) segments.push({ type: 'text', text: trailing });
+    } else if (match[15]) {
+      // @mention — re-emit the captured leading whitespace (so it doesn't glue
+      // to the prior word) then the linkified handle.
+      if (match[14]) segments.push({ type: 'text', text: match[14] });
+      segments.push({ type: 'mention', text: `@${match[16]}`, username: match[16] });
     }
 
     lastIndex = match.index + match[0].length;
