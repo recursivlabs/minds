@@ -3,10 +3,11 @@ import { Recursiv } from '@recursiv/sdk';
 export const BASE_URL =
   process.env.EXPO_PUBLIC_RECURSIV_API_URL ||
   process.env.EXPO_PUBLIC_API_URL ||
-  // Minds-network API host: api.minds.recursiv.io → (strip api.) minds.recursiv.io
-  // → slug `minds` → the Minds network. This is what puts the app on its own
-  // network (the API resolves tenancy from this Host).
-  'https://api.minds.recursiv.io/api/v1';
+  // Dedicated Minds instance API: api.minds.com → (strip api.) minds.com → matches
+  // the Minds network's verified customDomain → the Minds network, served by
+  // recursiv-minds-api off the dedicated Minds Neon. Cut over from the shared
+  // api.minds.recursiv.io (which ran on the central multi-tenant DB).
+  'https://api.minds.com/api/v1';
 
 export const BASE_ORIGIN = BASE_URL.replace(/\/api\/v1$/, '');
 
