@@ -3,6 +3,8 @@ import { View, Image, Pressable, Modal, Platform, Dimensions, ActivityIndicator,
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { VideoPlayer } from './VideoPlayer';
+import { InlineAudioPlayer } from './audio/InlineAudioPlayer';
+import { isAudioUrl, type AudioTrack } from '../lib/audio/types';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 import { SITE_URL } from '../lib/recursiv';
@@ -114,6 +116,11 @@ const isVideoUrl = (url: string): boolean =>
   url.includes('cloudflarestream') ||
   url.includes('/video/');
 
+// Classify a media URL when the item carries no explicit `type`. Video wins
+// over audio (some containers overlap, e.g. .webm), audio next, else image.
+const detectMediaType = (url: string): 'video' | 'audio' | 'image' =>
+  isVideoUrl(url) ? 'video' : isAudioUrl(url) ? 'audio' : 'image';
+
 interface MediaItem {
   url: string;
   type?: string;
@@ -183,13 +190,19 @@ function PostImage({ uri, onPress, badge, initialWidth, initialHeight }: {
 interface Props {
   media: MediaItem[] | string | null;
   thumbnail?: string | null;
+  /**
+   * Context for audio posts so the player + OS now-playing show real metadata.
+   * `id` should be the post guid (used for resume + the mini-player → post link).
+   */
+  audioMeta?: { id?: string; title?: string; artist?: string; artwork?: string };
 }
 
 /**
- * Renders post media — images with lightbox, videos with player.
- * Handles single items, arrays, and string URLs.
+ * Renders post media — images with lightbox, videos with player, audio with an
+ * inline player wired to the global queue. Handles single items, arrays, and
+ * string URLs.
  */
-export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }: Props) {
+export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail, audioMeta }: Props) {
   const colors = useColors();
   const [lightboxVisible, setLightboxVisible] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
@@ -197,10 +210,10 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
   // Normalize media to array of { url, type }
   const items: MediaItem[] = React.useMemo(() => {
     if (!media) return [];
-    if (typeof media === 'string') return [{ url: media, type: isVideoUrl(media) ? 'video' : 'image' }];
+    if (typeof media === 'string') return [{ url: media, type: detectMediaType(media) }];
     if (Array.isArray(media)) return media.map(m => ({
       url: typeof m === 'string' ? m : m.url,
-      type: (typeof m === 'string' ? undefined : m.type) || (isVideoUrl(typeof m === 'string' ? m : m.url) ? 'video' : 'image'),
+      type: (typeof m === 'string' ? undefined : m.type) || detectMediaType(typeof m === 'string' ? m : m.url),
     }));
     return [];
   }, [media]);
@@ -215,10 +228,19 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
     setLightboxVisible(true);
   };
 
-  // Split videos (full-width players) from images (an X-style multi-image grid,
-  // so 2+ images tile into columns instead of stacking down one column).
+  // Split audio (inline players) + videos (full-width players) from images (an
+  // X-style multi-image grid, so 2+ images tile into columns).
+  const audioItems = displayItems.map((it, idx) => ({ it, idx })).filter(x => x.it.type === 'audio');
   const videoItems = displayItems.map((it, idx) => ({ it, idx })).filter(x => x.it.type === 'video');
-  const imageItems = displayItems.map((it, idx) => ({ it, idx })).filter(x => x.it.type !== 'video');
+  const imageItems = displayItems.map((it, idx) => ({ it, idx })).filter(x => x.it.type !== 'video' && x.it.type !== 'audio');
+
+  const audioTrack = (it: MediaItem, idx: number): AudioTrack => ({
+    id: audioItems.length === 1 && audioMeta?.id ? audioMeta.id : (it.id || `${audioMeta?.id || 'audio'}-${idx}`),
+    url: it.url,
+    title: audioMeta?.title || 'Audio',
+    artist: audioMeta?.artist,
+    artwork: audioMeta?.artwork || thumbnail || undefined,
+  });
   const GAP = 2;
   const GRID_H = Platform.OS === 'web' ? 360 : 240;
   const FILL = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0 };
@@ -283,6 +305,9 @@ export const MediaViewer = React.memo(function MediaViewer({ media, thumbnail }:
   return (
     <>
       <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+        {audioItems.map(({ it, idx }) => (
+          <InlineAudioPlayer key={`a${idx}`} track={audioTrack(it, idx)} />
+        ))}
         {videoItems.map(({ it, idx }) => (
           <View key={`v${idx}`} style={{ position: 'relative' }}>
             <VideoMedia url={it.url} height={Platform.OS === 'web' ? 560 : 240} />

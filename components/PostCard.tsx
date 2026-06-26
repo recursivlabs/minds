@@ -8,7 +8,7 @@ import { VoteButtons } from './VoteButtons';
 import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { useAuth } from '../lib/auth';
-import { postScore, postUserVote, postRepostCount } from '../lib/models';
+import { postScore, postUserVote, postRepostCount, isArticlePost } from '../lib/models';
 import { BASE_ORIGIN, SITE_URL, ORG_ID } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
@@ -20,6 +20,7 @@ import { getCached } from '../lib/cache';
 import { askAgent, buildPostContextPrompt } from '../lib/askAgent';
 import { LinkPreview } from './LinkPreview';
 import { MediaViewer } from './MediaViewer';
+import { ArticleCard } from './ArticleCard';
 import { Badge, getBadges } from './Badge';
 import { spacing, radius, borders, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
@@ -201,6 +202,20 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const authorName = author.name || author.username || 'Anonymous';
   const authorUsername = author.username || author.id || 'anonymous';
   const authorAvatar = author.image || author.avatar || null;
+
+  // Context for audio posts → the inline player + OS now-playing show real
+  // title/author/artwork instead of a bare "Audio" label.
+  const audioMeta = {
+    id: displayPost.id,
+    title: displayPost.title || undefined,
+    artist: authorName,
+    artwork: authorAvatar || undefined,
+  };
+
+  // X-style long-form: render as an article (compact card in-feed, full reader on
+  // the detail page) instead of the plain text+media body.
+  const isArticle = isArticlePost(displayPost);
+  const openPost = () => router.push(`/(tabs)/post/${displayPost.id}` as any);
 
   // For agent-curated posts (author is the user's personal AI agent +
   // there's an external_url), the visual byline should be the SOURCE
@@ -712,7 +727,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <NSFWOverlay>
           <View>
             {renderMarkdownContent()}
-            <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} />
+            <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} audioMeta={audioMeta} />
             {isQuotePost && repostedFrom && (
               <QuoteEmbed
                 quoted={repostedFrom}
@@ -736,9 +751,17 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
               separate field, not embedded in content) render the right
               link; LinkPreview falls back to URL extraction from content
               for user posts that paste the URL inline. */}
-          {renderMarkdownContent()}
-          <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} />
-          <LinkPreview url={externalUrl} content={content} />
+          {isArticle ? (
+            // compact={true} on feed cards → compact article card; the detail
+            // page (compact false) renders the full reader.
+            <ArticleCard post={displayPost} full={!compact} onPress={openPost} />
+          ) : (
+            <>
+              {renderMarkdownContent()}
+              <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} audioMeta={audioMeta} />
+              <LinkPreview url={externalUrl} content={content} />
+            </>
+          )}
           {/* Quote post: the embedded original, X-style. Tappable → original. */}
           {isQuotePost && repostedFrom && (
             <QuoteEmbed

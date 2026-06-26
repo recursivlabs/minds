@@ -27,6 +27,49 @@ export function postUserVote(p: Raw): 'upvote' | 'downvote' | null {
   return v === 'upvote' || v === 'downvote' ? v : null;
 }
 
+// ── Articles (X-style long-form) ──
+// An article is a post with a title AND a markdown long-form body. Video posts
+// also carry a title but stay content_format 'plain', so the markdown flag is
+// what actually distinguishes an article from a titled post. The legacy blog
+// import stamps exactly these fields on the ~2.4M migrated articles.
+export function postContentFormat(p: Raw): string {
+  return (p?.contentFormat ?? p?.content_format ?? 'plain').toString();
+}
+export function postTitle(p: Raw): string {
+  const t = p?.title;
+  return typeof t === 'string' ? t.trim() : '';
+}
+export function isArticlePost(p: Raw): boolean {
+  return Boolean(postTitle(p)) && postContentFormat(p) === 'markdown';
+}
+/** First media URL (the article cover), tolerating array/object/string shapes. */
+export function coverImageUrl(p: Raw): string | null {
+  const raw = p?.media;
+  const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  for (const m of arr) {
+    const url = typeof m === 'string' ? m : m?.url;
+    if (url) return String(url);
+  }
+  return p?.image || p?.thumbnail || null;
+}
+/** Plain-text excerpt from a markdown body (strip formatting), clamped. */
+export function articleExcerpt(p: Raw, max = 180): string {
+  const plain = (p?.content ?? '')
+    .toString()
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[#>*_`~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max).trimEnd()}…` : plain;
+}
+/** Estimated reading time in minutes (~200 wpm), floored at 1. */
+export function readingTimeMinutes(p: Raw): number {
+  const words = (p?.content ?? '').toString().trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+}
+
 // ── Profiles ──
 export function profileFollowerCount(p: Raw): number {
   return num(p?.followersCount ?? p?.followers_count ?? p?.followerCount ?? p?.follower_count);

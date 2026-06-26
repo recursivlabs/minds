@@ -21,6 +21,8 @@ import { ToastProvider } from '../components/Toast';
 import { NetworkBanner } from '../components/NetworkBanner';
 import { CommandPalette } from '../components/CommandPalette';
 import { ActiveConvoProvider } from '../lib/activeConvo';
+import { AudioPlayerProvider } from '../lib/audioPlayer';
+import { AudioMiniPlayer } from '../components/audio/AudioMiniPlayer';
 import { initMonitoring } from '../lib/monitoring';
 import { injectWebStyles } from '../lib/webStyles';
 import { initKeyboardShortcuts } from '../lib/keyboard';
@@ -106,17 +108,22 @@ export default function RootLayout() {
               <ThemedRoot>
                 <ProjectProvider>
                   <AuthProvider>
-                    <ActiveConvoProvider>
-                      <ToastProvider>
-                        <NotificationWiring />
-                        <NetworkBanner />
-                        <Slot />
-                        {/* Cmd+K palette stays mounted at root so it
-                           can open from any screen. Web-only for now;
-                           the component returns null on native. */}
-                        <CommandPalette />
-                      </ToastProvider>
-                    </ActiveConvoProvider>
+                    <AudioPlayerProvider>
+                      <ActiveConvoProvider>
+                        <ToastProvider>
+                          <NotificationWiring />
+                          <NetworkBanner />
+                          <Slot />
+                          {/* Floating audio mini-player — rides above the tab
+                             bar on every screen while a track is loaded. */}
+                          <AudioMiniPlayer />
+                          {/* Cmd+K palette stays mounted at root so it
+                             can open from any screen. Web-only for now;
+                             the component returns null on native. */}
+                          <CommandPalette />
+                        </ToastProvider>
+                      </ActiveConvoProvider>
+                    </AudioPlayerProvider>
                   </AuthProvider>
                 </ProjectProvider>
               </ThemedRoot>
