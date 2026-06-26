@@ -30,11 +30,11 @@ import { useColors } from '../../lib/theme';
 
 // Consumer Create surface: Post is the only first-class mode. Community
 // stays as a reachable mode via ?mode=community deep-link from Discover's
-// "+ Start a community" button — but the mode tab bar is hidden. Blog /
+// "+ Start a community" button — but the mode tab bar is hidden. Article /
 // Agent / App authoring deferred to the Pro-tier upsell email campaign;
 // those branches stay typed only to avoid touching too much during this
 // pass.
-type Mode = 'post' | 'blog' | 'agent' | 'app' | 'community';
+type Mode = 'post' | 'article' | 'agent' | 'app' | 'community';
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'post', label: 'Post' },
@@ -180,7 +180,7 @@ export default function CreateScreen() {
   const quoteContent = typeof params.quoteContent === 'string' ? params.quoteContent : '';
   const { sdk, user } = useAuth();
   const colors = useColors();
-  const initialMode: Mode = (params.mode === 'community' || params.mode === 'blog' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
+  const initialMode: Mode = (params.mode === 'community' || params.mode === 'article' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
   const [mode, setMode] = React.useState<Mode>(initialMode);
 
   // Restore draft on mount
@@ -223,7 +223,7 @@ export default function CreateScreen() {
   const [mediaIsVideo, setMediaIsVideo] = React.useState(false);
   // Duration of the selected video, in seconds, for the X-style duration pill.
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
-  const mediaUri = mediaUris[0] ?? null; // first item — used for video + blog cover
+  const mediaUri = mediaUris[0] ?? null; // first item — used for video + article cover
   const [videoPct, setVideoPct] = React.useState<number | null>(null);
   const { mentionQuery, showMentions, insertMention } = useMentions(content, setContent);
   const [selectedCommunity, setSelectedCommunity] = React.useState<any>(
@@ -279,9 +279,9 @@ export default function CreateScreen() {
     { id: 'openai/o3', label: 'o3', provider: 'OpenAI' },
   ];
 
-  // Blog state
-  const [blogTitle, setBlogTitle] = React.useState('');
-  const [blogContent, setBlogContent] = React.useState('');
+  // Article state
+  const [articleTitle, setArticleTitle] = React.useState('');
+  const [articleContent, setArticleContent] = React.useState('');
 
   // Schedule state
   const [scheduleDate, setScheduleDate] = React.useState<string>('');
@@ -340,7 +340,7 @@ export default function CreateScreen() {
 
   const handlePickImage = async () => {
     try {
-      // Posts allow multiple images (or one video); the blog cover is single.
+      // Posts allow multiple images (or one video); the article cover is single.
       const allowMulti = mode === 'post';
       const picker = getImagePicker();
       if (picker) {
@@ -486,13 +486,13 @@ export default function CreateScreen() {
         // Land on the Following feed so you see your just-posted content as
         // immediate proof it worked (your own posts now show there).
         router.replace({ pathname: '/(tabs)', params: { tab: 'following' } });
-      } else if (mode === 'blog') {
-        if (!blogTitle.trim() || !blogContent.trim()) {
+      } else if (mode === 'article') {
+        if (!articleTitle.trim() || !articleContent.trim()) {
           setSubmitting(false);
           return;
         }
-        // Upload blog thumbnail if selected
-        let blogMediaUrls: string[] | undefined;
+        // Upload article cover if selected
+        let articleMediaUrls: string[] | undefined;
         if (mediaUri) {
           try {
             const response = await fetch(mediaUri);
@@ -502,17 +502,17 @@ export default function CreateScreen() {
             const uploadUrl = uploadRes.data?.upload_url || (uploadRes.data as any)?.url;
             if (uploadUrl) {
               const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
-              if (putRes.ok) blogMediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
+              if (putRes.ok) articleMediaUrls = [uploadRes.data?.public_url || uploadUrl.split('?')[0]];
             }
           } catch {}
         }
         await sdk.posts.create({
-          content: blogContent.trim(),
-          title: blogTitle.trim(),
+          content: articleContent.trim(),
+          title: articleTitle.trim(),
           content_format: 'markdown',
           organization_id: ORG_ID || undefined,
           community_id: selectedCommunity?.id || undefined,
-          media_urls: blogMediaUrls,
+          media_urls: articleMediaUrls,
         } as any);
         if (draftRef.current) deleteDraft(draftRef.current);
         router.back();
@@ -589,13 +589,13 @@ export default function CreateScreen() {
   };
 
   const canSubmit = mode === 'post' ? (content.trim().length > 0 || !!mediaUri || !!quotePostId)
-    : mode === 'blog' ? (blogTitle.trim().length > 0 && blogContent.trim().length > 0)
+    : mode === 'article' ? (articleTitle.trim().length > 0 && articleContent.trim().length > 0)
     : mode === 'agent' ? (agentName.trim().length > 0 && agentBio.trim().length > 0)
     : mode === 'app' ? (appName.trim().length > 0 && appDesc.trim().length > 0)
     : (communityName.trim().length > 0 && communityDesc.trim().length > 0);
 
   const submitLabel = mode === 'post' ? 'Post'
-    : mode === 'blog' ? 'Publish'
+    : mode === 'article' ? 'Publish'
     : mode === 'agent' ? 'Create Agent'
     : mode === 'app' ? 'Create App'
     : 'Create Community';
@@ -615,7 +615,7 @@ export default function CreateScreen() {
         }}
       >
         <Pressable onPress={() => {
-          // In a builder mode (community/blog/agent/app), this is the persistent
+          // In a builder mode (community/article/agent/app), this is the persistent
           // Create tab — going "back" stranded you in that mode. Instead, return
           // to the default Post composer in-place.
           if (mode !== 'post') {
@@ -683,7 +683,7 @@ export default function CreateScreen() {
       */}
 
       {/* Content area */}
-      {(mode === 'post' || mode === 'blog') ? (
+      {(mode === 'post' || mode === 'article') ? (
         <View style={{ flex: 1, padding: spacing.xl }}>
           {/* The error/success banners below were only rendered in the
               agent/app/community branch, so a failed post submit showed
@@ -854,13 +854,13 @@ export default function CreateScreen() {
 
           <MentionPicker query={mentionQuery} onSelect={insertMention} visible={showMentions} />
 
-          {mode === 'blog' && (
+          {mode === 'article' && (
             <>
               <TextInput
-                placeholder="Title"
+                placeholder="Article title"
                 placeholderTextColor={colors.textMuted}
-                value={blogTitle}
-                onChangeText={setBlogTitle}
+                value={articleTitle}
+                onChangeText={setArticleTitle}
                 style={{
                   color: colors.text,
                   fontFamily: 'Roboto-Medium',
@@ -907,14 +907,14 @@ export default function CreateScreen() {
               paddingTop: mode === 'post' ? 6 : 0,
             }}>
               <TextInput
-                placeholder={mode === 'blog' ? 'Write your blog post... (supports markdown)' : quotePostId ? 'Add a comment' : "What's happening?"}
+                placeholder={mode === 'article' ? 'Write your article…  (markdown supported)' : quotePostId ? 'Add a comment' : "What's happening?"}
                 placeholderTextColor={colors.textMuted}
-                value={mode === 'blog' ? blogContent : content}
-                onChangeText={mode === 'blog' ? setBlogContent : setContent}
+                value={mode === 'article' ? articleContent : content}
+                onChangeText={mode === 'article' ? setArticleContent : setContent}
                 multiline
                 autoFocus={false}
                 onKeyPress={(e: any) => {
-                  if (mode !== 'blog' && Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                  if (mode !== 'article' && Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
                     e.preventDefault();
                     handleSubmit();
                   }
@@ -1273,10 +1273,10 @@ export default function CreateScreen() {
         </ScrollView>
       )}
 
-      {/* Bottom toolbar (post and blog mode) — X-style: a row of round,
+      {/* Bottom toolbar (post and article mode) — X-style: a row of round,
           accent-tinted icon buttons on the left, then a character counter +
           prominent Post button on the right. */}
-      {(mode === 'post' || mode === 'blog') && (
+      {(mode === 'post' || mode === 'article') && (
         <View
           style={{
             flexDirection: 'row',
@@ -1288,6 +1288,14 @@ export default function CreateScreen() {
             borderTopColor: colors.borderSubtle,
           }}
         >
+          {/* Post ⇄ Article: switch to the long-form editor (title + cover +
+              markdown body). Back-arrow in the header returns to Post. */}
+          <ToolbarIconButton
+            icon="document-text-outline"
+            active={mode === 'article'}
+            onPress={() => setMode(mode === 'article' ? 'post' : 'article')}
+            colors={colors}
+          />
           <ToolbarIconButton
             icon="add"
             active={!!mediaUri}
@@ -1329,10 +1337,10 @@ export default function CreateScreen() {
 
           {/* Character counter — only surfaces once you start typing.
               Stays muted, goes gold near the limit, red over it. */}
-          {(mode === 'blog' ? blogContent : content).length > 0 && (
+          {(mode === 'article' ? articleContent : content).length > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginRight: spacing.md }}>
               <CharCounterRing
-                used={(mode === 'blog' ? blogContent : content).length}
+                used={(mode === 'article' ? articleContent : content).length}
                 limit={POST_CHAR_LIMIT}
                 colors={colors}
               />

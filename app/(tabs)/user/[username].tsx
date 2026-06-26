@@ -632,7 +632,7 @@ export default function UserProfileScreen() {
           );
         })()}
 
-        {/* Blogs */}
+        {/* Articles */}
         {/* Followers */}
         {profileTab === 'followers' && (() => {
           const visible = (followersList || []).filter((u: any) => matchText(u.name, u.username, u.bio));
