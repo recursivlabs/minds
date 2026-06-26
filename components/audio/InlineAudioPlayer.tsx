@@ -9,6 +9,7 @@ import { View, Pressable, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../Text';
 import { Scrubber } from './Scrubber';
+import { DownloadButton } from './DownloadButton';
 import { formatDuration } from './format';
 import { useColors } from '../../lib/theme';
 import { spacing, radius } from '../../constants/theme';
@@ -92,6 +93,9 @@ export function InlineAudioPlayer({ track }: { track: AudioTrack }) {
           </Text>
         )}
       </View>
+
+      {/* Download for offline (native only — hidden on web). */}
+      <DownloadButton track={track} size={24} />
 
       {/* Add to queue (only once something is playing + this isn't it). */}
       {!active && player.current ? (

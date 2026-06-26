@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Text } from '../Text';
 import { Scrubber } from './Scrubber';
+import { DownloadButton } from './DownloadButton';
 import { formatDuration } from './format';
 import { useColors } from '../../lib/theme';
 import { spacing, radius } from '../../constants/theme';
@@ -53,9 +54,12 @@ export function FullscreenAudioPlayer({ visible, onClose }: { visible: boolean; 
           <Text variant="label" color={colors.textSecondary}>
             Now Playing
           </Text>
-          <Pressable onPress={goToPost} hitSlop={10} style={webCursor}>
-            <Ionicons name="open-outline" size={22} color={colors.textSecondary} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+            <DownloadButton track={track} size={22} />
+            <Pressable onPress={goToPost} hitSlop={10} style={webCursor}>
+              <Ionicons name="open-outline" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: insets.bottom + spacing.xl }}>
