@@ -629,9 +629,13 @@ export function useSimilarPosts(postId: string | undefined, limit = 10) {
 /**
  * Fetch communities scoped to Minds org.
  */
-export function useCommunities(limit = 20) {
+export function useCommunities(limit = 20, opts?: { memberOnly?: boolean }) {
   const { sdk } = useAuth();
-  const cacheKey = `communities:${limit}`;
+  // memberOnly → server-side `member=true`: the caller's own (accepted)
+  // communities. Required at 96K communities — "mine" can no longer be derived
+  // from is_member flags on page one of the public directory.
+  const memberOnly = !!opts?.memberOnly;
+  const cacheKey = `communities:${limit}:${memberOnly ? 'mine' : 'all'}`;
   const cached = getCached(cacheKey);
   const [communities, setCommunities] = React.useState<any[]>(cached || []);
   const [loading, setLoading] = React.useState(!cached && limit > 0);
@@ -647,8 +651,8 @@ export function useCommunities(limit = 20) {
     try {
       if (!sdk) return; // identity-scoped fetch: NEVER fall back to the shared app key (it resolves to the key owner, not the signed-in user)
       const s = sdk;
-      const res = await fetchDeduped(`req:communities:${limit}`, () =>
-        s.communities.list({ limit, organization_id: ORG_ID || undefined }));
+      const res = await fetchDeduped(`req:communities:${limit}:${memberOnly ? 'mine' : 'all'}`, () =>
+        s.communities.list({ limit, organization_id: ORG_ID || undefined, ...(memberOnly ? { member: 'true' } : {}) } as any));
       const data = res.data || [];
       setCommunities(data);
       setCache(cacheKey, data);
