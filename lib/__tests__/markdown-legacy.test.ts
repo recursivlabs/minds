@@ -68,4 +68,17 @@ describe('stripHtmlToText', () => {
   it('never emits tags even for nasty input', () => {
     expect(stripHtmlToText('<script>alert(1)</script><p>ok</p>')).not.toContain('<');
   });
+
+  it('strips re-forming nested tags to a fixed point (CodeQL: incomplete sanitization)', () => {
+    expect(stripHtmlToText('<scr<script>ipt>alert(1)</scr</script>ipt>')).not.toMatch(/<\s*script/i);
+    expect(stripHtmlToText('<<p>b>x')).not.toMatch(/<[a-z]/i);
+    // unterminated trailing tag fragment is dropped, preceding text kept
+    expect(stripHtmlToText('hello <a href="https://x')).toBe('hello');
+  });
+
+  it('does not double-unescape entities (CodeQL: &amp; decoded last)', () => {
+    // "&amp;lt;b&amp;gt;" is the TEXT "&lt;b&gt;" — must not become "<b>"
+    expect(stripHtmlToText('&amp;lt;b&amp;gt;')).toBe('&lt;b&gt;');
+    expect(stripHtmlToText('Tom &amp; Jerry')).toBe('Tom & Jerry');
+  });
 });

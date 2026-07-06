@@ -134,16 +134,26 @@ export function looksLikeLegacyHtml(text: string): boolean {
 /** Strip HTML to readable plain text (native rendering + compact previews). */
 export function stripHtmlToText(html: string): string {
   if (!html) return '';
-  return html
+  let out = html
     .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/blockquote)[^>]*>/gi, '\n')
-    .replace(/<li\b[^>]*>/gi, '• ')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<li\b[^>]*>/gi, '• ');
+  // Tag strip must run to a FIXED POINT: a single pass lets crafted nesting
+  // like "<scr<script>ipt>" re-form a tag from the residue (CodeQL:
+  // incomplete multi-character sanitization). Loop until stable, then drop
+  // any unterminated trailing "<tag..." fragment.
+  let prev;
+  do { prev = out; out = out.replace(/<[^>]*>/g, ''); } while (out !== prev);
+  out = out.replace(/<[a-z/][^<]*$/gi, '');
+  // Entity decode: '&amp;' LAST — decoding it first double-unescapes
+  // ("&amp;lt;" → "&lt;" → "<"), manufacturing angle brackets (CodeQL:
+  // double unescaping).
+  return out
     .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/gi, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
