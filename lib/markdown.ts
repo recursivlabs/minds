@@ -116,6 +116,107 @@ export function renderMarkdownToHtml(text: string): string {
 }
 
 /**
+ * ── Legacy Minds HTML content ────────────────────────────────────────────────
+ * Migrated blog/article bodies (and some link-share posts) are stored as raw
+ * HTML. The markdown pipeline above entity-escapes everything (correct XSS
+ * stance for user text), which made legacy articles render as visible tag
+ * soup. These helpers give legacy HTML a dedicated, sanitized path:
+ *   web    → DOMPurify with a tight allowlist (+ forced safe link/img attrs)
+ *   native → tags stripped to readable plain text (RN can't render HTML)
+ */
+const LEGACY_HTML_TAG =
+  /<\/?(p|div|a|img|br|h[1-6]|ul|ol|li|blockquote|strong|em|b|i|u|s|span|figure|figcaption|pre|code|hr)\b[^>]*>/i;
+
+export function looksLikeLegacyHtml(text: string): boolean {
+  return !!text && LEGACY_HTML_TAG.test(text);
+}
+
+/** Strip HTML to readable plain text (native rendering + compact previews). */
+export function stripHtmlToText(html: string): string {
+  if (!html) return '';
+  let out = html
+    .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/blockquote)[^>]*>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '• ');
+  // Tag strip must run to a FIXED POINT: a single pass lets crafted nesting
+  // like "<scr<script>ipt>" re-form a tag from the residue (CodeQL:
+  // incomplete multi-character sanitization). Loop until stable, then drop
+  // any unterminated trailing "<tag..." fragment.
+  let prev;
+  do { prev = out; out = out.replace(/<[^>]*>/g, ''); } while (out !== prev);
+  out = out.replace(/<[a-z/][^<]*$/gi, '');
+  // Entity decode: '&amp;' LAST — decoding it first double-unescapes
+  // ("&amp;lt;" → "&lt;" → "<"), manufacturing angle brackets (CodeQL:
+  // double unescaping).
+  return out
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/gi, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// Lazily initialized so the native bundle never touches DOMPurify (web-only).
+let purifier: any = null;
+function getPurifier(): any {
+  if (purifier || Platform.OS !== 'web' || typeof window === 'undefined') return purifier;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const DOMPurify = require('dompurify');
+  const instance = DOMPurify.default ?? DOMPurify;
+  // Hard URI policy: href/src must be http(s)/mailto — enforced with an
+  // explicit hook rather than relying on ALLOWED_URI_REGEXP semantics alone
+  // (regression test caught data: image URIs surviving the config route).
+  instance.addHook('uponSanitizeAttribute', (_node: Element, data: any) => {
+    if ((data.attrName === 'src' || data.attrName === 'href')
+        && !/^(?:https?:|mailto:)/i.test(String(data.attrValue || '').trim())) {
+      data.keepAttr = false;
+    }
+  });
+  // Every sanitized link opens in a new tab without opener access; every image
+  // is bounded to the card. Styles are OURS (attacker style attrs are stripped
+  // by the allowlist), applied post-sanitize so they can't be smuggled in.
+  instance.addHook('afterSanitizeAttributes', (node: Element) => {
+    if (node.tagName === 'A') {
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer');
+      node.setAttribute('style', 'color:#d4a844;text-decoration:underline');
+    }
+    if (node.tagName === 'IMG') {
+      node.setAttribute('loading', 'lazy');
+      node.setAttribute('style', 'max-width:100%;height:auto;border-radius:8px;margin:8px 0');
+    }
+    if (node.tagName === 'P') node.setAttribute('style', 'margin:8px 0');
+    if (node.tagName === 'BLOCKQUOTE') {
+      node.setAttribute('style', 'border-left:3px solid #d4a844;margin:8px 0;padding-left:12px;opacity:.9');
+    }
+  });
+  purifier = instance;
+  return purifier;
+}
+
+/**
+ * Sanitize legacy HTML for web rendering. Allowlist only — script/style/
+ * iframe/event handlers/javascript: URLs are all removed by construction.
+ * Returns '' on native (callers must use stripHtmlToText there).
+ */
+export function sanitizeLegacyHtml(html: string): string {
+  const p = getPurifier();
+  if (!p) return '';
+  return p.sanitize(html, {
+    ALLOWED_TAGS: ['p','div','a','img','br','h1','h2','h3','h4','h5','h6','ul','ol','li',
+                   'blockquote','strong','em','b','i','u','s','span','figure','figcaption','pre','code','hr'],
+    ALLOWED_ATTR: ['href','src','alt','title'],
+    // data-*/aria-* are separate gates in DOMPurify — allowed by default even
+    // when ALLOWED_ATTR is set. Close them explicitly.
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
+  });
+}
+
+/**
  * Parse markdown into simple segments for native rendering.
  * Returns an array of { type, text, url? } segments.
  */
