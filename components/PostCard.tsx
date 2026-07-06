@@ -24,7 +24,7 @@ import { ArticleCard } from './ArticleCard';
 import { Badge, getBadges } from './Badge';
 import { spacing, radius, borders, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
-import { renderMarkdownToHtml, parseMarkdownSegments, isSafeUrl } from '../lib/markdown';
+import { renderMarkdownToHtml, parseMarkdownSegments, isSafeUrl, looksLikeLegacyHtml, stripHtmlToText, sanitizeLegacyHtml } from '../lib/markdown';
 
 interface Props {
   post: any;
@@ -475,10 +475,15 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
 
   const renderMarkdownContent = () => {
     if (!content) return null;
+    // Legacy Minds articles/blogs are stored as raw HTML. They get a dedicated
+    // path: stripped plain text for previews + native, sanitized HTML (web,
+    // full view) — never the markdown escaper, which showed them as tag soup.
+    const isLegacyHtml = looksLikeLegacyHtml(content);
+    const plain = isLegacyHtml ? stripHtmlToText(content) : content;
     // Feed cards preview long posts; "Show more" expands the body inline
     // (the detail view already shows it in full) rather than a bare cut-off.
-    const truncated = compact && !expanded && content.length > 300;
-    const shown = truncated ? content.slice(0, 300).trimEnd() + '…' : content;
+    const truncated = compact && !expanded && plain.length > 300;
+    const shown = truncated ? plain.slice(0, 300).trimEnd() + '…' : plain;
     const seeMore = truncated ? (
       <Pressable
         onPress={(e: any) => { e?.stopPropagation?.(); setExpanded(true); }}
@@ -490,12 +495,16 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
     ) : null;
 
     if (Platform.OS === 'web') {
-      const html = renderMarkdownToHtml(shown);
+      // Full-view legacy HTML renders sanitized (DOMPurify allowlist); previews
+      // and everything else go through the escaping markdown renderer.
+      const html = (isLegacyHtml && !truncated)
+        ? sanitizeLegacyHtml(content)
+        : renderMarkdownToHtml(shown);
       const WebDiv = 'div' as any;
       return (
         <>
           <WebDiv
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML comes from renderMarkdownToHtml, which escapes all user input before formatting.
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is either escaped by renderMarkdownToHtml or allowlist-sanitized by sanitizeLegacyHtml (DOMPurify).
             dangerouslySetInnerHTML={{ __html: html }}
             style={{
               color: colors.text,
