@@ -208,6 +208,10 @@ export function sanitizeLegacyHtml(html: string): string {
     ALLOWED_TAGS: ['p','div','a','img','br','h1','h2','h3','h4','h5','h6','ul','ol','li',
                    'blockquote','strong','em','b','i','u','s','span','figure','figcaption','pre','code','hr'],
     ALLOWED_ATTR: ['href','src','alt','title'],
+    // data-*/aria-* are separate gates in DOMPurify — allowed by default even
+    // when ALLOWED_ATTR is set. Close them explicitly.
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
   });
 }
