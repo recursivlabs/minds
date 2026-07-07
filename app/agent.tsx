@@ -25,10 +25,10 @@ import { resolvePersonalAgent, invalidatePersonalAgent } from '../lib/resolvePer
 // IDs are dotted (OpenRouter convention), not dashed. Keep list short to
 // keep the picker clean; full set is broader.
 const MODELS: Array<{ key: string; label: string; sub: string }> = [
-  { key: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', sub: 'Sharp, balanced. Default.' },
+  { key: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', sub: 'Fast, strong at multi-step tools. Default.' },
+  { key: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', sub: 'Sharp, balanced.' },
   { key: 'anthropic/claude-opus-4.6', label: 'Claude Opus 4.6', sub: 'Most thoughtful, slower.' },
   { key: 'openai/gpt-5.4', label: 'GPT-5.4', sub: 'Versatile, broad context.' },
-  { key: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', sub: 'Strong at multi-step tools.' },
 ];
 
 const DEFAULT_SYSTEM_PROMPT = [

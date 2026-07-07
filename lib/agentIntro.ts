@@ -16,15 +16,16 @@ import { fetchDeduped } from './cache';
 // trailing 's, so the intro rendered "Hey jack's, I'm...". Generic
 // greeting dodges the whole class of name-parsing bugs.
 const INTRO_DM_BODY = [
-  "Hey, I'm your personal AI agent on Minds.",
+  "Hi, I'm Minds AI. I work only for you.",
   '',
-  'I curate your "For You" feed by learning your preferences and finding you the best content across Minds and the full internet each day.',
+  "I'm your own assistant here on Minds. I learn what you care about and bring you the best of it, help you keep up with your groups, draft replies in your voice, and answer questions about anything on the network or the open web.",
   '',
-  'I can perform scheduled tasks or reminders, help you write new posts, answer questions about Minds, teach you about your engagement patterns, or talk about anything you want really.',
+  'A few things worth knowing:',
+  '- Just reply here anytime. Ask me something, or tell me a topic you follow and I will find the best of it for you.',
+  '- You are in control. Change my name, my style, the model I run on, and what I can see in Settings.',
+  '- Not interested right now? You can turn me off in Settings in one tap, and back on whenever.',
   '',
-  "Our conversation is private between us and doesn't train any models. You can change my name, model, or personality anytime in settings. You are free to disable me anytime.",
-  '',
-  "Let me know where you'd like to start.",
+  'Our chats are private between us and never train a shared model.',
 ].join('\n');
 
 export const INTRO_DM_TEMPLATE = (_firstName?: string): string => INTRO_DM_BODY;
