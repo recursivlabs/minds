@@ -1,7 +1,9 @@
 // Comprehensive X/Bluesky basic real-time social parity check, two real
 // accounts against production. Exercises the full loop and prints a scorecard.
 import { Recursiv } from '@recursiv/sdk';
-const BASE_URL = 'https://api.recursiv.io/api/v1';
+// Post instance-split (2026-06-24), Minds prod = the DEDICATED api.minds.com,
+// not the shared platform API. Overridable for ad-hoc runs.
+const BASE_URL = process.env.PARITY_BASE_URL || 'https://api.minds.com/api/v1';
 const PROJECT_ID = '019d5190-f0c0-717e-a1bd-ef9c335292b9';
 const ORG_ID = '019d517b-bb87-744d-92db-b3801dc15927';
 const SCOPES = ['posts:read','posts:write','users:read','users:write','communities:read','communities:write','chat:read','chat:write','agents:read','agents:write','notifications:read','notifications:write','settings:read','tags:read','uploads:write'];
