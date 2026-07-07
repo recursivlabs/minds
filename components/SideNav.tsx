@@ -75,7 +75,9 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   };
   const { colors } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
-  const { communities, fetchedOnce: communitiesFetched } = useCommunities(5);
+  // memberOnly — at 96K network communities the caller's groups are never in
+  // page one of the directory; ask the server for exactly "mine".
+  const { communities, fetchedOnce: communitiesFetched } = useCommunities(5, { memberOnly: true });
   // Messages + Communities are fixed, independently-scrollable sections so a
   // long DM list can't bury Communities. Each is collapsible.
   const [messagesOpen, setMessagesOpen] = React.useState(true);

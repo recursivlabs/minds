@@ -15,10 +15,14 @@ import { useColors } from '../../lib/theme';
 export default function CommunitiesScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { communities, loading, fetchedOnce } = useCommunities(100);
+  // memberOnly: the server returns exactly the caller's accepted communities.
+  // At 96K network communities, "mine" can't be derived client-side anymore —
+  // the caller's groups are almost never in page one of the directory.
+  const { communities, loading, fetchedOnce } = useCommunities(100, { memberOnly: true });
 
   // Gate on fetchedOnce so a stale cached is_member=true can't flash a community
-  // you've left (mirrors the sidebar's guard).
+  // you've left (mirrors the sidebar's guard). is_member filter kept as belt —
+  // server rows are already all-mine.
   const mine = (fetchedOnce ? (communities || []) : [])
     .filter((c: any) => c.is_member === true || c.isMember === true);
 
