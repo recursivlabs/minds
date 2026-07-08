@@ -2,6 +2,7 @@ import * as React from 'react';
 import { router } from 'expo-router';
 import { Recursiv } from '@recursiv/sdk';
 import { BASE_URL, BASE_ORIGIN, PROJECT_ID, createAuthedSdk } from './recursiv';
+import { bootstrapMindsAI } from './mindsAI';
 import * as storage from './storage';
 import { captureRefFromUrl, getPendingRef, clearPendingRef } from './referral';
 import { registerPushToken, registerTokenWithServer } from './notifications';
@@ -330,6 +331,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearPendingRef();
       }
     } catch {}
+
+    // Greet the new user: ensure their "Minds AI" personal agent + welcome DM.
+    // Fire-and-forget — onboarding must never block or fail sign-up.
+    void bootstrapMindsAI(createAuthedSdk(result.apiKey), {
+      id: result.user?.id,
+      name: result.user?.name || name,
+    });
   }, []);
 
   const signIn = React.useCallback(async (email: string, password: string) => {
@@ -350,6 +358,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       username: (result.user as any)?.username || email.split('@')[0],
       image: result.user?.image ?? null,
       bio: '',
+    });
+
+    // Returning users (incl. pre-imported die-hards logging in for the first
+    // time on 2.0) also get their Minds AI + welcome DM. Idempotent, so it
+    // no-ops for anyone who has already been greeted. Fire-and-forget.
+    void bootstrapMindsAI(createAuthedSdk(result.apiKey), {
+      id: result.user?.id,
+      name: result.user?.name,
     });
   }, []);
 
