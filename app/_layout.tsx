@@ -88,6 +88,15 @@ export default function RootLayout() {
   });
 
   const onLayoutRootView = useCallback(async () => {
+    // Web: the app just painted its first frame — fade out the static boot
+    // shell (app/+html.tsx) so the real UI is revealed with no blank flash.
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const shell = document.getElementById('minds-boot');
+      if (shell) {
+        shell.style.opacity = '0';
+        setTimeout(() => shell.parentNode?.removeChild(shell), 350);
+      }
+    }
     if (fontsLoaded) {
       await SplashScreen.hideAsync();
     }
