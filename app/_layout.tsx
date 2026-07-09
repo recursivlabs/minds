@@ -28,9 +28,13 @@ import { injectWebStyles } from '../lib/webStyles';
 import { initKeyboardShortcuts } from '../lib/keyboard';
 import { setupNotificationListeners } from '../lib/notifications';
 
-initMonitoring();
-injectWebStyles();
-initKeyboardShortcuts();
+// These touch window/document/analytics — skip them during static export (Node,
+// no DOM). They run for real in the browser once the module loads client-side.
+if (typeof window !== 'undefined') {
+  initMonitoring();
+  injectWebStyles();
+  initKeyboardShortcuts();
+}
 
 SplashScreen.preventAutoHideAsync();
 

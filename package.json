@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "serve dist -l 3000 -s",
-    "build": "expo export --platform web && node scripts/inject-boot-shell.mjs",
+    "build": "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH=1 EXPO_UNSTABLE_TREE_SHAKING=1 expo export --platform web",
     "dev": "expo start",
     "web": "expo start --web",
     "ios": "expo start --ios",
