@@ -5,6 +5,7 @@ import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { formatCount } from '../lib/discover';
 
 interface Props {
   community: any;
@@ -36,7 +37,7 @@ export function CommunityCard({ community, variant = 'card' }: Props) {
         <View style={{ flex: 1 }}>
           <Text variant="bodyMedium" numberOfLines={1}>{name}</Text>
           <Text variant="caption" color={colors.textMuted} numberOfLines={1}>
-            {memberCount} member{memberCount !== 1 ? 's' : ''}
+            {formatCount(memberCount)} member{memberCount !== 1 ? 's' : ''}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -81,7 +82,7 @@ export function CommunityCard({ community, variant = 'card' }: Props) {
       >
         <Ionicons name="people-outline" size={14} color={colors.textMuted} />
         <Text variant="caption" color={colors.textMuted}>
-          {memberCount}
+          {formatCount(memberCount)}
         </Text>
       </View>
     </Pressable>

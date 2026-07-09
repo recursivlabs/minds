@@ -53,12 +53,14 @@ export function CoverImage({ uri, height, radius: r = 0 }: { uri: string; height
   );
 }
 
+// Canonical number formatter: comma thousands separators (1,234,567).
+// Used everywhere counts/amounts are shown so the app is consistent.
 export function formatCount(n: number): string {
   if (!n || n < 0) return '0';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
-  return String(n);
+  return Math.round(n).toLocaleString('en-US');
 }
+// Alias — same comma formatting; clearer name at call sites for non-"count" values.
+export const formatNumber = formatCount;
 
 export function timeAgoShort(dateStr?: string): string {
   if (!dateStr) return '';

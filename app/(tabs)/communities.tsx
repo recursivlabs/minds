@@ -1,11 +1,12 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, Platform } from 'react-native';
+import { View, FlatList, Pressable, Platform, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Avatar, Skeleton } from '../../components';
+import { Text, Avatar, Skeleton, RightRailLayout } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useCommunities } from '../../lib/hooks';
+import { formatCount } from '../../lib/discover';
 import { spacing, radius } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
@@ -26,6 +27,14 @@ export default function CommunitiesScreen() {
   const mine = (fetchedOnce ? (communities || []) : [])
     .filter((c: any) => c.is_member === true || c.isMember === true);
 
+  // Client-side search over the caller's joined communities (the list is small
+  // enough — the server returns exactly "mine", capped at 100).
+  const [query, setQuery] = React.useState('');
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? mine.filter((c: any) => (c.name || '').toLowerCase().includes(q))
+    : mine;
+
   const renderRow = ({ item }: { item: any }) => (
     <Pressable
       onPress={() => router.push(`/(tabs)/community/${item.slug || item.id}` as any)}
@@ -43,7 +52,7 @@ export default function CommunitiesScreen() {
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="bodyMedium" numberOfLines={1}>{item.name || 'Community'}</Text>
         <Text variant="caption" color={colors.textMuted} numberOfLines={1}>
-          {(item.member_count || item.memberCount || 0)} members
+          {formatCount(item.member_count || item.memberCount || 0)} members
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -68,9 +77,39 @@ export default function CommunitiesScreen() {
     </Pressable>
   );
 
+  const searchBar = mine.length > 0 && (
+    <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.xs }}>
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+        backgroundColor: colors.glass, borderRadius: radius.full,
+        paddingHorizontal: spacing.md, paddingVertical: 9,
+        borderWidth: 0.5, borderColor: colors.glassBorder,
+      }}>
+        <Ionicons name="search" size={16} color={colors.textMuted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search your communities"
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          returnKeyType="search"
+          style={{ flex: 1, color: colors.text, paddingVertical: 0, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+        />
+        {query.length > 0 && (
+          <Pressable onPress={() => setQuery('')} hitSlop={8} style={Platform.OS === 'web' ? { cursor: 'pointer' } as any : undefined}>
+            <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+
   return (
     <Container safeTop padded={false}>
+      <RightRailLayout>
       <ScreenHeader title="Communities" right={newCommunityButton} />
+
+      {searchBar}
 
       {loading && mine.length === 0 ? (
         <View style={{ padding: spacing.xl, gap: spacing.lg }}>
@@ -104,9 +143,16 @@ export default function CommunitiesScreen() {
             <Text variant="bodyMedium" color={colors.bg}>Discover communities</Text>
           </Pressable>
         </View>
+      ) : filtered.length === 0 ? (
+        <View style={{ alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing['3xl'], paddingHorizontal: spacing.xl }}>
+          <Ionicons name="search" size={28} color={colors.textMuted} />
+          <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center' }}>
+            No communities match “{query}”.
+          </Text>
+        </View>
       ) : (
         <FlatList
-          data={mine}
+          data={filtered}
           keyExtractor={(item) => item.id}
           renderItem={renderRow}
           contentContainerStyle={{ paddingVertical: spacing.sm }}
@@ -125,6 +171,7 @@ export default function CommunitiesScreen() {
           }
         />
       )}
+      </RightRailLayout>
     </Container>
   );
 }

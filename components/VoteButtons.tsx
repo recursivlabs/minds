@@ -51,7 +51,7 @@ export const VoteButtons = React.memo(function VoteButtons({ score, userVote, on
         }
         style={{ fontSize: compact ? 13 : 15, minWidth: 20, textAlign: 'center' }}
       >
-        {score}
+        {score.toLocaleString('en-US')}
       </Text>
 
       <Pressable
