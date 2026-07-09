@@ -9,35 +9,31 @@ const KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY || '';
 const HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
 
 let ph: any = null;
-let loading: Promise<any> | null = null;
-// Async-load posthog-js so its ~60KB gz stays OUT of the startup bundle (it
-// splits into its own chunk under static output). Error reporting is
-// fire-and-forget, so nothing waits on it; console logging happens inline.
-function client(): Promise<any> {
-  if (ph) return Promise.resolve(ph);
-  if (loading) return loading;
-  if (Platform.OS !== 'web' || !KEY || typeof window === 'undefined') {
-    return Promise.resolve(null);
+let loaded = false;
+function client() {
+  if (loaded) return ph;
+  loaded = true;
+  // Web-first: minds is deployed as web. Native error monitoring (posthog-
+  // react-native) can be added later; it no-ops on native for now.
+  if (Platform.OS !== 'web' || !KEY) return null;
+  try {
+    const posthog = require('posthog-js').default ?? require('posthog-js');
+    posthog.init(KEY, {
+      api_host: HOST,
+      capture_pageview: false,
+      autocapture: false,
+      person_profiles: 'identified_only',
+    });
+    ph = posthog;
+  } catch {
+    ph = null;
   }
-  loading = import('posthog-js')
-    .then((mod) => {
-      const posthog = (mod as any).default ?? mod;
-      posthog.init(KEY, {
-        api_host: HOST,
-        capture_pageview: false,
-        autocapture: false,
-        person_profiles: 'identified_only',
-      });
-      ph = posthog;
-      return ph;
-    })
-    .catch(() => null);
-  return loading;
+  return ph;
 }
 
-/** Initialize at app boot (fire-and-forget — never blocks paint). */
+/** Initialize at app boot. */
 export function initMonitoring() {
-  void client();
+  client();
 }
 
 const exceptionProps = (err: Error, source: string, extra?: Record<string, any>) => ({
@@ -53,19 +49,20 @@ const exceptionProps = (err: Error, source: string, extra?: Record<string, any>)
 export function captureException(error: unknown, context?: Record<string, any>) {
   const err = error instanceof Error ? error : new Error(typeof error === 'string' ? error : JSON.stringify(error));
   console.error('[Error]', err.message, context || '');
-  void client().then((p) => { if (p) p.capture('$exception', exceptionProps(err, 'web', context)); });
+  const p = client();
+  if (p) p.capture('$exception', exceptionProps(err, 'web', context));
 }
 
 /** Report a non-fatal condition on a critical path. */
 export function captureMessage(message: string, context?: Record<string, any>) {
   console.warn('[Warn]', message, context || '');
-  void client().then((p) => { if (p) p.capture('$exception', exceptionProps(new Error(message), 'web', { level: 'warning', ...context })); });
+  const p = client();
+  if (p) p.capture('$exception', exceptionProps(new Error(message), 'web', { level: 'warning', ...context }));
 }
 
 export function setUser(user: { id: string; username?: string; email?: string } | null) {
-  void client().then((p) => {
-    if (!p) return;
-    if (user) p.identify(user.id, { username: user.username, email: user.email });
-    else p.reset();
-  });
+  const p = client();
+  if (!p) return;
+  if (user) p.identify(user.id, { username: user.username, email: user.email });
+  else p.reset();
 }
