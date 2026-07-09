@@ -77,6 +77,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
+  switchAccount: (targetUserId: string) => Promise<void>;
   sendOtp: (email: string) => Promise<void>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
@@ -277,6 +278,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [authedSdk, user]);
 
+  // Switch to a SIBLING account on the same real email (legacy multi-account
+  // support — one email can own many accounts). The server mints a fresh api key
+  // for the target user; persistSession swaps the active identity (key + user +
+  // cache namespace + authed SDK), then refreshUser() loads the canonical
+  // profile. Throws with the server's error message on failure.
+  const switchAccount = React.useCallback(async (targetUserId: string) => {
+    const apiKey = await storage.getItem(KEYS.apiKey);
+    if (!apiKey) throw new Error('Not signed in');
+
+    const res = await fetch(`${BASE_URL}/accounts/switch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ target_user_id: targetUserId }),
+    });
+
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(body?.error?.message || 'Could not switch accounts');
+    }
+
+    const result = body?.data;
+    const newKey = result?.api_key;
+    const newUser = result?.user;
+    if (!newKey || !newUser?.id) throw new Error('Could not switch accounts');
+
+    await persistSession(newKey, {
+      id: newUser.id,
+      name: newUser.name || '',
+      email: newUser.email || '',
+      username: newUser.username || '',
+      image: newUser.image ?? null,
+      bio: newUser.bio || '',
+    });
+    // Load the canonical profile for the account we just switched into.
+    await refreshUser();
+  }, [refreshUser]);
+
   const sendOtp = React.useCallback(async (email: string) => {
     await anonSdk.auth.sendOtp({ email });
   }, []);
@@ -403,13 +441,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       isAuthenticated: !!user,
       refreshUser,
+      switchAccount,
       sendOtp,
       verifyOtp,
       signUp,
       signIn,
       signOut,
     }),
-    [user, authedSdk, projectId, isLoading, refreshUser, sendOtp, verifyOtp, signUp, signIn, signOut],
+    [user, authedSdk, projectId, isLoading, refreshUser, switchAccount, sendOtp, verifyOtp, signUp, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
