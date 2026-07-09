@@ -9,6 +9,7 @@ import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { useAuth } from '../lib/auth';
 import { postScore, postUserVote, postRepostCount, isArticlePost, postTitle } from '../lib/models';
+import { formatCount } from '../lib/discover';
 import { BASE_ORIGIN, SITE_URL, ORG_ID } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
@@ -865,7 +866,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           hitSlop={8}
         >
           <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{replyCount}</Text>
+          <Text variant="caption" color={colors.textMuted}>{formatCount(replyCount)}</Text>
         </Pressable>
 
         <Pressable
@@ -892,7 +893,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             color={myRepostId ? colors.accent : colors.textMuted}
           />
           {repostCount > 0 && (
-            <Text variant="caption" color={myRepostId ? colors.accent : colors.textMuted}>{repostCount}</Text>
+            <Text variant="caption" color={myRepostId ? colors.accent : colors.textMuted}>{formatCount(repostCount)}</Text>
           )}
         </Pressable>
 

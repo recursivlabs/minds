@@ -18,6 +18,7 @@ import { getCached, invalidate, fetchDeduped } from '../../../lib/cache';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
 import { profileFollowerCount, profileFollowingCount, isArticlePost } from '../../../lib/models';
+import { formatCount } from '../../../lib/discover';
 
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
 
@@ -88,7 +89,12 @@ export default function UserProfileScreen() {
     })();
     return () => { cancelled = true; };
   }, [sdk, profile?.id, profile?.isAi, profile?.is_ai]);
-  const ALLOWED_TABS = isOwnProfile ? OWNER_TABS : OTHER_TABS;
+  // The official @minds channel is followed by ~every user, so its follower
+  // count effectively discloses the total network size, and its followers list
+  // is a prime scrape/spam target. Hide both (count + tab) for all viewers.
+  const isMindsChannel = (profile?.username || username || '').toLowerCase() === 'minds';
+  const ALLOWED_TABS = (isOwnProfile ? OWNER_TABS : OTHER_TABS)
+    .filter((t) => !(isMindsChannel && t === 'followers')) as readonly ProfileTab[];
   const validInitialTab: ProfileTab = (ALLOWED_TABS as readonly string[]).includes(initialTab || '')
     ? (initialTab as ProfileTab)
     : 'posts';
@@ -466,13 +472,15 @@ export default function UserProfileScreen() {
           {/* Follower/Following counts */}
           <View style={{ flexDirection: 'row', gap: spacing['2xl'], marginTop: spacing.xl }}>
             <Pressable onPress={() => setProfileTab('following')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Text variant="bodyMedium">{followingCount}</Text>
+              <Text variant="bodyMedium">{formatCount(followingCount)}</Text>
               <Text variant="caption" color={colors.textMuted}>Following</Text>
             </Pressable>
-            <Pressable onPress={() => setProfileTab('followers')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Text variant="bodyMedium">{followerCount}</Text>
-              <Text variant="caption" color={colors.textMuted}>Followers</Text>
-            </Pressable>
+            {!isMindsChannel && (
+              <Pressable onPress={() => setProfileTab('followers')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <Text variant="bodyMedium">{formatCount(followerCount)}</Text>
+                <Text variant="caption" color={colors.textMuted}>Followers</Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Non-owner action row */}
