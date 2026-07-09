@@ -22,9 +22,11 @@ import { colors as defaultColors, spacing, radius } from '../constants/theme';
 import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
 import { NewChatModal } from './NewChatModal';
 
-// The classic Minds bulb — shown as the collapsed-rail mark (matches the
-// browser favicon) so the brand reads the same as legacy Minds. 212x345 source.
+// The classic Minds bulb — collapsed-rail mark (matches the browser favicon).
+// 212x345 source. Expanded rail shows the full wordmark logo (theme-specific).
 const BULB = require('../assets/bulb.svg');
+const LOGO_DARK = require('../assets/logo-dark-mode.svg');
+const LOGO_LIGHT = require('../assets/logo-light-mode.svg');
 
 const COLLAPSED_WIDTH = 68;
 const EXPANDED_WIDTH = 264;
@@ -78,7 +80,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     } catch { showToast('Could not copy your invite link', 'error'); }
     finally { setReferBusy(false); }
   };
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { conversations, refresh: refreshConvos } = useConversations();
   // memberOnly — at 96K network communities the caller's groups are never in
   // page one of the directory; ask the server for exactly "mine".
@@ -572,8 +574,8 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           >
             <Pressable onPress={() => router.push('/(tabs)')} hitSlop={8}>
               {collapsed ? (
-                // Bulb mark (matches the favicon). Source is 212x345, so keep
-                // that aspect ratio (~0.614) to avoid squashing.
+                // Bulb mark only (matches the favicon). Source is 212x345, so
+                // keep that aspect ratio (~0.614) to avoid squashing.
                 <Image
                   source={BULB}
                   style={{ width: 22, height: 36 }}
@@ -581,13 +583,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
                   accessibilityLabel="Minds"
                 />
               ) : (
-                <Text
-                  variant="h2"
-                  color={colors.accent}
-                  style={{ fontSize: 20, letterSpacing: 0.5 }}
-                >
-                  minds
-                </Text>
+                // Expanded: full Minds wordmark logo, matched to the theme.
+                // Source viewBox is 104x40 (2.6:1) — keep the ratio.
+                <Image
+                  source={isDark ? LOGO_DARK : LOGO_LIGHT}
+                  style={{ width: 91, height: 35 }}
+                  contentFit="contain"
+                  accessibilityLabel="Minds"
+                />
               )}
             </Pressable>
           </View>
