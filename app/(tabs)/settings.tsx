@@ -599,7 +599,8 @@ export default function SettingsScreen() {
               )}
             </Section>
             <Section title="Account actions">
-              <SettingRow first icon="log-out-outline" label="Log out" onPress={() => { signOut(); }} />
+              <SettingRow first icon="swap-horizontal-outline" label="Switch account" onPress={() => router.push('/(tabs)/switch-account' as any)} />
+              <SettingRow icon="log-out-outline" label="Log out" onPress={() => { signOut(); }} />
               <SettingRow icon="trash-outline" label="Delete account" destructive onPress={() => setDeleteConfirm(true)} />
               {deleteConfirm && (
                 <SectionBlock>
