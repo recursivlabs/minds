@@ -15,7 +15,7 @@
  *
  * Idempotent: re-running is a no-op if the shell is already present.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dist = process.env.EXPO_WEB_DIST || 'dist';
@@ -24,6 +24,18 @@ const file = join(dist, 'index.html');
 if (!existsSync(file)) {
   console.error(`[boot-shell] ${file} not found — did 'expo export --platform web' run?`);
   process.exit(1);
+}
+
+// Ship the Minds bulb as an SVG favicon so the browser tab matches the in-app
+// collapsed logo (both the bulb), like legacy Minds. Copied to a stable path at
+// the web root (Expo's asset pipeline content-hashes assets, so we can't link
+// those from static HTML). The <link> is injected below.
+const bulbSrc = join('assets', 'bulb.svg');
+if (existsSync(bulbSrc)) {
+  copyFileSync(bulbSrc, join(dist, 'bulb.svg'));
+  console.log(`[boot-shell] copied ${bulbSrc} -> ${join(dist, 'bulb.svg')}`);
+} else {
+  console.warn(`[boot-shell] ${bulbSrc} not found — favicon link will 404`);
 }
 
 // Emit a serve.json so `serve dist` sends correct cache headers. The exported
@@ -70,12 +82,16 @@ const SHELL = `<div id="minds-boot" aria-hidden="true"><div class="mb-wm">Minds<
 
 const FAILSAFE = `<script>setTimeout(function(){var b=document.getElementById('minds-boot');if(b){b.style.opacity='0';setTimeout(function(){b.parentNode&&b.parentNode.removeChild(b)},400)}},20000)</script>`;
 
+// SVG favicon (the bulb) so the browser tab matches the in-app logo. Modern
+// browsers prefer the SVG icon over Expo's generated PNG favicon link.
+const FAVICON = `<link rel="icon" type="image/svg+xml" href="/bulb.svg">`;
+
 // Inject: style before </head>, shell right after <body>, failsafe before </body>.
 if (!html.includes('</head>') || !html.includes('<body>') || !html.includes('</body>')) {
   console.error('[boot-shell] unexpected index.html shape (missing head/body markers)');
   process.exit(1);
 }
-html = html.replace('</head>', `${STYLE}</head>`);
+html = html.replace('</head>', `${FAVICON}${STYLE}</head>`);
 html = html.replace('<body>', `<body>${SHELL}`);
 html = html.replace('</body>', `${FAILSAFE}</body>`);
 
