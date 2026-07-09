@@ -26,9 +26,35 @@ if (!existsSync(file)) {
   process.exit(1);
 }
 
+// Emit a serve.json so `serve dist` sends correct cache headers. The exported
+// JS/CSS/font assets are content-hashed (index-<hash>.js), so they are safe to
+// cache forever — this removes the ~1MB revalidation round-trip returning users
+// were paying on every visit (the bundle shipped with an etag but no
+// Cache-Control). index.html stays no-cache so a new deploy's asset hashes are
+// always picked up. Written unconditionally (before the shell idempotency
+// guard) so it lands even on a re-run.
+const serveConfig = {
+  headers: [
+    {
+      source: '_expo/static/**',
+      headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+    },
+    {
+      source: '**/*.@(js|css|woff|woff2|ttf|otf|png|jpg|jpeg|gif|svg|ico)',
+      headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+    },
+    {
+      source: 'index.html',
+      headers: [{ key: 'Cache-Control', value: 'no-cache' }],
+    },
+  ],
+};
+writeFileSync(join(dist, 'serve.json'), JSON.stringify(serveConfig, null, 2));
+console.log(`[boot-shell] wrote ${join(dist, 'serve.json')} (immutable cache for hashed assets)`);
+
 let html = readFileSync(file, 'utf8');
 if (html.includes('id="minds-boot"')) {
-  console.log('[boot-shell] already injected — skipping');
+  console.log('[boot-shell] already injected — skipping shell');
   process.exit(0);
 }
 
