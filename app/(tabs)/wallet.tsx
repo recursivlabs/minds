@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { showToast } from '../../components/Toast';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Button, Skeleton, Avatar } from '../../components';
+import { Text, Button, Skeleton, Avatar, RightRailLayout } from '../../components';
 import { Container } from '../../components/Container';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
@@ -287,6 +287,7 @@ export default function WalletScreen() {
 
   return (
     <Container safeTop padded={false}>
+      <RightRailLayout>
       <ScreenHeader title="Wallet" />
 
       {loading ? (
@@ -310,6 +311,7 @@ export default function WalletScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      </RightRailLayout>
 
       {/* Receive modal */}
       <Modal visible={receiveOpen} transparent animationType="fade" onRequestClose={() => setReceiveOpen(false)}>

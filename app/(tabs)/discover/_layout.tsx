@@ -2,7 +2,7 @@ import * as React from 'react';
 import { View, TextInput, Platform, Pressable } from 'react-native';
 import { Slot, useRouter, usePathname, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text } from '../../../components';
+import { Text, RightRailLayout } from '../../../components';
 import { Container } from '../../../components/Container';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
@@ -121,6 +121,7 @@ export default function DiscoverLayout() {
 
   return (
     <Container safeTop padded={false}>
+      <RightRailLayout>
       <View style={{ backgroundColor: colors.bg, zIndex: 1 }}>
         {/* Header row */}
         <View
@@ -171,6 +172,7 @@ export default function DiscoverLayout() {
       <View style={{ flex: 1 }}>
         <Slot />
       </View>
+      </RightRailLayout>
     </Container>
   );
 }
