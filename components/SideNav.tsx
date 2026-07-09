@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
@@ -20,6 +21,10 @@ import { subscribeLocalChat } from '../lib/chatEvents';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
 import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
 import { NewChatModal } from './NewChatModal';
+
+// The classic Minds bulb — shown as the collapsed-rail mark (matches the
+// browser favicon) so the brand reads the same as legacy Minds. 212x345 source.
+const BULB = require('../assets/bulb.svg');
 
 const COLLAPSED_WIDTH = 68;
 const EXPANDED_WIDTH = 264;
@@ -566,13 +571,24 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             }}
           >
             <Pressable onPress={() => router.push('/(tabs)')} hitSlop={8}>
-              <Text
-                variant="h2"
-                color={colors.accent}
-                style={{ fontSize: 20, letterSpacing: collapsed ? 1 : 0.5 }}
-              >
-                {collapsed ? 'm' : 'minds'}
-              </Text>
+              {collapsed ? (
+                // Bulb mark (matches the favicon). Source is 212x345, so keep
+                // that aspect ratio (~0.614) to avoid squashing.
+                <Image
+                  source={BULB}
+                  style={{ width: 22, height: 36 }}
+                  contentFit="contain"
+                  accessibilityLabel="Minds"
+                />
+              ) : (
+                <Text
+                  variant="h2"
+                  color={colors.accent}
+                  style={{ fontSize: 20, letterSpacing: 0.5 }}
+                >
+                  minds
+                </Text>
+              )}
             </Pressable>
           </View>
 
