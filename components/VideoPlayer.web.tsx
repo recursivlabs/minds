@@ -8,7 +8,7 @@
 // "Processing" overlay and poll until it's ready, then load and play. Status is
 // only checked when a load actually fails, so already-ready videos cost nothing.
 import React, { useEffect, useRef, useState } from 'react';
-import type HlsType from 'hls.js'; // type-only — erased at build, not bundled
+import Hls from 'hls.js';
 import { getVideoStatus, extractVideoGuid } from '../lib/video';
 
 export interface VideoPlayerProps {
@@ -32,7 +32,7 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
     if (!video) return;
     setState('loading');
     const guid = extractVideoGuid(uri);
-    let hls: HlsType | null = null;
+    let hls: Hls | null = null;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
     const holdTimers: ReturnType<typeof setTimeout>[] = [];
     let cancelled = false;
@@ -80,12 +80,7 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
         setState('ready');
         return;
       }
-      // Lazy-load hls.js (~350KB gz) only when we actually need to play an HLS
-      // stream — it's the single biggest dependency and most sessions never hit
-      // a video, so keeping it out of the startup bundle is the big FCP win.
-      void import('hls.js').then(({ default: Hls }) => {
-        if (cancelled || !video) return;
-        if (!Hls.isSupported()) { video.src = uri; setState('ready'); return; }
+      if (Hls.isSupported()) {
         // capLevelToPlayerSize is intentionally OFF. It bounds ABR to the
         // rendered element size, but before the <video> has measured itself it
         // floors to the LOWEST rendition — and even after our first-segment seed,
@@ -120,7 +115,10 @@ export function VideoPlayer({ uri, poster, autoplay = true, height = 480 }: Vide
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR) { hls?.recoverMediaError(); return; }
           onFatalError(data.type);
         });
-      }).catch(() => { if (!cancelled && video) { video.src = uri; setState('ready'); } });
+        return;
+      }
+      video.src = uri; // last resort
+      setState('ready');
     }
 
     load();
