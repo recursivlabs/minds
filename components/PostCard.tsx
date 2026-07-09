@@ -8,7 +8,7 @@ import { VoteButtons } from './VoteButtons';
 import { NSFWOverlay } from './NSFWOverlay';
 import { ReportModal } from './ReportModal';
 import { useAuth } from '../lib/auth';
-import { postScore, postUserVote, postRepostCount, isArticlePost } from '../lib/models';
+import { postScore, postUserVote, postRepostCount, isArticlePost, postTitle } from '../lib/models';
 import { BASE_ORIGIN, SITE_URL, ORG_ID } from '../lib/recursiv';
 import { getItem } from '../lib/storage';
 import { useToast } from './Toast';
@@ -303,8 +303,11 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
     if (!communityId) return null;
     const communities = getCached('communities:30') || getCached('communities:50') || getCached('communities:10') || getCached('communities:100') || [];
     const match = communities.find((c: any) => c.id === communityId);
-    return match?.name || null;
-  }, [communityId]);
+    // Fall back to the community the API hydrates on the post — so posts in
+    // groups the viewer hasn't joined still show "in <group>" (the cache only
+    // holds the viewer's own communities).
+    return match?.name || displayPost.community?.name || displayPost.community_name || null;
+  }, [communityId, displayPost.community?.name, displayPost.community_name]);
 
   const handleVote = async (type: 'upvote' | 'downvote') => {
     if (!sdk) return;
@@ -780,6 +783,14 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             <ArticleCard post={displayPost} full={!compact} onPress={openPost} />
           ) : (
             <>
+              {/* Legacy media posts (image/video) carry their caption in `title`,
+                 separate from the body. Non-article titled posts render it as a
+                 bold line above the body so the caption isn't lost. */}
+              {!!postTitle(displayPost) && (
+                <Text variant="body" color={colors.text} style={{ fontFamily: 'Roboto-Medium', marginBottom: spacing.xs, lineHeight: 22 }}>
+                  {postTitle(displayPost)}
+                </Text>
+              )}
               {renderMarkdownContent()}
               <MediaViewer media={displayPost.media} thumbnail={displayPost.image || displayPost.thumbnail} audioMeta={audioMeta} />
               <LinkPreview url={externalUrl} content={content} />
