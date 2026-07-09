@@ -82,15 +82,21 @@ const SHELL = `<div id="minds-boot" aria-hidden="true"><div class="mb-wm">Minds<
 
 const FAILSAFE = `<script>setTimeout(function(){var b=document.getElementById('minds-boot');if(b){b.style.opacity='0';setTimeout(function(){b.parentNode&&b.parentNode.removeChild(b)},400)}},20000)</script>`;
 
-// SVG favicon (the bulb) so the browser tab matches the in-app logo. Modern
-// browsers prefer the SVG icon over Expo's generated PNG favicon link.
-const FAVICON = `<link rel="icon" type="image/svg+xml" href="/bulb.svg">`;
+// SVG favicon (the bulb) so the browser tab matches the in-app logo. We must
+// STRIP Expo's generated `<link rel="icon" href="/favicon.ico">` first — with
+// it present, browsers (esp. Safari) keep using the cached .ico and never pick
+// up the SVG. Removing the competitor forces the bulb.
+const FAVICON = `<link rel="icon" type="image/svg+xml" href="/bulb.svg"><link rel="shortcut icon" type="image/svg+xml" href="/bulb.svg"><link rel="apple-touch-icon" href="/bulb.svg">`;
 
 // Inject: style before </head>, shell right after <body>, failsafe before </body>.
 if (!html.includes('</head>') || !html.includes('<body>') || !html.includes('</body>')) {
   console.error('[boot-shell] unexpected index.html shape (missing head/body markers)');
   process.exit(1);
 }
+// Drop any Expo-emitted favicon/apple-touch links so only the bulb remains.
+const beforeIcons = html;
+html = html.replace(/<link[^>]*rel="(?:icon|shortcut icon|apple-touch-icon)"[^>]*>/gi, '');
+console.log(`[boot-shell] stripped ${(beforeIcons.match(/<link[^>]*rel="(?:icon|shortcut icon|apple-touch-icon)"[^>]*>/gi) || []).length} stock icon link(s)`);
 html = html.replace('</head>', `${FAVICON}${STYLE}</head>`);
 html = html.replace('<body>', `<body>${SHELL}`);
 html = html.replace('</body>', `${FAILSAFE}</body>`);
