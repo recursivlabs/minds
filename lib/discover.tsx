@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Platform, Pressable, ScrollView, Image, Modal } from 'react-native';
+import { View, Platform, Pressable, ScrollView, Image, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Avatar, Skeleton } from '../components';
 import { logSignal } from './signals';
@@ -1121,6 +1121,7 @@ export function TagCloudModal({ visible, tags, activeId, onPick, onClose }: {
   onClose: () => void;
 }) {
   const colors = useColors();
+  const [query, setQuery] = React.useState('');
   // Rank by volume so the biggest topics read first (top-left), and compute the
   // corpus min/max once for the weighting.
   const { sorted, minCount, maxCount } = React.useMemo(() => {
@@ -1131,6 +1132,11 @@ export function TagCloudModal({ visible, tags, activeId, onPick, onClose }: {
     const s = [...withCounts].sort((a, b) => b.c - a.c).map((x) => x.t);
     return { sorted: s, minCount: min, maxCount: max };
   }, [tags]);
+  // Type-to-filter: at 40+ topics, scanning the cloud for a specific one is slow.
+  const q = query.trim().toLowerCase();
+  const shown = q ? sorted.filter((t) => (t.name || '').toLowerCase().includes(q)) : sorted;
+  // Reset the query each time the sheet is dismissed so it opens fresh.
+  React.useEffect(() => { if (!visible) setQuery(''); }, [visible]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -1174,9 +1180,40 @@ export function TagCloudModal({ visible, tags, activeId, onPick, onClose }: {
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing['3xl'] }} showsVerticalScrollIndicator={false}>
+          {/* Type-to-filter — fast selection when there are many topics. */}
+          <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.xs, paddingBottom: spacing.sm }}>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+              backgroundColor: colors.surface, borderRadius: radius.full,
+              borderWidth: 0.5, borderColor: colors.glassBorder,
+              paddingHorizontal: spacing.md, paddingVertical: 9,
+            }}>
+              <Ionicons name="search" size={16} color={colors.textMuted} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search topics"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={{ flex: 1, color: colors.text, paddingVertical: 0, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+              />
+              {query.length > 0 && (
+                <Pressable onPress={() => setQuery('')} hitSlop={8} style={Platform.OS === 'web' ? { cursor: 'pointer' } as any : undefined}>
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing['3xl'] }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {shown.length === 0 ? (
+              <Text variant="body" color={colors.textSecondary} style={{ textAlign: 'center', paddingVertical: spacing['2xl'] }}>
+                No topics match “{query}”.
+              </Text>
+            ) : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
-              {sorted.map((t) => {
+              {shown.map((t) => {
                 const count = topicPostCount(t);
                 const { fontSize, weight, opacity } = cloudWeight(count, minCount, maxCount);
                 const isActive = activeId === t.id;

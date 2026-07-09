@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator } from 'react-native';
-import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
+import { Text, Avatar, Button, PostCard, Skeleton, RightRailLayout } from '../../../components';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TabBar } from '../../../components/TabBar';
@@ -320,7 +320,8 @@ export default function UserProfileScreen() {
     <Container safeTop padded={false}>
       <ScreenHeader title={`@${profile.username || username}`} />
 
-      <ScrollView showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
+      <RightRailLayout>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
         <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
           {/* Top row: avatar + owner action buttons */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -747,6 +748,7 @@ export default function UserProfileScreen() {
 
         <View style={{ height: spacing['4xl'] }} />
       </ScrollView>
+      </RightRailLayout>
 
       {/* Edit Profile Modal */}
       {isOwnProfile && (
