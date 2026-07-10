@@ -49,9 +49,13 @@ const BOTTOM_ITEMS: NavItem[] = [];
 
 export function useSidebarState() {
   const { width: windowWidth } = useWindowDimensions();
-  // Auto-collapse below the breakpoint only. No manual toggle — collapsing a
-  // full-size desktop nav by hand looked odd, so it's width-driven.
-  const collapsed = windowWidth < AUTO_COLLAPSE_WIDTH;
+  const pathname = usePathname();
+  // Collapse to icons below the breakpoint, OR whenever the wide 2-pane chat is
+  // open — the conversation list + thread deserve the full width (X-style). The
+  // nav container animates the width transition, so entering/leaving /chat
+  // smoothly collapses then re-expands the menu.
+  const onWideChat = windowWidth >= 1000 && !!pathname?.includes('chat');
+  const collapsed = windowWidth < AUTO_COLLAPSE_WIDTH || onWideChat;
   const toggle = React.useCallback(() => {}, []);
   return { collapsed, toggle, width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH };
 }

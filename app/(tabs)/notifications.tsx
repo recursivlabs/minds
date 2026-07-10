@@ -28,13 +28,14 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
+  const [loadedOnce, setLoadedOnce] = React.useState(false);
   const loadNotifications = React.useCallback(async () => {
       if (!sdk) { setLoading(false); return; }
       try {
         const res = await sdk.notifications.list({ limit: 30, organization_id: ORG_ID || undefined });
         setNotifications(res.data || []);
       } catch {}
-      finally { setLoading(false); }
+      finally { setLoading(false); setLoadedOnce(true); }
   }, [sdk]);
 
   // Initial load.
@@ -161,6 +162,19 @@ export default function NotificationsScreen() {
     return 'notifications';
   };
 
+  // X-style type badge (small colored circle overlaid on the actor avatar):
+  // a glanceable indicator of WHAT happened, color-coded like X/Instagram.
+  const getTypeVisual = (type: string): { icon: string; color: string } => {
+    const t = (type || '').toLowerCase();
+    if (t.includes('follow')) return { icon: 'person', color: colors.accent };
+    if (t.includes('repost') || t.includes('reshare') || t.includes('remind')) return { icon: 'repeat', color: '#00ba7c' };
+    if (t.includes('like') || t.includes('reaction') || t.includes('vote') || t.includes('react')) return { icon: 'heart', color: '#f91880' };
+    if (t.includes('reply') || t.includes('comment')) return { icon: 'chatbubble', color: colors.accent };
+    if (t.includes('mention')) return { icon: 'at', color: colors.accent };
+    if (t.includes('message') || t.includes('chat') || t.includes('dm')) return { icon: 'mail', color: colors.accent };
+    return { icon: 'notifications', color: colors.accent };
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
       <RightRailLayout context="notifications">
@@ -185,7 +199,7 @@ export default function NotificationsScreen() {
             </View>
           ))}
         </View>
-      ) : notifications.length === 0 ? (
+      ) : loadedOnce && notifications.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, paddingHorizontal: spacing.xl }}>
           <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="notifications-outline" size={34} color={colors.accent} />
@@ -276,39 +290,28 @@ export default function NotificationsScreen() {
                 borderBottomColor: colors.borderSubtle,
               })}
             >
-              {item._agentSourced ? (
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: colors.accent,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Ionicons name="sparkles" size={16} color="#fff" />
-                </View>
-              ) : item.imageUrl || item.image_url ? (
-                <Avatar uri={item.imageUrl || item.image_url} name={item.title} size="md" />
-              ) : (
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: colors.accentSubtle,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Ionicons
-                    name={getIcon(item.targetType || item.target_type) as any}
-                    size={16}
-                    color={colors.accent}
-                  />
-                </View>
-              )}
+              {/* Actor avatar with an X-style type badge overlaid bottom-right. */}
+              <View style={{ position: 'relative', width: 40, height: 40 }}>
+                {item._agentSourced ? (
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="sparkles" size={18} color="#fff" />
+                  </View>
+                ) : (item.imageUrl || item.image_url) ? (
+                  <Avatar uri={item.imageUrl || item.image_url} name={item.title} size="md" />
+                ) : (
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentSubtle, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name={getIcon(item.targetType || item.target_type) as any} size={18} color={colors.accent} />
+                  </View>
+                )}
+                {(() => {
+                  const tv = getTypeVisual(item.targetType || item.target_type);
+                  return (
+                    <View style={{ position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: tv.color, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg }}>
+                      <Ionicons name={tv.icon as any} size={9} color="#fff" />
+                    </View>
+                  );
+                })()}
+              </View>
               <View style={{ flex: 1 }}>
                 <Text variant="body" numberOfLines={2} style={{ fontSize: 14 }}>
                   {item._groupedTitle || item.title || item.body || 'New notification'}
