@@ -171,14 +171,35 @@ export function CommandPalette() {
         // palette stays scannable and Enter still falls through to Discover.
         const qLower = q.toLowerCase();
         const [profilesRes, commRes, agentsRes, postsRes] = await Promise.all([
-          sdk.profiles.search({ q, limit: 5, organization_id: ORG_ID || undefined } as any).catch(() => ({ data: [] })),
+          // Pull a wider pool so the client can rank deterministically — with
+          // limit:5 the server's tie-broken top-5 reshuffles between identical
+          // searches. We rank + slice locally instead.
+          sdk.profiles.search({ q, limit: 20, organization_id: ORG_ID || undefined } as any).catch(() => ({ data: [] })),
           sdk.communities.list({ limit: 50, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
           (sdk as any).agents.listDiscoverable({ limit: 50 }).catch(() => ({ data: [] })),
           sdk.posts.search({ q, limit: 4, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
 
-        const profileRows: Result[] = (profilesRes.data || []).map((p: any) => ({
+        // STABLE relevance rank: exact handle/name, then prefix, then contains;
+        // ties broken by handle length then id so the same query is deterministic.
+        const rankProfile = (p: any) => {
+          const un = (p.username || '').toLowerCase();
+          const nm = (p.name || '').toLowerCase();
+          if (un === qLower) return 0;
+          if (nm === qLower) return 1;
+          if (un.startsWith(qLower)) return 2;
+          if (nm.startsWith(qLower)) return 3;
+          if (un.includes(qLower)) return 4;
+          if (nm.includes(qLower)) return 5;
+          return 6;
+        };
+        const rankedProfiles = [...(profilesRes.data || [])].sort((a: any, b: any) =>
+          rankProfile(a) - rankProfile(b)
+          || (a.username || '').length - (b.username || '').length
+          || String(a.id).localeCompare(String(b.id))
+        ).slice(0, 5);
+        const profileRows: Result[] = rankedProfiles.map((p: any) => ({
           kind: 'user',
           id: p.id,
           title: p.name || p.username || 'Unknown',

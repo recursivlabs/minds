@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
+import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform, useWindowDimensions, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -273,7 +273,11 @@ export default function ChatScreen() {
             // there). Match on the nested id too — otherwise a participant whose
             // top-level id is undefined can match the current user, picking the
             // wrong "other" and showing no avatar.
-            const other = item.participants?.find((p: any) => (p?.user?.id ?? p?.id ?? p?.userId) !== user?.id) || item.participants?.[0];
+            // The conversations API returns `members` (flat {id,image}); older
+            // shapes use `participants`. Read either, else no "other" resolves
+            // and the avatar/name fall back to nothing.
+            const members = item.participants || item.members || [];
+            const other = members.find((p: any) => (p?.user?.id ?? p?.id ?? p?.userId) !== user?.id) || members[0];
             const ou = other?.user || other || {};
             const name = item.name || ou.name || other?.name || ou.username || other?.username || 'Conversation';
             const avatar = ou.image || other?.image || ou.avatar || other?.avatar || ou.profile?.image || item.image || item.avatar || null;
@@ -357,11 +361,11 @@ export default function ChatScreen() {
   // pane, so the list stays put (no navigation, X/iMessage feel).
   if (isWide) {
     return (
-      <View style={{ flex: 1, flexDirection: 'row' }}>
-        <View style={{ width: 360, borderRightWidth: 0.5, borderRightColor: colors.borderSubtle }}>
+      <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.bg }}>
+        <View style={{ width: 360, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.borderSubtle, backgroundColor: colors.bg }}>
           <Container safeTop padded={false} style={{ flex: 1 }}>{listBody}</Container>
         </View>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
           {activeConvoId ? (
             <ConversationView
               conversationId={activeConvoId}
@@ -369,11 +373,17 @@ export default function ChatScreen() {
               hideBack
             />
           ) : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
-              <Ionicons name="chatbubbles-outline" size={40} color={colors.textMuted} />
-              <Text variant="body" color={colors.textSecondary} align="center">
-                Select a conversation to start messaging
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.md, backgroundColor: colors.bg }}>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm }}>
+                <Ionicons name="chatbubbles-outline" size={30} color={colors.accent} />
+              </View>
+              <Text variant="h3" color={colors.text} align="center">Your messages</Text>
+              <Text variant="body" color={colors.textSecondary} align="center" style={{ maxWidth: 280, lineHeight: 20 }}>
+                Select a conversation from the list, or start a new one.
               </Text>
+              <Button onPress={() => { setShowNewChat(true); }} size="sm" style={{ marginTop: spacing.md }}>
+                New message
+              </Button>
             </View>
           )}
         </View>

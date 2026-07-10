@@ -25,6 +25,11 @@ function isJunkCreator(u: any): boolean {
   return /(^|[^a-z])(betabot|parody|test|qa|demo|simulator|dummy|sample|fixture|bot)([^a-z]|\d|$)/.test(s);
 }
 
+// Advances once per sidebar mount so the recommendation window rotates on
+// navigation / refresh (not just on a timer). Module-scoped so it persists
+// across mounts within a session.
+let sidebarRotSeed = 0;
+
 function SidebarSection({ title, icon, children, onSeeAll }: {
   title: string;
   icon: string;
@@ -197,14 +202,14 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
     return m;
   }, [profiles]);
 
-  // FRESHNESS: rotate which slice of each ranked pool is shown so a lingering
-  // reader who takes no action keeps seeing NEW recommendations instead of the
-  // same five forever. A slow tick advances a shared window offset; each section
-  // shows a rotating window over its (wider) candidate pool. Gentle by design —
-  // the rail evolves over a session, it doesn't shuffle under the cursor.
-  const [rot, setRot] = React.useState(0);
+  // FRESHNESS: rotate which slice of each ranked pool is shown so the rail
+  // evolves instead of showing the same five forever. Primarily driven by
+  // NAVIGATION — each mount advances the shared seed, so moving between pages
+  // (or a refresh) surfaces new recommendations. A slow 3-min tick is a gentle
+  // fallback for someone who lingers on one page. Never shuffles under the cursor.
+  const [rot, setRot] = React.useState(() => ++sidebarRotSeed);
   React.useEffect(() => {
-    const id = setInterval(() => setRot((r) => r + 1), 45000);
+    const id = setInterval(() => setRot((r) => r + 1), 180000);
     return () => clearInterval(id);
   }, []);
   const rotateWindow = React.useCallback(<T,>(arr: T[], size: number): T[] => {

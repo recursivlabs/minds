@@ -172,14 +172,14 @@ function PostImage({ uri, onPress, badge, initialWidth, initialHeight }: {
         alignItems: 'flex-start',
         justifyContent: 'flex-start',
       }}>
+        {/* Size the image box to height x natural-ratio and let the container's
+            flex-start alignment hug it to the leading edge. This left-justifies
+            reliably on web + native WITHOUT relying on objectPosition (which
+            RN-Web strips, leaving contain() to center the letterboxed image). */}
         <Image
           source={{ uri }}
-          style={{
-            width: '100%',
-            height: '100%',
-            ...(Platform.OS === 'web' ? { objectPosition: 'left center' } as any : null),
-          }}
-          resizeMode="contain"
+          style={{ height: '100%', aspectRatio, alignSelf: 'flex-start' }}
+          resizeMode="cover"
         />
         {badge}
       </View>
