@@ -345,14 +345,16 @@ export default function CreateScreen() {
     } catch (e) { /* image picker cancelled or unavailable */ }
   };
 
-  const handlePickImage = async () => {
+  const handlePickImage = async (kind: 'image' | 'video' | 'all' = 'all') => {
     try {
-      // Posts allow multiple images (or one video); the article cover is single.
-      const allowMulti = mode === 'post';
+      // Posts allow multiple images; a video is always single. Article cover is single.
+      const allowMulti = mode === 'post' && kind !== 'video';
       const picker = getImagePicker();
       if (picker) {
         const result = await picker.launchImageLibraryAsync({
-          mediaTypes: picker.MediaTypeOptions.All, // image OR video
+          mediaTypes: kind === 'video' ? picker.MediaTypeOptions.Videos
+            : kind === 'image' ? picker.MediaTypeOptions.Images
+            : picker.MediaTypeOptions.All,
           allowsMultipleSelection: allowMulti,
           selectionLimit: allowMulti ? MAX_IMAGES : 1,
           quality: 0.8,
@@ -376,7 +378,7 @@ export default function CreateScreen() {
       } else if (Platform.OS === 'web') {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/*,video/*';
+        input.accept = kind === 'video' ? 'video/*' : kind === 'image' ? 'image/*' : 'image/*,video/*';
         if (allowMulti) input.multiple = true;
         input.onchange = (e: any) => {
           const files: File[] = Array.from(e.target?.files || []);
@@ -923,7 +925,7 @@ export default function CreateScreen() {
                 }}
               />
               <Pressable
-                onPress={handlePickImage}
+                onPress={() => handlePickImage()}
                 style={{
                   backgroundColor: colors.surface,
                   borderWidth: 1,
@@ -1359,13 +1361,20 @@ export default function CreateScreen() {
             onPress={() => setMode(mode === 'article' ? 'post' : 'article')}
             colors={colors}
           />
+          {/* Distinct image / video / music affordances so it's obvious you can
+             attach any of the three. */}
           <ToolbarIconButton
-            icon="add"
-            active={!!mediaUri && !mediaIsAudio}
-            onPress={handlePickImage}
+            icon="image-outline"
+            active={!!mediaUri && !mediaIsAudio && !mediaIsVideo}
+            onPress={() => handlePickImage('image')}
             colors={colors}
           />
-          {/* Attach audio (voice post). */}
+          <ToolbarIconButton
+            icon="videocam-outline"
+            active={mediaIsVideo}
+            onPress={() => handlePickImage('video')}
+            colors={colors}
+          />
           <ToolbarIconButton
             icon="musical-notes-outline"
             active={mediaIsAudio}
@@ -1525,6 +1534,20 @@ function ScheduleModal({
 
           {/* Picker body */}
           <View style={{ padding: spacing.xl, gap: spacing.md }}>
+            {/* Make the schedule timezone explicit — the times below are the
+               user's LOCAL time, so tell them which zone that is. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Ionicons name="globe-outline" size={12} color={colors.textMuted} />
+              <Text variant="caption" color={colors.textMuted}>
+                {(() => {
+                  let tz = '';
+                  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch {}
+                  const m = -new Date().getTimezoneOffset();
+                  const off = `GMT${m >= 0 ? '+' : '-'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
+                  return `Your timezone${tz ? ` — ${tz.replace(/_/g, ' ')}` : ''} (${off})`;
+                })()}
+              </Text>
+            </View>
             {Platform.OS === 'web' ? (
               <View
                 style={{
