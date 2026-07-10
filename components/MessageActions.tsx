@@ -14,6 +14,8 @@ interface Props {
   isOwn: boolean;
   /** the reaction the current user has already applied, to show it selected */
   myReaction?: string | null;
+  /** press coordinates (pageX/pageY) so the menu can anchor near the tapped bubble on web */
+  anchor?: { x: number; y: number } | null;
   onClose: () => void;
   onReact: (emoji: string) => void;
   onReply: () => void;
@@ -21,14 +23,30 @@ interface Props {
   onDelete?: () => void;
 }
 
+// The floating menu is ~260 tall (reaction pill + action list) and ~230 wide.
+const MENU_W = 230;
+const MENU_H = 260;
+
 /**
  * Tap-and-hold message action overlay (Signal / WhatsApp / Telegram class).
  * A dimmed backdrop lifts focus to a floating quick-reaction bar + a compact
  * action list. One tap to react, reply, or copy — frictionless on web + native.
  */
-export function MessageActions({ visible, isOwn, myReaction, onClose, onReact, onReply, onCopy, onDelete }: Props) {
+export function MessageActions({ visible, isOwn, myReaction, anchor, onClose, onReact, onReply, onCopy, onDelete }: Props) {
   const colors = useColors();
   const anim = React.useRef(new Animated.Value(0)).current;
+
+  // On web, anchor the menu next to the tapped bubble (clamped to the viewport)
+  // instead of dead-centering it — Signal/iMessage behaviour. Native falls back
+  // to the centered overlay (touch targets are already large there).
+  const anchoredStyle = React.useMemo(() => {
+    if (Platform.OS !== 'web' || !anchor || typeof window === 'undefined') return null;
+    const vw = window.innerWidth || 1200;
+    const vh = window.innerHeight || 800;
+    const left = Math.max(12, Math.min(anchor.x - (isOwn ? MENU_W - 40 : 40), vw - MENU_W - 12));
+    const top = Math.max(12, Math.min(anchor.y - 20, vh - MENU_H - 12));
+    return { position: 'absolute' as const, left, top };
+  }, [anchor, isOwn]);
 
   React.useEffect(() => {
     Animated.spring(anim, {
@@ -63,8 +81,8 @@ export function MessageActions({ visible, isOwn, myReaction, onClose, onReact, o
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}>
-        <Animated.View style={{ transform: [{ scale }], opacity: anim, alignItems: isOwn ? 'flex-end' : 'flex-start', maxWidth: 420, width: '100%' }}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: anchoredStyle ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}>
+        <Animated.View style={{ transform: [{ scale }], opacity: anim, alignItems: isOwn ? 'flex-end' : 'flex-start', maxWidth: 420, width: anchoredStyle ? undefined : '100%', ...(anchoredStyle || {}) }}>
           {/* Quick reactions pill */}
           <Pressable onPress={() => {}} style={{
             flexDirection: 'row', alignItems: 'center', gap: spacing.xs,

@@ -865,8 +865,8 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
           })}
           hitSlop={8}
         >
-          <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
-          <Text variant="caption" color={colors.textMuted}>{formatCount(replyCount)}</Text>
+          <Ionicons name="chatbubble-outline" size={19} color={colors.textMuted} />
+          <Text variant="caption" color={colors.textMuted} style={{ fontSize: 14 }}>{formatCount(replyCount)}</Text>
         </Pressable>
 
         <Pressable
@@ -889,11 +889,11 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         >
           <Ionicons
             name={myRepostId ? 'repeat' : 'repeat-outline'}
-            size={16}
+            size={19}
             color={myRepostId ? colors.accent : colors.textMuted}
           />
           {repostCount > 0 && (
-            <Text variant="caption" color={myRepostId ? colors.accent : colors.textMuted}>{formatCount(repostCount)}</Text>
+            <Text variant="caption" color={myRepostId ? colors.accent : colors.textMuted} style={{ fontSize: 14 }}>{formatCount(repostCount)}</Text>
           )}
         </Pressable>
 
@@ -911,7 +911,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease' } as any : {}),
           })}
         >
-          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={saved ? colors.accent : colors.textMuted} />
+          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={19} color={saved ? colors.accent : colors.textMuted} />
         </Pressable>
 
         {/* Ask your agent about this post (Grok-on-X style). Opens the personal
@@ -929,7 +929,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease', cursor: 'pointer' } as any : {}),
           })}
         >
-          <Ionicons name="paper-plane-outline" size={16} color={colors.textMuted} />
+          <Ionicons name="paper-plane-outline" size={19} color={colors.textMuted} />
         </Pressable>
 
         <Pressable
@@ -951,7 +951,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease' } as any : {}),
           })}
         >
-          <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
+          <Ionicons name="ellipsis-horizontal" size={19} color={colors.textMuted} />
         </Pressable>
       </View>
       {/* End content column */}

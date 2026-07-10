@@ -92,16 +92,16 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge, isAg
       <Avatar uri={avatar} name={name} size="sm" />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Text variant="body" numberOfLines={1} style={{ fontSize: 13, flexShrink: 1 }}>{name}</Text>
-          {isAgent && <AgentBadge size={11} />}
+          <Text variant="body" numberOfLines={1} style={{ fontSize: 15, flexShrink: 1 }}>{name}</Text>
+          {isAgent && <AgentBadge size={13} />}
           {badge && (
             <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: radius.sm }}>
               <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>{badge}</Text>
             </View>
           )}
         </View>
-        {subtitle && <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{subtitle}</Text>}
-        {description && <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ fontSize: 11, marginTop: 1, lineHeight: 15 }}>{description}</Text>}
+        {subtitle && <Text variant="caption" color={colors.textMuted} style={{ fontSize: 13 }}>{subtitle}</Text>}
+        {description && <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ fontSize: 13, marginTop: 1, lineHeight: 17 }}>{description}</Text>}
       </View>
       {action && (
         <Pressable
@@ -280,14 +280,14 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
             >
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="body" numberOfLines={2} style={{ fontSize: 13 }}>
+                  <Text variant="body" numberOfLines={2} style={{ fontSize: 15, lineHeight: 20 }}>
                     {cardLabel(post, postTitle(post).slice(0, 80))}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 }}>
-                    <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 11, flexShrink: 1 }}>
+                    <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 13, flexShrink: 1 }}>
                       {post.author?.name || 'Anonymous'}
                     </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
+                    <Text variant="caption" color={colors.textMuted} style={{ fontSize: 13 }}>
                       · {post.score || 0} pts
                     </Text>
                   </View>

@@ -19,8 +19,9 @@ interface Props {
   // absent the failed row still shows its "Not delivered" state, just without
   // the retry affordance.
   onRetry?: (message: any) => void;
-  // Tap-and-hold → open the message action menu (react / reply / copy).
-  onLongPress?: (message: any) => void;
+  // Tap-and-hold → open the message action menu (react / reply / copy). The
+  // second arg carries the press coordinates so the menu can anchor near the bubble.
+  onLongPress?: (message: any, pos?: { x: number; y: number }) => void;
   // Tap an existing reaction pill to toggle your own reaction.
   onReactPill?: (message: any, emoji: string) => void;
   // The message this one is replying to (resolved by the chat screen), shown as
@@ -145,7 +146,7 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
       }}
     >
       <Pressable
-        onLongPress={() => onLongPress?.(message)}
+        onLongPress={(e: any) => onLongPress?.(message, { x: e?.nativeEvent?.pageX ?? 0, y: e?.nativeEvent?.pageY ?? 0 })}
         delayLongPress={320}
         style={{
           backgroundColor: isOwn

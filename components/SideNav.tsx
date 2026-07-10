@@ -2,7 +2,7 @@ import * as React from 'react';
 import { View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { useRouter, usePathname } from 'expo-router';
+import { useRouter, usePathname, useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
@@ -50,12 +50,13 @@ const BOTTOM_ITEMS: NavItem[] = [];
 export function useSidebarState() {
   const { width: windowWidth } = useWindowDimensions();
   const pathname = usePathname();
-  // Collapse to icons below the breakpoint, OR whenever the wide 2-pane chat is
-  // open — the conversation list + thread deserve the full width (X-style). The
-  // nav container animates the width transition, so entering/leaving /chat
-  // smoothly collapses then re-expands the menu.
-  const onWideChat = windowWidth >= 1000 && !!pathname?.includes('chat');
-  const collapsed = windowWidth < AUTO_COLLAPSE_WIDTH || onWideChat;
+  const params = useGlobalSearchParams<{ focused?: string }>();
+  // Collapse to icons below the breakpoint, OR when the wide 2-PANE chat is open
+  // (the list+thread deserve full width). But NOT when a thread is opened
+  // full-bleed from the sidebar inbox (focused=1) — there the nav should stay
+  // put. So collapse only on /chat WITHOUT the focused flag.
+  const onWide2PaneChat = windowWidth >= 1000 && !!pathname?.includes('chat') && !params?.focused;
+  const collapsed = windowWidth < AUTO_COLLAPSE_WIDTH || onWide2PaneChat;
   const toggle = React.useCallback(() => {}, []);
   return { collapsed, toggle, width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH };
 }
@@ -493,25 +494,25 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
         })}
       >
-        <Avatar uri={item.avatar} name={item.name} size="xs" />
+        <Avatar uri={item.avatar} name={item.name} size="sm" />
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text
               variant="caption"
               numberOfLines={1}
               color={isUnread ? colors.text : undefined}
-              style={{ fontWeight: isUnread ? '600' : '400', fontSize: 13, flexShrink: 1 }}
+              style={{ fontWeight: isUnread ? '600' : '400', fontSize: 15, flexShrink: 1 }}
             >
               {item.name}
             </Text>
-            {(item as any).isAgent && <AgentBadge size={11} />}
+            {(item as any).isAgent && <AgentBadge size={13} />}
           </View>
           {item.preview ? (
             <Text
               variant="caption"
               color={isUnread ? colors.textSecondary : colors.textMuted}
               numberOfLines={1}
-              style={{ fontSize: 11 }}
+              style={{ fontSize: 13 }}
             >
               {item.preview}
             </Text>

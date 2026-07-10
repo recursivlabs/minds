@@ -34,6 +34,7 @@ import { useAuth } from '../lib/auth';
 import { registerShortcut } from '../lib/keyboard';
 import { getCached, setCache } from '../lib/cache';
 import { ORG_ID } from '../lib/recursiv';
+import { profileFollowerCount, profilePostCount } from '../lib/models';
 import { spacing, radius, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
@@ -174,16 +175,16 @@ export function CommandPalette() {
           // Pull a wider pool so the client can rank deterministically — with
           // limit:5 the server's tie-broken top-5 reshuffles between identical
           // searches. We rank + slice locally instead.
-          sdk.profiles.search({ q, limit: 20, organization_id: ORG_ID || undefined } as any).catch(() => ({ data: [] })),
+          sdk.profiles.search({ q, limit: 40, organization_id: ORG_ID || undefined } as any).catch(() => ({ data: [] })),
           sdk.communities.list({ limit: 50, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
           (sdk as any).agents.listDiscoverable({ limit: 50 }).catch(() => ({ data: [] })),
           sdk.posts.search({ q, limit: 4, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
 
-        // STABLE relevance rank: exact handle/name, then prefix, then contains;
-        // ties broken by handle length then id so the same query is deterministic.
-        const rankProfile = (p: any) => {
+        // Relevance bucket: exact handle/name, then prefix, then contains.
+        // Lower is better. Real people (jack, ottman) land in buckets 0-3.
+        const matchBucket = (p: any) => {
           const un = (p.username || '').toLowerCase();
           const nm = (p.name || '').toLowerCase();
           if (un === qLower) return 0;
@@ -194,11 +195,20 @@ export function CommandPalette() {
           if (nm.includes(qLower)) return 5;
           return 6;
         };
+        // Popularity signal — followers first, posts as a fallback — so within a
+        // match bucket the accounts people actually recognize surface, and empty
+        // spam accounts (no avatar, no followers, no posts) sink to the bottom.
+        const popularity = (p: any) => profileFollowerCount(p) * 3 + profilePostCount(p);
+        const hasAvatar = (p: any) => !!(p.image || p.avatar);
         const rankedProfiles = [...(profilesRes.data || [])].sort((a: any, b: any) =>
-          rankProfile(a) - rankProfile(b)
+          matchBucket(a) - matchBucket(b)
+          // Accounts with an avatar beat avatar-less spam within the same bucket.
+          || (hasAvatar(b) ? 1 : 0) - (hasAvatar(a) ? 1 : 0)
+          // Then most-followed / most-active.
+          || popularity(b) - popularity(a)
           || (a.username || '').length - (b.username || '').length
           || String(a.id).localeCompare(String(b.id))
-        ).slice(0, 5);
+        ).slice(0, 6);
         const profileRows: Result[] = rankedProfiles.map((p: any) => ({
           kind: 'user',
           id: p.id,

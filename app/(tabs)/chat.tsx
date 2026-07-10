@@ -510,6 +510,8 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
   const [messages, setMessages] = React.useState<any[]>(cachedSorted);
   // Tap-and-hold message actions + reply state.
   const [actionMsg, setActionMsg] = React.useState<any>(null);
+  const [actionPos, setActionPos] = React.useState<{ x: number; y: number } | null>(null);
+  const openActions = React.useCallback((m: any, pos?: { x: number; y: number }) => { setActionMsg(m); setActionPos(pos || null); }, []);
   const [replyingTo, setReplyingTo] = React.useState<any>(null);
   // Toggle a reaction — optimistic (mirrors the server's per-emoji-per-user
   // toggle), then fire the API. Skips optimistic-only temp rows.
@@ -1229,7 +1231,7 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
                     </View>
                   </View>
                 ) : null}
-                <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} onLongPress={setActionMsg} onReactPill={handleReact} quoted={resolveQuoted(item)} myUserId={user?.id} />
+                <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} onLongPress={openActions} onReactPill={handleReact} quoted={resolveQuoted(item)} myUserId={user?.id} />
               </>
             );
           }}
@@ -1372,7 +1374,8 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
         visible={!!actionMsg}
         isOwn={!!actionMsg && (actionMsg.sender?.id || actionMsg.senderId || actionMsg.sender_id) === user?.id}
         myReaction={(actionMsg?.reactions || []).find((r: any) => (r.user_id ?? r.userId) === user?.id)?.type || null}
-        onClose={() => setActionMsg(null)}
+        anchor={actionPos}
+        onClose={() => { setActionMsg(null); setActionPos(null); }}
         onReact={(emoji) => handleReact(actionMsg, emoji)}
         onReply={() => setReplyingTo(actionMsg)}
         onCopy={() => handleCopyMsg(actionMsg)}
@@ -1419,7 +1422,7 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
       >
         {/* Attach media (image / video). */}
         <Pressable onPress={handleAttach} disabled={attaching} hitSlop={8} style={{ opacity: attaching ? 0.5 : 1, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) }}>
-          <Ionicons name={attaching ? 'ellipsis-horizontal' : 'add-circle-outline'} size={26} color={colors.accent} />
+          <Ionicons name={attaching ? 'ellipsis-horizontal' : 'add-circle-outline'} size={18} color={colors.accent} />
         </Pressable>
         <TextInput
           placeholder="Type a message..."
