@@ -197,6 +197,22 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
     return m;
   }, [profiles]);
 
+  // FRESHNESS: rotate which slice of each ranked pool is shown so a lingering
+  // reader who takes no action keeps seeing NEW recommendations instead of the
+  // same five forever. A slow tick advances a shared window offset; each section
+  // shows a rotating window over its (wider) candidate pool. Gentle by design —
+  // the rail evolves over a session, it doesn't shuffle under the cursor.
+  const [rot, setRot] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setRot((r) => r + 1), 45000);
+    return () => clearInterval(id);
+  }, []);
+  const rotateWindow = React.useCallback(<T,>(arr: T[], size: number): T[] => {
+    if (arr.length <= size) return arr.slice(0, size);
+    const off = (rot * size) % arr.length;
+    return [...arr.slice(off), ...arr.slice(0, off)].slice(0, size);
+  }, [rot]);
+
   // POSTS: hot-rank, dedup, then keep AT MOST ONE post per author so a single
   // prolific poster can't fill the entire rail (the "5 posts from one account"
   // problem). Fall back to raw order if hot-ranking collapses on a legacy corpus.
@@ -214,21 +230,21 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
 
   // CREATORS: present the follower board's exact order (already ranked, real
   // counts), hydrated with directory bio/identity, minus AI/bot/test accounts.
-  const topPeople = ((creatorBoard || []).length
+  const rankedPeople = ((creatorBoard || []).length
     ? (creatorBoard || []).map((row: any) => { const p = profileById.get(row?.id); return p ? { ...p, ...row } : row; })
     : [...(profiles || [])])
     .filter((u: any) => !isJunkCreator(u))
     // The official @minds channel is the network's own account, not a creator to
     // follow — keep it out of the human Creators rail.
-    .filter((u: any) => (u?.username || '').toLowerCase() !== 'minds')
-    .slice(0, 5);
-  const topCommunities = [...(communities || [])]
-    .sort((a: any, b: any) => communityActivity(b) - communityActivity(a))
-    .slice(0, 5);
-  const visibleAgents = (agents || [])
+    .filter((u: any) => (u?.username || '').toLowerCase() !== 'minds');
+  const topPeople = rotateWindow(rankedPeople, 5);
+  const rankedCommunities = [...(communities || [])]
+    .sort((a: any, b: any) => communityActivity(b) - communityActivity(a));
+  const topCommunities = rotateWindow(rankedCommunities, 5);
+  const rankedAgents = (agents || [])
     .filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id))
-    .sort((a: any, b: any) => agentPopularity(b) - agentPopularity(a))
-    .slice(0, 5);
+    .sort((a: any, b: any) => agentPopularity(b) - agentPopularity(a));
+  const visibleAgents = rotateWindow(rankedAgents, 5);
 
   // The four discovery widgets. Rendered in a context-dependent order so the
   // most relevant "next step" leads on each page (below).
