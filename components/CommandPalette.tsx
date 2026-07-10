@@ -37,7 +37,7 @@ import { ORG_ID } from '../lib/recursiv';
 import { spacing, radius, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
-type ResultKind = 'post' | 'user' | 'community' | 'agent' | 'command' | 'recent';
+type ResultKind = 'post' | 'user' | 'community' | 'agent' | 'command' | 'recent' | 'search';
 interface Result {
   kind: ResultKind;
   id: string;
@@ -260,7 +260,17 @@ export function CommandPalette() {
           },
         }));
 
-        setResults([...profileRows, ...communityRows, ...agentRows, ...postRows]);
+        // The DEFAULT action is always a Minds-wide search — it leads the list
+        // and is pre-selected, so Enter dumps you into Discovery results rather
+        // than opening the top auto-suggestion (which is sometimes the wrong one).
+        const searchRow: Result = {
+          kind: 'search',
+          id: 'search',
+          title: `Search Minds for "${q}"`,
+          subtitle: 'Enter',
+          onPress: () => runFind(q),
+        };
+        setResults([searchRow, ...profileRows, ...communityRows, ...agentRows, ...postRows]);
         setActiveIdx(0);
       } catch {
         if (!cancelled) setResults([]);
@@ -411,12 +421,13 @@ export function CommandPalette() {
                       >
                         <Ionicons
                           name={
-                            item.kind === 'command' ? 'flash-outline'
-                              : item.kind === 'recent' ? 'time-outline'
-                                : item.kind === 'post' ? 'document-text-outline'
-                                  : item.kind === 'community' ? 'people-outline'
-                                    : item.kind === 'agent' ? 'sparkles-outline'
-                                      : 'person-outline'
+                            item.kind === 'search' ? 'search'
+                              : item.kind === 'command' ? 'flash-outline'
+                                : item.kind === 'recent' ? 'time-outline'
+                                  : item.kind === 'post' ? 'document-text-outline'
+                                    : item.kind === 'community' ? 'people-outline'
+                                      : item.kind === 'agent' ? 'sparkles-outline'
+                                        : 'person-outline'
                           }
                           size={14}
                           color={colors.textMuted}

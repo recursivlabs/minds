@@ -2,6 +2,7 @@ import * as React from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
+import { AgentBadge } from './AgentBadge';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 import { getCached } from '../lib/cache';
@@ -72,11 +73,7 @@ export const MentionPicker = React.memo(function MentionPicker({ query, onSelect
             <Avatar uri={avatar} name={name} size="xs" />
             <Text variant="body" style={{ fontSize: 13, flex: 1 }} numberOfLines={1}>{name}</Text>
             <Text variant="caption" color={colors.textMuted}>@{username}</Text>
-            {isAgent && (
-              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: 3 }}>
-                <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>AI</Text>
-              </View>
-            )}
+            {isAgent && <AgentBadge size={12} />}
           </Pressable>
         );
       })}

@@ -6,12 +6,13 @@ import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
+import { AgentBadge } from './AgentBadge';
 import { useAuth } from '../lib/auth';
 import { getReferralLink } from '../lib/referral';
 import { showToast } from './Toast';
 import { ORG_ID } from '../lib/recursiv';
 import { useTheme } from '../lib/theme';
-import { conversationUnreadCount } from '../lib/models';
+import { conversationUnreadCount, isAiActor } from '../lib/models';
 import { useConversations, useCommunities } from '../lib/hooks';
 import { ensureIntroDM } from '../lib/agentIntro';
 import { invalidate, subscribeToInvalidations } from '../lib/cache';
@@ -407,13 +408,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         type: 'dm' as const,
         name,
         avatar: ou?.image || other?.image || ou?.avatar || null,
+        isAgent: isAiActor(ou) || isAiActor(other),
         preview: stripMarkdown(useLive ? live.content : (c.lastMessage?.content || c.last_message?.content || '')),
       };
     })
     .filter(Boolean)
     // Show a real inbox, not a teaser. The panel scrolls, so the cap only
     // exists to keep the render light — 4 was hiding active threads.
-    .slice(0, 10) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string }>;
+    .slice(0, 10) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string; isAgent?: boolean }>;
   // Communities the user is a member of. Strict is_member check (only true).
   // NOTE: this reflects real communityMember rows — if a community the user
   // never joined appears here, the fix is at the source (an auto-join path
@@ -468,15 +470,18 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         })}
       >
         <Avatar uri={item.avatar} name={item.name} size="xs" />
-        <View style={{ flex: 1 }}>
-          <Text
-            variant="caption"
-            numberOfLines={1}
-            color={isUnread ? colors.text : undefined}
-            style={{ fontWeight: isUnread ? '600' : '400', fontSize: 13 }}
-          >
-            {item.name}
-          </Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text
+              variant="caption"
+              numberOfLines={1}
+              color={isUnread ? colors.text : undefined}
+              style={{ fontWeight: isUnread ? '600' : '400', fontSize: 13, flexShrink: 1 }}
+            >
+              {item.name}
+            </Text>
+            {(item as any).isAgent && <AgentBadge size={11} />}
+          </View>
           {item.preview ? (
             <Text
               variant="caption"

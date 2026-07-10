@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
+import { AgentBadge } from './AgentBadge';
 import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents, useFollowingIds } from '../lib/hooks';
@@ -63,13 +64,14 @@ function SidebarSection({ title, icon, children, onSeeAll }: {
   );
 }
 
-function SidebarItem({ avatar, name, subtitle, description, onPress, badge, action }: {
+function SidebarItem({ avatar, name, subtitle, description, onPress, badge, isAgent, action }: {
   avatar?: string | null;
   name: string;
   subtitle?: string;
   description?: string;
   onPress: () => void;
   badge?: string;
+  isAgent?: boolean;
   // One-tap CTA on the right (follow a creator, join a community, message an
   // agent). `active` flips the affordance to a confirmed/done state.
   action?: { icon: string; onPress: () => void; active?: boolean; label?: string };
@@ -90,7 +92,8 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge, acti
       <Avatar uri={avatar} name={name} size="sm" />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Text variant="body" numberOfLines={1} style={{ fontSize: 13, flex: 1 }}>{name}</Text>
+          <Text variant="body" numberOfLines={1} style={{ fontSize: 13, flexShrink: 1 }}>{name}</Text>
+          {isAgent && <AgentBadge size={11} />}
           {badge && (
             <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: radius.sm }}>
               <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>{badge}</Text>
@@ -364,7 +367,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
             avatar={a.image || a.avatar}
             name={a.name || 'Agent'}
             description={a.bio || a.description}
-            badge="AI"
+            isAgent
             onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
             action={{ icon: 'chatbubble-outline', label: 'Message', onPress: () => message(a.id) }}
           />

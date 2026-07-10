@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { View, Platform, Pressable, ScrollView, Image, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Avatar, Skeleton } from '../components';
+import { Text, Avatar, Skeleton, AgentBadge } from '../components';
 import { logSignal } from './signals';
 import { spacing, radius, shadows } from '../constants/theme';
 import { useColors } from './theme';
@@ -846,10 +846,8 @@ export function AgentRow({ agent, onPress }: { agent: any; onPress: () => void }
       <Avatar uri={avatar} name={name} size="lg" />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{name}</Text>
-          <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm }}>
-            <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
-          </View>
+          <Text variant="bodyMedium" style={{ flexShrink: 1 }} numberOfLines={1}>{name}</Text>
+          <AgentBadge size={12} />
         </View>
         {bio ? <Text variant="body" color={colors.textSecondary} numberOfLines={4} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{bio}</Text> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>

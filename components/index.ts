@@ -6,6 +6,7 @@ export { Container } from './Container';
 export { Divider } from './Divider';
 export { Skeleton } from './Skeleton';
 export { Avatar } from './Avatar';
+export { AgentBadge } from './AgentBadge';
 export { PostCard } from './PostCard';
 export { ComposePost } from './ComposePost';
 export { FeedTabs } from './FeedTabs';

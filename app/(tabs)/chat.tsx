@@ -3,7 +3,7 @@ import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform, u
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Avatar, Skeleton, ChatBubble, Button } from '../../components';
+import { Text, Avatar, Skeleton, ChatBubble, Button, AgentBadge } from '../../components';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
@@ -316,12 +316,8 @@ export default function ChatScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 }}>
-                      <Text variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>{name}</Text>
-                      {isAgentConvo && (
-                        <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: 4 }}>
-                          <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>AI</Text>
-                        </View>
-                      )}
+                      <Text variant="bodyMedium" numberOfLines={1} style={{ flexShrink: 1 }}>{name}</Text>
+                      {isAgentConvo && <AgentBadge size={12} />}
                     </View>
                     {time ? (
                       <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>

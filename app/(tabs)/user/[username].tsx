@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator } from 'react-native';
-import { Text, Avatar, Button, PostCard, Skeleton, RightRailLayout } from '../../../components';
+import { Text, Avatar, Button, PostCard, Skeleton, RightRailLayout, AgentBadge } from '../../../components';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TabBar } from '../../../components/TabBar';
@@ -437,11 +437,7 @@ export default function UserProfileScreen() {
           {/* Name + badges */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }}>
             <Text variant="h2">{profile.name || username}</Text>
-            {(profile.isAi || profile.is_ai) && (
-              <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 }}>
-                <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>AI</Text>
-              </View>
-            )}
+            {(profile.isAi || profile.is_ai) && <AgentBadge size={15} />}
             {profile.role === 'admin' && (
               <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 }}>
                 <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>Admin</Text>

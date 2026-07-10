@@ -248,7 +248,19 @@ export default function CreateScreen() {
   // ~1.2s of idle. Flashes a small "Saved" indicator so the user knows
   // their work is preserved even if they navigate away accidentally.
   React.useEffect(() => {
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      // Emptying the composer is an INTENTIONAL discard — drop the stored draft
+      // so abandoned text doesn't resurrect on the next open. (Previously this
+      // just early-returned, leaving the old draft to restore forever, so you
+      // couldn't get rid of it.) Guarded so the initial empty mount, before a
+      // draft is restored, is a harmless no-op.
+      if (draftRef.current) {
+        try { deleteDraft(draftRef.current); } catch {}
+        draftRef.current = null;
+      }
+      restoredContentRef.current = null;
+      return;
+    }
     // Don't re-save a draft we just restored and the user hasn't touched.
     if (content === restoredContentRef.current) return;
     const timer = setTimeout(() => {
