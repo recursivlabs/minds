@@ -134,7 +134,16 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
   // reverts on failure.
   const [followOverride, setFollowOverride] = React.useState<Map<string, boolean>>(new Map());
   const [joinOverride, setJoinOverride] = React.useState<Map<string, boolean>>(new Map());
-  const isFollowing = (id: string) => followOverride.has(id) ? !!followOverride.get(id) : (followingIds?.has(id) ?? false);
+  // Accepts a user row or a bare id. Priority: optimistic override → the row's
+  // own server is_following flag (reliable, not subject to the 100-cap on the
+  // following-list fetch) → the following-graph set as a last-resort fallback.
+  const isFollowing = (u: any) => {
+    const id = typeof u === 'string' ? u : u?.id;
+    if (followOverride.has(id)) return !!followOverride.get(id);
+    const flag = typeof u === 'object' ? (u?.is_following ?? u?.isFollowing) : undefined;
+    if (flag != null) return !!flag;
+    return followingIds?.has(id) ?? false;
+  };
   const isJoined = (c: any) => joinOverride.has(c.id) ? !!joinOverride.get(c.id) : !!(c.is_member ?? c.isMember);
   const toggleFollow = React.useCallback((id: string, currently: boolean) => {
     if (!sdk) return;
@@ -209,6 +218,9 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
     ? (creatorBoard || []).map((row: any) => { const p = profileById.get(row?.id); return p ? { ...p, ...row } : row; })
     : [...(profiles || [])])
     .filter((u: any) => !isJunkCreator(u))
+    // The official @minds channel is the network's own account, not a creator to
+    // follow — keep it out of the human Creators rail.
+    .filter((u: any) => (u?.username || '').toLowerCase() !== 'minds')
     .slice(0, 5);
   const topCommunities = [...(communities || [])]
     .sort((a: any, b: any) => communityActivity(b) - communityActivity(a))
@@ -294,7 +306,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
                 : (u.username ? `@${u.username}` : undefined)}
               description={u.bio || u.description}
               onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
-              action={{ icon: isFollowing(u.id) ? 'checkmark' : 'add', active: isFollowing(u.id), label: isFollowing(u.id) ? 'Following' : 'Follow', onPress: () => toggleFollow(u.id, isFollowing(u.id)) }}
+              action={{ icon: isFollowing(u) ? 'checkmark' : 'add', active: isFollowing(u), label: isFollowing(u) ? 'Following' : 'Follow', onPress: () => toggleFollow(u.id, isFollowing(u)) }}
             />
           );
         })}

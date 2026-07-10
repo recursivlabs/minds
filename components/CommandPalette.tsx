@@ -36,7 +36,6 @@ import { getCached, setCache } from '../lib/cache';
 import { ORG_ID } from '../lib/recursiv';
 import { spacing, radius, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
-import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
 
 type ResultKind = 'post' | 'user' | 'community' | 'agent' | 'command' | 'recent';
 interface Result {
@@ -114,62 +113,8 @@ export function CommandPalette() {
     router.push(`/(tabs)/discover/posts?q=${encodeURIComponent(q)}` as any);
   }, [router, close]);
 
-  const runPost = React.useCallback(() => {
-    close();
-    router.push('/(tabs)/create' as any);
-  }, [router, close]);
-
-  const runDm = React.useCallback(async (username: string) => {
-    if (!sdk) return;
-    try {
-      const profileRes = await sdk.profiles.getByUsername(username);
-      const userId = profileRes.data?.id;
-      if (!userId) return;
-      const dm = await sdk.chat.dm({ user_id: userId, organization_id: ORG_ID || undefined } as any);
-      if (dm.data?.id) {
-        close();
-        router.push(`/(tabs)/chat?id=${dm.data.id}` as any);
-      }
-    } catch {}
-  }, [sdk, router, close]);
-
-  const runAskAgent = React.useCallback(async (prompt: string) => {
-    if (!sdk) return;
-    try {
-      const personal = await resolvePersonalAgent(sdk);
-      if (!personal) {
-        close();
-        router.push('/agent' as any);
-        return;
-      }
-      const dm = await sdk.chat.dm({ user_id: personal.id, organization_id: ORG_ID || undefined } as any);
-      const convoId = dm.data?.id;
-      if (!convoId) return;
-      // Send the prompt as a user message right away so the agent
-      // sees it on open. (The DM screen will pick up the WS broadcast.)
-      try {
-        await sdk.chat.send({ conversation_id: convoId, content: prompt });
-      } catch {}
-      close();
-      router.push(`/(tabs)/chat?id=${convoId}` as any);
-    } catch {}
-  }, [sdk, router, close]);
-
-  const runSwitch = React.useCallback(async (name: string) => {
-    if (!sdk) return;
-    try {
-      const list = await sdk.communities.list({ limit: 100, organization_id: ORG_ID || undefined });
-      const match = (list.data || []).find(
-        (c: any) => c.slug === name || c.name?.toLowerCase() === name.toLowerCase(),
-      );
-      if (match) {
-        close();
-        router.push(`/(tabs)/community/${match.slug || match.id}` as any);
-      }
-    } catch {}
-  }, [sdk, router, close]);
-
-  // Debounced search + slash parser. Runs when query changes.
+  // Debounced unified search — auto-suggests creators, communities, and agents
+  // (plus a few post hits), or Enter jumps to Discover. Runs when query changes.
   React.useEffect(() => {
     if (!open) return;
     const q = query.trim();
@@ -184,23 +129,7 @@ export function CommandPalette() {
         subtitle: 'Recent search',
         onPress: () => runFind(r),
       }));
-      const suggestions: Result[] = [
-        {
-          kind: 'command',
-          id: 'cmd:post',
-          title: 'Write a post',
-          subtitle: '/post',
-          onPress: runPost,
-        },
-        {
-          kind: 'command',
-          id: 'cmd:ask',
-          title: 'Ask your agent',
-          subtitle: '/ask <question>',
-          onPress: () => inputRef.current?.setNativeProps({ text: '/ask ' }),
-        },
-      ];
-      setResults([...recents, ...suggestions]);
+      setResults(recents);
       setActiveIdx(0);
       return;
     }
@@ -235,96 +164,82 @@ export function CommandPalette() {
           return;
         }
 
-        // Slash-command preview rows: render the command itself as a
-        // result so Enter from the preview runs the action.
-        const slashPreview: Result[] = [];
-        if (q.startsWith('/find ') || q === '/find') {
-          const rest = q.replace(/^\/find\s*/, '');
-          slashPreview.push({
-            kind: 'command',
-            id: 'cmd:find',
-            title: rest ? `Find "${rest}"` : 'Find…',
-            subtitle: '/find',
-            onPress: () => runFind(rest || ''),
-          });
-        }
-        if (q === '/post' || q.startsWith('/post')) {
-          slashPreview.push({
-            kind: 'command',
-            id: 'cmd:post',
-            title: 'Write a post',
-            subtitle: '/post',
-            onPress: runPost,
-          });
-        }
-        if (q.startsWith('/dm ') || q === '/dm') {
-          const rest = q.replace(/^\/dm\s*@?/, '').trim();
-          slashPreview.push({
-            kind: 'command',
-            id: 'cmd:dm',
-            title: rest ? `DM @${rest}` : 'DM…',
-            subtitle: '/dm',
-            onPress: () => rest ? runDm(rest) : undefined,
-          });
-        }
-        if (q.startsWith('/ask ') || q === '/ask') {
-          const rest = q.replace(/^\/ask\s*/, '').trim();
-          slashPreview.push({
-            kind: 'command',
-            id: 'cmd:ask',
-            title: rest ? `Ask your agent: "${rest}"` : 'Ask your agent…',
-            subtitle: '/ask',
-            onPress: () => rest ? runAskAgent(rest) : undefined,
-          });
-        }
-        if (q.startsWith('/switch ') || q === '/switch') {
-          const rest = q.replace(/^\/switch\s*/, '').trim();
-          slashPreview.push({
-            kind: 'command',
-            id: 'cmd:switch',
-            title: rest ? `Switch to ${rest}` : 'Switch community…',
-            subtitle: '/switch',
-            onPress: () => rest ? runSwitch(rest) : undefined,
-          });
-        }
-        if (slashPreview.length > 0) {
-          if (cancelled) return;
-          setResults(slashPreview);
-          setActiveIdx(0);
-          setLoading(false);
-          return;
-        }
-
-        // Plain query: unified search across posts + profiles. Limit
-        // each lane to a handful so the palette stays scannable.
-        const [postsRes, profilesRes] = await Promise.all([
-          sdk.posts.search({ q, limit: 6, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
-          sdk.profiles.search({ q, limit: 4 }).catch(() => ({ data: [] })),
+        // Plain query: unified auto-suggest. Creators lead (real people search
+        // is what users reach for), then communities and agents, then a few
+        // post hits. Communities + agents have no server search endpoint, so we
+        // pull a page and filter by name client-side. Each lane is capped so the
+        // palette stays scannable and Enter still falls through to Discover.
+        const qLower = q.toLowerCase();
+        const [profilesRes, commRes, agentsRes, postsRes] = await Promise.all([
+          sdk.profiles.search({ q, limit: 5, organization_id: ORG_ID || undefined } as any).catch(() => ({ data: [] })),
+          sdk.communities.list({ limit: 50, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
+          (sdk as any).agents.listDiscoverable({ limit: 50 }).catch(() => ({ data: [] })),
+          sdk.posts.search({ q, limit: 4, organization_id: ORG_ID || undefined }).catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
-        const postRows: Result[] = (postsRes.data || []).map((p: any) => ({
-          kind: 'post',
-          id: p.id,
-          title: (p.title || p.content || '').slice(0, 100),
-          subtitle: p.author?.name ? `Post by ${p.author.name}` : 'Post',
-          avatar: undefined,
-          onPress: () => {
-            close();
-            router.push(`/(tabs)/post/${p.id}` as any);
-          },
-        }));
+
         const profileRows: Result[] = (profilesRes.data || []).map((p: any) => ({
           kind: 'user',
           id: p.id,
           title: p.name || p.username || 'Unknown',
-          subtitle: p.username ? `@${p.username}` : undefined,
-          avatar: p.image,
+          subtitle: p.username ? `@${p.username}` : 'Creator',
+          avatar: p.image || p.avatar,
           onPress: () => {
+            pushRecent(q);
             close();
             router.push(`/(tabs)/user/${p.username || p.id}` as any);
           },
         }));
-        setResults([...profileRows, ...postRows]);
+
+        const communityRows: Result[] = (commRes.data || [])
+          .filter((c: any) =>
+            (c.name || '').toLowerCase().includes(qLower) ||
+            (c.description || c.bio || '').toLowerCase().includes(qLower))
+          .slice(0, 4)
+          .map((c: any) => ({
+            kind: 'community' as const,
+            id: `community:${c.id}`,
+            title: c.name || 'Community',
+            subtitle: 'Community',
+            avatar: c.image || c.avatar,
+            onPress: () => {
+              pushRecent(q);
+              close();
+              router.push(`/(tabs)/community/${c.slug || c.id}` as any);
+            },
+          }));
+
+        const agentRows: Result[] = (agentsRes.data || [])
+          .filter((a: any) =>
+            (a.name || '').toLowerCase().includes(qLower) ||
+            (a.username || '').toLowerCase().includes(qLower))
+          .slice(0, 4)
+          .map((a: any) => ({
+            kind: 'agent' as const,
+            id: `agent:${a.id}`,
+            title: a.name || a.username || 'Agent',
+            subtitle: 'Agent',
+            avatar: a.image || a.avatar,
+            onPress: () => {
+              pushRecent(q);
+              close();
+              router.push(`/(tabs)/user/${a.username || a.id}` as any);
+            },
+          }));
+
+        const postRows: Result[] = (postsRes.data || []).map((p: any) => ({
+          kind: 'post' as const,
+          id: `post:${p.id}`,
+          title: (p.title || p.content || '').slice(0, 100),
+          subtitle: p.author?.name ? `Post by ${p.author.name}` : 'Post',
+          onPress: () => {
+            pushRecent(q);
+            close();
+            router.push(`/(tabs)/post/${p.id}` as any);
+          },
+        }));
+
+        setResults([...profileRows, ...communityRows, ...agentRows, ...postRows]);
         setActiveIdx(0);
       } catch {
         if (!cancelled) setResults([]);
@@ -334,7 +249,7 @@ export function CommandPalette() {
     }, 200);
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [open, query, sdk, router, close, runFind, runPost, runDm, runAskAgent, runSwitch]);
+  }, [open, query, sdk, router, close, runFind]);
 
   const onKeyDown = React.useCallback((e: any) => {
     if (Platform.OS !== 'web') return;
@@ -350,21 +265,15 @@ export function CommandPalette() {
   const onSubmit = React.useCallback(() => {
     const q = query.trim();
     const r = results[activeIdx];
-    const isSlash = q.startsWith('/');
-    // A plain keyword + Enter must ALWAYS run a keyword search — never fire a
-    // stale empty-state suggestion (e.g. "Write a post" → create page) that
-    // lingers during the 200ms search debounce or when the query is still
-    // resolving. Only honor a highlighted row if it's a live hit for this
-    // query (post/user/recent) or an explicit slash command.
-    if (q && !isSlash && (loading || !r || r.kind === 'command')) {
-      runFind(q);
+    // If the user is actively pointing at a live suggestion (a creator,
+    // community, agent, post, or recent), open it. Otherwise Enter always jumps
+    // to Discover for the typed query — including while results are still
+    // resolving during the debounce, so a fast typist never lands on a stale row.
+    if (r && !loading && r.kind !== 'command') {
+      r.onPress();
       return;
     }
-    if (r) {
-      r.onPress();
-    } else if (q) {
-      runFind(q);
-    }
+    if (q) runFind(q);
   }, [results, activeIdx, query, loading, runFind]);
 
   if (Platform.OS !== 'web') {
@@ -412,7 +321,7 @@ export function CommandPalette() {
               <Ionicons name="search" size={18} color={colors.textMuted} />
               <TextInput
                 ref={inputRef}
-                placeholder="Search, or type / for actions…"
+                placeholder="Search creators, communities, agents…"
                 placeholderTextColor={colors.textMuted}
                 value={query}
                 onChangeText={setQuery}
@@ -485,7 +394,8 @@ export function CommandPalette() {
                               : item.kind === 'recent' ? 'time-outline'
                                 : item.kind === 'post' ? 'document-text-outline'
                                   : item.kind === 'community' ? 'people-outline'
-                                    : 'person-outline'
+                                    : item.kind === 'agent' ? 'sparkles-outline'
+                                      : 'person-outline'
                           }
                           size={14}
                           color={colors.textMuted}
