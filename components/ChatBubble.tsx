@@ -17,10 +17,32 @@ interface Props {
   // absent the failed row still shows its "Not delivered" state, just without
   // the retry affordance.
   onRetry?: (message: any) => void;
+  // Tap-and-hold → open the message action menu (react / reply / copy).
+  onLongPress?: (message: any) => void;
+  // Tap an existing reaction pill to toggle your own reaction.
+  onReactPill?: (message: any, emoji: string) => void;
+  // The message this one is replying to (resolved by the chat screen), shown as
+  // a quoted snippet above the content.
+  quoted?: { name: string; text: string } | null;
+  // Current user id, to show which reaction pill YOU applied.
+  myUserId?: string;
 }
 
-export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agentChat, onRetry }: Props) {
+export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agentChat, onRetry, onLongPress, onReactPill, quoted, myUserId }: Props) {
   const colors = useColors();
+  // Aggregate reactions by emoji: { '❤️': { count, mine } }.
+  const reactionGroups = React.useMemo(() => {
+    const raw: any[] = message.reactions || [];
+    const m = new Map<string, { count: number; mine: boolean }>();
+    for (const r of raw) {
+      const t = r.type || r.emoji; if (!t) continue;
+      const prev = m.get(t) || { count: 0, mine: false };
+      prev.count += 1;
+      if ((r.user_id ?? r.userId) === myUserId) prev.mine = true;
+      m.set(t, prev);
+    }
+    return [...m.entries()];
+  }, [message.reactions, myUserId]);
   const content = message.content || message.text || message.body || '';
   // Never render an empty bubble. A streaming placeholder legitimately starts
   // empty (caret only), but a non-streaming empty message is a tool-only agent
@@ -106,11 +128,10 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
         marginBottom: spacing.sm,
       }}
     >
-      <View
+      <Pressable
+        onLongPress={() => onLongPress?.(message)}
+        delayLongPress={320}
         style={{
-          // Failed sends go red-tinted; pending sends dim slightly so the
-          // "still sending" state reads at a glance — both reconcile to the
-          // solid accent bubble once the server confirms.
           backgroundColor: isOwn
             ? (isFailed ? colors.error : colors.accent)
             : colors.surfaceRaised,
@@ -126,13 +147,41 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
           borderRadius: 20,
           borderBottomRightRadius: isOwn ? radius.sm : 20,
           borderBottomLeftRadius: isOwn ? 20 : radius.sm,
-          flexDirection: 'row',
-          alignItems: 'flex-end',
         }}
       >
-        <View style={{ flexShrink: 1 }}>{renderContent()}</View>
-        {isStreaming ? <StreamingCaret color={textColor} /> : null}
-      </View>
+        {/* Reply quote — the message this one is answering, iMessage/WhatsApp style. */}
+        {quoted ? (
+          <View style={{ borderLeftWidth: 2, borderLeftColor: isOwn ? colors.textOnAccent : colors.accent, paddingLeft: spacing.sm, marginBottom: spacing.xs, opacity: 0.9 }}>
+            <Text variant="caption" color={textColor} numberOfLines={1} style={{ fontWeight: '700' }}>{quoted.name}</Text>
+            <Text variant="caption" color={textColor} numberOfLines={1} style={{ opacity: 0.8 }}>{quoted.text}</Text>
+          </View>
+        ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+          <View style={{ flexShrink: 1 }}>{renderContent()}</View>
+          {isStreaming ? <StreamingCaret color={textColor} /> : null}
+        </View>
+      </Pressable>
+      {/* Reaction pills — tap one to toggle your own reaction. */}
+      {reactionGroups.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3, alignSelf: isOwn ? 'flex-end' : 'flex-start' }}>
+          {reactionGroups.map(([emoji, g]) => (
+            <Pressable
+              key={emoji}
+              onPress={() => onReactPill?.(message, emoji)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 3,
+                backgroundColor: g.mine ? colors.accentMuted : colors.surfaceRaised,
+                borderWidth: 0.5, borderColor: g.mine ? colors.accent : colors.borderSubtle,
+                borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              }}
+            >
+              <Text style={{ fontSize: 12 }}>{emoji}</Text>
+              {g.count > 1 ? <Text variant="caption" color={colors.textSecondary} style={{ fontSize: 11 }}>{g.count}</Text> : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {/* Failed send: clear "Not delivered" + tap-to-retry, iMessage-style. */}
       {isFailed ? (
         <Pressable

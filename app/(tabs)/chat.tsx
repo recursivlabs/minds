@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button, AgentBadge } from '../../components';
+import { MessageActions } from '../../components/MessageActions';
+import * as Clipboard from 'expo-clipboard';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
@@ -489,6 +491,36 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
     })).filter((m: any) => m.content); // never render empty bubbles
   }, [cachedMsgs]);
   const [messages, setMessages] = React.useState<any[]>(cachedSorted);
+  // Tap-and-hold message actions + reply state.
+  const [actionMsg, setActionMsg] = React.useState<any>(null);
+  const [replyingTo, setReplyingTo] = React.useState<any>(null);
+  // Toggle a reaction — optimistic (mirrors the server's per-emoji-per-user
+  // toggle), then fire the API. Skips optimistic-only temp rows.
+  const handleReact = React.useCallback((msg: any, emoji: string) => {
+    if (!sdk || !msg?.id || String(msg.id).startsWith('temp-')) return;
+    setMessages(prev => prev.map(m => {
+      if (m.id !== msg.id) return m;
+      const rx: any[] = m.reactions || [];
+      const mine = rx.some(r => (r.type || r.emoji) === emoji && (r.user_id ?? r.userId) === user?.id);
+      const next = mine
+        ? rx.filter(r => !((r.type || r.emoji) === emoji && (r.user_id ?? r.userId) === user?.id))
+        : [...rx, { type: emoji, user_id: user?.id, user_name: user?.name }];
+      return { ...m, reactions: next };
+    }));
+    (sdk as any).chat?.reactToMessage?.(msg.id, { type: emoji }).catch(() => {});
+  }, [sdk, user?.id, user?.name]);
+  const handleCopyMsg = React.useCallback((msg: any) => {
+    Clipboard.setStringAsync(String(msg?.content || msg?.text || '')).catch(() => {});
+  }, []);
+  // Resolve the quoted message for a reply, from the loaded thread.
+  const resolveQuoted = React.useCallback((m: any) => {
+    const rid = m?.reply_to_id || m?.replyToId;
+    if (!rid) return null;
+    const q = messages.find(x => x.id === rid);
+    if (!q) return null;
+    const qid = q.sender?.id || q.senderId || q.sender_id;
+    return { name: qid === user?.id ? 'You' : (q.sender?.name || q.senderName || ''), text: String(q.content || q.text || '').slice(0, 90) };
+  }, [messages, user?.id]);
   const [loading, setLoading] = React.useState(cachedSorted.length === 0);
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
@@ -908,6 +940,9 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
     const messageText = (typeof overrideText === 'string' ? overrideText : text).trim();
     if (!messageText || !sdk) return;
     if (typeof overrideText !== 'string') setText('');
+    // Capture + clear the reply target up front so the banner dismisses instantly.
+    const replyId = replyingTo?.id && !String(replyingTo.id).startsWith('temp-') ? replyingTo.id : undefined;
+    setReplyingTo(null);
     setSending(true);
     // Sending always pins you to the bottom — you want to see your own
     // message and the reply that follows.
@@ -923,6 +958,7 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
       content: messageText,
       sender: { id: user?.id, name: user?.name },
       createdAt: optimisticCreatedAt,
+      reply_to_id: replyId,
       pending: true,
     }]);
     // Tell the sidebar inbox NOW (not after the WS echo) so its preview text,
@@ -943,7 +979,7 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
       // after refresh. Only call chat.send for human DMs; for agents just clear
       // the optimistic row's pending state and let chatStream persist it.
       if (!isAgent) {
-        const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText });
+        const sendRes = await sdk.chat.send({ conversation_id: conversationId, content: messageText, reply_to_id: replyId } as any);
         const serverMsgId = sendRes?.data?.id;
         if (serverMsgId) {
           messageIdsRef.current.add(serverMsgId);
@@ -1138,7 +1174,7 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
             const senderId = item.sender?.id || item.senderId || item.sender_id;
-            return <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} />;
+            return <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} onLongPress={setActionMsg} onReactPill={handleReact} quoted={resolveQuoted(item)} myUserId={user?.id} />;
           }}
           contentContainerStyle={{
             paddingVertical: spacing.xl,
@@ -1273,6 +1309,38 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
           </View>
         );
       })()}
+
+      {/* Tap-and-hold action menu */}
+      <MessageActions
+        visible={!!actionMsg}
+        isOwn={!!actionMsg && (actionMsg.sender?.id || actionMsg.senderId || actionMsg.sender_id) === user?.id}
+        myReaction={(actionMsg?.reactions || []).find((r: any) => (r.user_id ?? r.userId) === user?.id)?.type || null}
+        onClose={() => setActionMsg(null)}
+        onReact={(emoji) => handleReact(actionMsg, emoji)}
+        onReply={() => setReplyingTo(actionMsg)}
+        onCopy={() => handleCopyMsg(actionMsg)}
+      />
+
+      {/* Reply banner — the message you're replying to, with a cancel. */}
+      {replyingTo ? (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+          paddingHorizontal: spacing.xl, paddingVertical: spacing.sm,
+          borderTopWidth: 0.5, borderTopColor: colors.borderSubtle,
+          ...(Platform.OS === 'web' ? { maxWidth: 760, width: '100%', alignSelf: 'center' } as any : {}),
+        }}>
+          <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: colors.accent }} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="caption" color={colors.accent} style={{ fontWeight: '700' }} numberOfLines={1}>
+              Replying to {(replyingTo.sender?.id || replyingTo.senderId) === user?.id ? 'yourself' : (replyingTo.sender?.name || replyingTo.senderName || '')}
+            </Text>
+            <Text variant="caption" color={colors.textMuted} numberOfLines={1}>{String(replyingTo.content || replyingTo.text || '').slice(0, 100)}</Text>
+          </View>
+          <Pressable onPress={() => setReplyingTo(null)} hitSlop={8}>
+            <Ionicons name="close" size={18} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Input */}
       <View
