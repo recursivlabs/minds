@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
+import { useAuth } from '../lib/auth';
+import { ORG_ID } from '../lib/recursiv';
 import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents } from '../lib/hooks';
 import { profileFollowerCount } from '../lib/models';
 import { hotScore, cardLabel, postTitle, postThumb, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
@@ -56,13 +58,16 @@ function SidebarSection({ title, icon, children, onSeeAll }: {
   );
 }
 
-function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
+function SidebarItem({ avatar, name, subtitle, description, onPress, badge, action }: {
   avatar?: string | null;
   name: string;
   subtitle?: string;
   description?: string;
   onPress: () => void;
   badge?: string;
+  // One-tap CTA on the right (follow a creator, join a community, message an
+  // agent). `active` flips the affordance to a confirmed/done state.
+  action?: { icon: string; onPress: () => void; active?: boolean; label?: string };
 }) {
   const colors = useColors();
   return (
@@ -90,6 +95,22 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
         {subtitle && <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>{subtitle}</Text>}
         {description && <Text variant="caption" color={colors.textSecondary} numberOfLines={1} style={{ fontSize: 11, marginTop: 1, lineHeight: 15 }}>{description}</Text>}
       </View>
+      {action && (
+        <Pressable
+          onPress={(e: any) => { e?.stopPropagation?.(); action.onPress(); }}
+          hitSlop={8}
+          accessibilityLabel={action.label}
+          style={({ pressed }: any) => ({
+            width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: action.active ? colors.accentMuted : colors.surface,
+            borderWidth: 0.5, borderColor: action.active ? colors.accent : colors.borderSubtle,
+            opacity: pressed ? 0.6 : 1,
+            ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+          })}
+        >
+          <Ionicons name={action.icon as any} size={15} color={colors.accent} />
+        </Pressable>
+      )}
     </Pressable>
   );
 }
@@ -103,6 +124,31 @@ export type SidebarContext = 'feed' | 'discover' | 'profile' | 'community' | 'co
 export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } = {}) {
   const router = useRouter();
   const colors = useColors();
+  const { sdk } = useAuth();
+
+  // One-tap CTAs on the rail rows. Optimistic sets so the affordance flips to a
+  // confirmed state immediately; revert on failure.
+  const [followed, setFollowed] = React.useState<Set<string>>(new Set());
+  const [joined, setJoined] = React.useState<Set<string>>(new Set());
+  const follow = React.useCallback((id: string) => {
+    if (!sdk || followed.has(id)) return;
+    setFollowed((p) => new Set(p).add(id));
+    Promise.resolve(sdk.profiles.follow(id)).catch(() => setFollowed((p) => { const n = new Set(p); n.delete(id); return n; }));
+  }, [sdk, followed]);
+  const join = React.useCallback((id: string) => {
+    if (!sdk || joined.has(id)) return;
+    setJoined((p) => new Set(p).add(id));
+    Promise.resolve((sdk as any).communities.join(id)).catch(() => setJoined((p) => { const n = new Set(p); n.delete(id); return n; }));
+  }, [sdk, joined]);
+  const message = React.useCallback(async (agentId: string) => {
+    if (!sdk) return;
+    try {
+      const dm: any = await (sdk as any).chat.dm({ user_id: agentId, organization_id: ORG_ID || undefined });
+      const convoId = dm?.data?.id;
+      if (convoId) router.push(`/(tabs)/chat?id=${convoId}` as any);
+    } catch {}
+  }, [sdk, router]);
+
   // The sidebar is a mini-version of the same engagement-quality system as the
   // Feed's For You and the Discover tabs — every widget reuses the SAME hook +
   // ranking the corresponding Discover tab uses, so "popular" means one thing
@@ -238,6 +284,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
                 : (u.username ? `@${u.username}` : undefined)}
               description={u.bio || u.description}
               onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
+              action={{ icon: followed.has(u.id) ? 'checkmark' : 'add', active: followed.has(u.id), label: 'Follow', onPress: () => follow(u.id) }}
             />
           );
         })}
@@ -257,6 +304,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
             subtitle={`${(c.memberCount || c.member_count || 0).toLocaleString()} ${(c.memberCount || c.member_count || 0) === 1 ? 'member' : 'members'}`}
             description={c.description || c.bio}
             onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
+            action={{ icon: joined.has(c.id) ? 'checkmark' : 'add', active: joined.has(c.id), label: 'Join', onPress: () => join(c.id) }}
           />
         ))}
       </SidebarSection>
@@ -275,6 +323,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
             description={a.bio || a.description}
             badge="AI"
             onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
+            action={{ icon: 'chatbubble-outline', label: 'Message', onPress: () => message(a.id) }}
           />
         ))}
       </SidebarSection>
