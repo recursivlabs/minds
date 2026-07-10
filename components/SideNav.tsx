@@ -435,7 +435,9 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           if (item.type === 'dm') {
             readLocallyRef.current.add(item.id);
             setUnreadConvos(prev => { if (!prev.has(item.id)) return prev; const next = new Set(prev); next.delete(item.id); return next; });
-            router.push({ pathname: '/(tabs)/chat', params: { id: item.id } } as any);
+            // `focused` opens the thread full-bleed — the sidebar inbox already
+            // served as the list, so a second list column would be redundant.
+            router.push({ pathname: '/(tabs)/chat', params: { id: item.id, focused: '1' } } as any);
           } else {
             router.push(`/(tabs)/community/${item.id}` as any);
           }

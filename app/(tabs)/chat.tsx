@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,8 +25,15 @@ import { publishLocalChat } from '../../lib/chatEvents';
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
   const colors = useColors();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string; focused?: string }>();
+  const { width } = useWindowDimensions();
   const { conversations, loading, refresh } = useConversations();
+  // Two-pane (list + open thread, X/iMessage-style) only on wide web. `focused`
+  // is set when you deep-link a thread from the sidebar inbox — that inbox WAS
+  // the list, so a second list column is redundant; show the thread full-bleed.
+  const isWide = Platform.OS === 'web' && width >= 1000;
+  const focusedMode = !!params.focused && !!params.id;
   const [activeConvoId, setActiveConvoId] = React.useState<string | null>(params.id || null);
   const [showNewChat, setShowNewChat] = React.useState(false);
   const [dmUsername, setDmUsername] = React.useState('');
@@ -99,11 +106,20 @@ export default function ChatScreen() {
     return () => { cancelled = true; };
   }, [sdk]);
 
-  if (activeConvoId) {
+  // Full-bleed single thread when deep-linked from the sidebar inbox
+  // (focusedMode), or on mobile/narrow where a 2-pane layout doesn't fit. On
+  // wide web without `focused`, fall through to the 2-pane list+thread below.
+  if (activeConvoId && (focusedMode || !isWide)) {
     return (
       <ConversationView
         conversationId={activeConvoId}
-        onBack={() => { setActiveConvoId(null); refresh(); }}
+        onBack={() => {
+          // From a sidebar deep-link, "back" opens the full 2-pane list; on
+          // mobile it just returns to the list in place.
+          if (focusedMode) router.push('/(tabs)/chat' as any);
+          setActiveConvoId(null);
+          refresh();
+        }}
       />
     );
   }
@@ -141,8 +157,8 @@ export default function ChatScreen() {
     }
   };
 
-  return (
-    <Container safeTop padded={false}>
+  const listBody = (
+    <>
       {/* Header */}
       <View
         style={{
@@ -333,7 +349,40 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </Container>
+    </>
+  );
+
+  // Wide web: two-pane layout — conversation list on the left, the open thread
+  // (or a prompt to pick one) on the right. Selecting a row just swaps the right
+  // pane, so the list stays put (no navigation, X/iMessage feel).
+  if (isWide) {
+    return (
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+        <View style={{ width: 360, borderRightWidth: 0.5, borderRightColor: colors.borderSubtle }}>
+          <Container safeTop padded={false} style={{ flex: 1 }}>{listBody}</Container>
+        </View>
+        <View style={{ flex: 1 }}>
+          {activeConvoId ? (
+            <ConversationView
+              conversationId={activeConvoId}
+              onBack={() => { setActiveConvoId(null); refresh(); }}
+              hideBack
+            />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing['3xl'], gap: spacing.lg }}>
+              <Ionicons name="chatbubbles-outline" size={40} color={colors.textMuted} />
+              <Text variant="body" color={colors.textSecondary} align="center">
+                Select a conversation to start messaging
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <Container safeTop padded={false}>{listBody}</Container>
   );
 }
 
@@ -385,7 +434,7 @@ function TypingIndicator() {
   );
 }
 
-function ConversationView({ conversationId, onBack }: { conversationId: string; onBack: () => void }) {
+function ConversationView({ conversationId, onBack, hideBack }: { conversationId: string; onBack: () => void; hideBack?: boolean }) {
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
   const colors = useColors();
@@ -1042,9 +1091,11 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           borderBottomColor: colors.borderSubtle,
         }}
       >
-        <Pressable onPress={onBack} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
+        {!hideBack && (
+          <Pressable onPress={onBack} hitSlop={12}>
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </Pressable>
+        )}
         <Avatar uri={partnerInfo?.image || partnerInfo?.user?.image} name={partnerName} size="sm" />
         <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>{partnerName}</Text>
       </View>
