@@ -383,10 +383,12 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     })
     .map((c: any) => {
       const participants: any[] = c.participants || c.members || [];
-      const others = participants.filter((p: any) => (p?.id ?? p?.userId) && (p?.id ?? p?.userId) !== user?.id);
+      // Participant identity may be nested under `.user` (id/name/image there).
+      const others = participants.filter((p: any) => { const pid = p?.user?.id ?? p?.id ?? p?.userId; return pid && pid !== user?.id; });
       const other = others[0];
+      const ou = other?.user || other;
       const type = c.type || (others.length <= 1 ? 'one_on_one' : 'group');
-      const name = c.name || other?.name || other?.username || null;
+      const name = c.name || ou?.name || other?.name || ou?.username || other?.username || null;
       // One-on-one with no resolvable other is the orphan case.
       if (type === 'one_on_one' && !other) return null;
       if (!name) return null;
@@ -396,7 +398,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         id: c.id,
         type: 'dm' as const,
         name,
-        avatar: other?.image || null,
+        avatar: ou?.image || other?.image || ou?.avatar || null,
         preview: stripMarkdown(useLive ? live.content : (c.lastMessage?.content || c.last_message?.content || '')),
       };
     })
