@@ -131,6 +131,26 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     if (key === 'notifications') refreshNotifs();
   }), [refreshNotifs]);
 
+  // REALTIME: the server emits a 'notification' socket event to the recipient
+  // the instant one is created (follow/reply/vote/mention). Subscribe here so
+  // the gold dot lights up immediately from ANY screen — no refresh, no 15s
+  // wait. (The notifications screen separately refetches on the same event.)
+  React.useEffect(() => {
+    if (!sdk) return;
+    let cleanup: (() => void) | undefined;
+    (async () => {
+      try {
+        await (sdk as any).realtime?.connect?.();
+        const sock = (sdk as any).realtime?.socket;
+        if (!sock?.on) return;
+        const onNotif = () => refreshNotifs();
+        sock.on('notification', onNotif);
+        cleanup = () => sock.off?.('notification', onNotif);
+      } catch {}
+    })();
+    return () => cleanup?.();
+  }, [sdk, refreshNotifs]);
+
   // Navigation-triggered refetches are throttled: neither call below is
   // actually cached (refreshNotifs hits notifications.list directly, and the
   // conversations refresh refetches), so every route change used to cost two
