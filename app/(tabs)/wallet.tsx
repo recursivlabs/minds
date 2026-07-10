@@ -287,7 +287,7 @@ export default function WalletScreen() {
 
   return (
     <Container safeTop padded={false}>
-      <RightRailLayout>
+      <RightRailLayout context="wallet">
       <ScreenHeader title="Wallet" />
 
       {loading ? (

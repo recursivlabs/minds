@@ -320,7 +320,7 @@ export default function UserProfileScreen() {
     <Container safeTop padded={false}>
       <ScreenHeader title={`@${profile.username || username}`} />
 
-      <RightRailLayout>
+      <RightRailLayout context="profile">
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
         <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
           {/* Top row: avatar + owner action buttons */}
