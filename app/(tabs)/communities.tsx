@@ -106,7 +106,7 @@ export default function CommunitiesScreen() {
 
   return (
     <Container safeTop padded={false}>
-      <RightRailLayout>
+      <RightRailLayout context="communities">
       <ScreenHeader title="Communities" right={newCommunityButton} />
 
       {searchBar}

@@ -121,7 +121,7 @@ export default function DiscoverLayout() {
 
   return (
     <Container safeTop padded={false}>
-      <RightRailLayout>
+      <RightRailLayout context="discover">
       <View style={{ backgroundColor: colors.bg, zIndex: 1 }}>
         {/* Header row */}
         <View

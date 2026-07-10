@@ -3,7 +3,8 @@ import { View, FlatList, Pressable, ActivityIndicator, Alert, TextInput, Platfor
 import { showToast } from '../../../components/Toast';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, Avatar, Button, PostCard, Skeleton } from '../../../components';
+import { Text, Avatar, Button, PostCard, Skeleton, RightRailLayout } from '../../../components';
+import { formatCount } from '../../../lib/discover';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
@@ -227,6 +228,7 @@ export default function CommunityDetailScreen() {
     <Container safeTop padded={false}>
       <ScreenHeader title={community.name} />
 
+      <RightRailLayout context="community">
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -240,11 +242,11 @@ export default function CommunityDetailScreen() {
                 <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: spacing.xs }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                     <Ionicons name="people-outline" size={14} color={colors.textMuted} />
-                    <Text variant="caption" color={colors.textMuted}>{memberCount}</Text>
+                    <Text variant="caption" color={colors.textMuted}>{formatCount(memberCount)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                     <Ionicons name="newspaper-outline" size={14} color={colors.textMuted} />
-                    <Text variant="caption" color={colors.textMuted}>{postCount}</Text>
+                    <Text variant="caption" color={colors.textMuted}>{formatCount(postCount)}</Text>
                   </View>
                 </View>
               </View>
@@ -347,7 +349,7 @@ export default function CommunityDetailScreen() {
                   variant="ghost"
                   size="sm"
                 >
-                  {`View Members (${memberCount})`}
+                  {`View Members (${formatCount(memberCount)})`}
                 </Button>
                 <Button
                   onPress={async () => {
@@ -422,6 +424,7 @@ export default function CommunityDetailScreen() {
         ) : null}
         showsVerticalScrollIndicator={false}
       />
+      </RightRailLayout>
     </Container>
   );
 }

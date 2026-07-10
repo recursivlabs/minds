@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { View, Platform, useWindowDimensions } from 'react-native';
-import { FeedSidebar } from './FeedSidebar';
+import { FeedSidebar, type SidebarContext } from './FeedSidebar';
 import { spacing } from '../constants/theme';
 
 /**
@@ -17,10 +17,13 @@ import { spacing } from '../constants/theme';
 export function RightRailLayout({
   children,
   rail,
+  context = 'feed',
   maxWidth = 600,
 }: {
   children: React.ReactNode;
   rail?: React.ReactNode;
+  /** Page context — reorders the sidebar widgets to lead with what's relevant. */
+  context?: SidebarContext;
   maxWidth?: number;
 }) {
   const { width } = useWindowDimensions();
@@ -32,7 +35,7 @@ export function RightRailLayout({
     <View style={{ flex: 1, flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
       <View style={{ flex: 1, maxWidth, minWidth: 0 }}>{children}</View>
       <View style={{ width: spacing.xl }} />
-      <View style={{ width: 340 }}>{rail ?? <FeedSidebar />}</View>
+      <View style={{ width: 340 }}>{rail ?? <FeedSidebar context={context} />}</View>
     </View>
   );
 }
