@@ -253,10 +253,15 @@ export default function ChatScreen() {
           })}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            const other = item.participants?.find((p: any) => (p?.id ?? p?.userId) !== user?.id) || item.participants?.[0];
-            const name = item.name || other?.name || other?.username || 'Conversation';
-            const avatar = other?.image || other?.avatar || other?.user?.image || other?.profile?.image || item.image || item.avatar || null;
-            const isAgentConvo = isAiActor(other);
+            // Participants nest the real user under `.user` (id/name/image live
+            // there). Match on the nested id too — otherwise a participant whose
+            // top-level id is undefined can match the current user, picking the
+            // wrong "other" and showing no avatar.
+            const other = item.participants?.find((p: any) => (p?.user?.id ?? p?.id ?? p?.userId) !== user?.id) || item.participants?.[0];
+            const ou = other?.user || other || {};
+            const name = item.name || ou.name || other?.name || ou.username || other?.username || 'Conversation';
+            const avatar = ou.image || other?.image || ou.avatar || other?.avatar || ou.profile?.image || item.image || item.avatar || null;
+            const isAgentConvo = isAiActor(ou) || isAiActor(other);
             const lastMsg = item.lastMessage || item.last_message;
             const lastText = stripMarkdown(lastMsg?.content || lastMsg?.text || '');
             const time = lastMsg?.createdAt || lastMsg?.created_at || item.updatedAt || '';
