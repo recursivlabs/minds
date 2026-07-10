@@ -109,6 +109,8 @@ export default function FeedScreen() {
     following: 'following',
   } as const;
   const { posts, setPosts, loading: postsLoading, error: feedError, refreshing, refresh, loadMore, hasMore } = usePosts(sortMap[activeTab] as any);
+  // Gate infinite-scroll to one loadMore per scroll momentum (see FlatList).
+  const canLoadMoreRef = React.useRef(true);
 
   // For You is ranked server-side by the recommender now — pull-to-refresh just
   // re-fetches (which re-ranks). No more "your agent is curating…" banner.
@@ -406,8 +408,17 @@ export default function FeedScreen() {
           }
           onRefresh={refresh}
           refreshing={refreshing}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
+          // onEndReached fires repeatedly per scroll gesture (RN quirk), which
+          // rapid-loaded many pages at once and made the feed jump. Gate it to
+          // ONE loadMore per scroll momentum: onMomentumScrollBegin re-arms it.
+          onMomentumScrollBegin={() => { canLoadMoreRef.current = true; }}
+          onEndReached={() => {
+            if (canLoadMoreRef.current) {
+              canLoadMoreRef.current = false;
+              loadMore();
+            }
+          }}
+          onEndReachedThreshold={0.4}
           ListFooterComponent={
             hasMore && posts.length > 0 ? (
               <View style={{ padding: spacing.xl, alignItems: 'center' }}>

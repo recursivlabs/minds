@@ -3,7 +3,11 @@ import { View, Platform, Animated, Dimensions, Pressable, TextInput, Alert, useW
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useAuth } from '../lib/auth';
+
+const LOGO_DARK = require('../assets/logo-dark-mode.svg');
+const LOGO_LIGHT = require('../assets/logo-light-mode.svg');
 import { BASE_URL, SITE_URL } from '../lib/recursiv';
 import { Text, Button } from '../components';
 import { colors, spacing } from '../constants/theme';
@@ -114,7 +118,8 @@ function Ufo({ delay, duration, startX, startY, endX, endY }: {
         Animated.timing(progress, { toValue: 1, duration, useNativeDriver: true }),
       ]),
       Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
-      Animated.delay(2000),
+      // Rare easter egg: ~3 minutes between fly-bys, not a constant parade.
+      Animated.delay(180000),
       Animated.timing(progress, { toValue: 0, duration: 0, useNativeDriver: true }),
     ]));
     anim.start();
@@ -151,9 +156,10 @@ function Ufo({ delay, duration, startX, startY, endX, endY }: {
 }
 
 function UfoField() {
+  // A single UFO, rarely (see the 3-min loop gap in <Ufo>). An easter egg, not
+  // a recurring distraction.
   const ufos = React.useMemo(() => [
-    { id: 0, delay: 8000, duration: 14000, startX: -20, startY: H * 0.3, endX: W + 20, endY: H * 0.25 },
-    { id: 1, delay: 45000, duration: 12000, startX: W + 20, startY: H * 0.7, endX: -20, endY: H * 0.6 },
+    { id: 0, delay: 20000, duration: 14000, startX: -20, startY: H * 0.3, endX: W + 20, endY: H * 0.25 },
   ], []);
   return (
     <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="none">
@@ -403,9 +409,7 @@ export default function LandingScreen() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: '#06060a', alignItems: 'center', justifyContent: 'center' }}>
-        <Text variant="h2" color="#d4a844" style={{ letterSpacing: 4, fontWeight: '300' }}>
-          minds
-        </Text>
+        <Image source={LOGO_DARK} style={{ width: 200, height: 77 }} contentFit="contain" accessibilityLabel="Minds" />
       </View>
     );
   }
@@ -981,7 +985,6 @@ export default function LandingScreen() {
         }} />
         <SunGlow />
         <CloudField />
-        <AirplaneField />
       </Animated.View>
 
       {/* Content — KeyboardAvoidingView shifts the form above the
@@ -1030,21 +1033,18 @@ export default function LandingScreen() {
 
         {/* Hero */}
         <View style={{ alignItems: 'center', marginBottom: isMobile ? spacing['3xl'] : spacing['6xl'] }}>
-          <Text
-            variant="hero"
-            color={c.wordmark}
-            align="center"
+          {/* Full Minds wordmark logo (theme-matched), matching the logged-in
+             logos — replaces the old lowercase text. Source ratio 104x40 (2.6:1). */}
+          <Image
+            source={isDark ? LOGO_DARK : LOGO_LIGHT}
             style={{
-              fontSize: heroFontSize,
-              letterSpacing: heroLetterSpacing,
-              fontWeight: '300',
-              textTransform: 'lowercase',
+              width: isMobile ? 208 : 286,
+              height: isMobile ? 80 : 110,
               marginBottom: isMobile ? spacing.lg : spacing['3xl'],
-              lineHeight: heroFontSize * 1.2,
             }}
-          >
-            minds
-          </Text>
+            contentFit="contain"
+            accessibilityLabel="Minds"
+          />
 
           <Text
             variant="body"

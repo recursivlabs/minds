@@ -20,6 +20,7 @@ import { useActiveConvoId } from '../lib/activeConvo';
 import { subscribeLocalChat } from '../lib/chatEvents';
 import { colors as defaultColors, spacing, radius } from '../constants/theme';
 import { resolvePersonalAgent } from '../lib/resolvePersonalAgent';
+import { stripMarkdown } from '../lib/text';
 import { NewChatModal } from './NewChatModal';
 
 // The classic Minds bulb — collapsed-rail mark (matches the browser favicon).
@@ -396,7 +397,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         type: 'dm' as const,
         name,
         avatar: other?.image || null,
-        preview: useLive ? live.content : (c.lastMessage?.content || c.last_message?.content || ''),
+        preview: stripMarkdown(useLive ? live.content : (c.lastMessage?.content || c.last_message?.content || '')),
       };
     })
     .filter(Boolean)

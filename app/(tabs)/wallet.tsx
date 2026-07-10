@@ -124,10 +124,12 @@ export default function WalletScreen() {
   const [sendAmount, setSendAmount] = React.useState('');
   const [sending, setSending] = React.useState(false);
   const [referral, setReferral] = React.useState<ReferralState | null>(null);
+  const [txFilter, setTxFilter] = React.useState<'all' | 'in' | 'out'>('all');
 
   // No tx-history endpoint yet — see DATA GAPS. Kept as state so the list is a
   // true FlatList and rows light up the moment a backend lands.
   const activity: ActivityItem[] = [];
+  const filteredActivity = txFilter === 'all' ? activity : activity.filter((a) => a.direction === txFilter);
 
   const loadWallet = React.useCallback(async () => {
     if (!sdk) return;
@@ -240,9 +242,13 @@ export default function WalletScreen() {
 
   /* The whole screen is a single FlatList so the activity ledger stays
      virtualized; everything above it rides in the list header. */
+  const balanceDisplay = (() => {
+    const { whole, frac } = splitBalance(wallet?.balance ?? '0');
+    return frac ? `${whole}.${frac}` : whole;
+  })();
+
   const header = (
-    <View style={{ paddingTop: spacing.xl, gap: spacing['3xl'] }}>
-      {/* Status chip — only shown when something needs saying. */}
+    <View style={{ paddingTop: spacing.lg, gap: spacing.xl }}>
       {loadError ? (
         <Pressable
           onPress={loadWallet}
@@ -255,32 +261,65 @@ export default function WalletScreen() {
           <Ionicons name="cloud-offline-outline" size={13} color={colors.error} />
           <Text variant="caption" color={colors.error}>Couldn't reach your wallet · Tap to retry</Text>
         </Pressable>
-      ) : !wallet?.configured ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.accentMuted }}>
-          <Ionicons name="construct-outline" size={13} color={colors.accent} />
-          <Text variant="caption" color={colors.accent}>Under construction</Text>
-        </View>
       ) : null}
 
-      {/* ── HERO ───────────────────────────────────────────────────────── */}
-      <HeroBalance balance={wallet?.balance ?? '0'} colors={colors} />
-
-      {/* ── ACTIONS ────────────────────────────────────────────────────── */}
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <ActionButton icon="arrow-down" label="Receive" onPress={() => setReceiveOpen(true)} colors={colors} />
-        <ActionButton icon="arrow-up" label="Send" primary onPress={() => setSendOpen(true)} colors={colors} />
-        <ActionButton icon="flash" label="Boost" onPress={() => router.push('/(tabs)/boost')} colors={colors} />
+      {/* Balance + Send/Receive — one clean line, no wasted vertical space. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.lg, flexWrap: 'wrap' }}>
+        <View>
+          <Text variant="caption" color={colors.textMuted}>Balance</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs, marginTop: 2 }}>
+            <Text variant="h1" color={colors.text} style={{ ...tabular }}>{balanceDisplay}</Text>
+            <Text variant="bodyMedium" color={colors.textMuted}>MINDS</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Pressable
+            onPress={() => setSendOpen(true)}
+            style={({ pressed }) => ({
+              flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+              paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full,
+              backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1, ...webCursor,
+            })}
+          >
+            <Ionicons name="arrow-up" size={16} color={colors.textOnAccent} />
+            <Text variant="bodyMedium" color={colors.textOnAccent}>Send</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setReceiveOpen(true)}
+            style={({ pressed }) => ({
+              flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+              paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full,
+              backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.borderSubtle,
+              opacity: pressed ? 0.85 : 1, ...webCursor,
+            })}
+          >
+            <Ionicons name="arrow-down" size={16} color={colors.text} />
+            <Text variant="bodyMedium" color={colors.text}>Receive</Text>
+          </Pressable>
+        </View>
       </View>
 
-      {/* ── ACCOUNT ────────────────────────────────────────────────────── */}
-      <AccountRow address={wallet?.address ?? null} onCopy={handleCopyAddress} colors={colors} />
-
-      {/* ── REFERRALS ──────────────────────────────────────────────────── */}
-      <ReferralLedger referral={referral} onCopyLink={handleCopyReferral} colors={colors} />
-
-      {/* ── ACTIVITY header ────────────────────────────────────────────── */}
-      <View style={{ gap: spacing.xs }}>
+      {/* Activity + filter */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm }}>
         <SectionLabel label="Activity" colors={colors} />
+        <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+          {(['all', 'in', 'out'] as const).map((f) => (
+            <Pressable
+              key={f}
+              onPress={() => setTxFilter(f)}
+              style={({ pressed }) => ({
+                paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: radius.full,
+                backgroundColor: txFilter === f ? colors.accentMuted : 'transparent',
+                borderWidth: 0.5, borderColor: txFilter === f ? colors.accent : colors.borderSubtle,
+                opacity: pressed ? 0.7 : 1, ...webCursor,
+              })}
+            >
+              <Text variant="caption" color={txFilter === f ? colors.accent : colors.textMuted}>
+                {f === 'all' ? 'All' : f === 'in' ? 'Received' : 'Sent'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -299,7 +338,7 @@ export default function WalletScreen() {
         </View>
       ) : (
         <FlatList
-          data={activity}
+          data={filteredActivity}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ActivityRow item={item} colors={colors} />}
           ListHeaderComponent={header}
