@@ -4,7 +4,7 @@ import { showToast } from '../../../components/Toast';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, PostCard, Avatar, Skeleton } from '../../../components';
+import { Text, PostCard, Avatar, Skeleton, RightRailLayout } from '../../../components';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { useAuth } from '../../../lib/auth';
@@ -147,6 +147,7 @@ export default function PostDetailScreen() {
     >
       <ScreenHeader title="Post" />
 
+      <RightRailLayout context="feed">
       <FlatList
         data={replies}
         keyExtractor={(item) => item.id}
@@ -264,6 +265,7 @@ export default function PostDetailScreen() {
           <Ionicons name="send" size={16} color={replyText.trim() ? '#fff' : colors.textMuted} />
         </Pressable>
       </View>
+      </RightRailLayout>
     </KeyboardAvoidingView>
   );
 }
