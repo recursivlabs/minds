@@ -6,6 +6,7 @@ import { logSignal } from './signals';
 import { spacing, radius, shadows } from '../constants/theme';
 import { useColors } from './theme';
 import { profileFollowerCount, profilePostCount, postScore, postReplyCount, timestampOf } from './models';
+import { useAuth } from './auth';
 
 // Re-export so the Discover tabs can import dedup from one place (the shared kit)
 // alongside the ranking helpers, without reaching into lib/models directly.
@@ -755,12 +756,24 @@ export function PersonRow({ person, onPress, onFollow, isFollowed }: { person: a
 
 export function CommunityRow({ community, onPress }: { community: any; onPress: () => void }) {
   const colors = useColors();
+  const { sdk } = useAuth();
   const name = community.name || 'Unnamed';
   const description = community.description || community.bio || '';
   const avatar = community.image || community.avatar;
   const memberCount = communityMemberCount(community);
   const postCount = communityPostCount(community);
   const privacy = community.privacy;
+  // Reflect join state on the CTA: seed from the row's is_member flag, then let
+  // an optimistic override win so the pill flips instantly on tap (reverts on error).
+  const [joinOverride, setJoinOverride] = React.useState<boolean | null>(null);
+  const joined = joinOverride ?? !!(community.is_member ?? community.isMember);
+  const toggleJoin = React.useCallback(() => {
+    if (!sdk) return;
+    const next = !joined;
+    setJoinOverride(next);
+    Promise.resolve(next ? (sdk as any).communities.join(community.id) : (sdk as any).communities.leave(community.id))
+      .catch(() => setJoinOverride(!next));
+  }, [sdk, joined, community.id]);
   return (
     <Pressable
       onPress={onPress}
@@ -776,6 +789,20 @@ export function CommunityRow({ community, onPress }: { community: any; onPress: 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>{name}</Text>
           {privacy === 'private' && <Ionicons name="lock-closed" size={12} color={colors.textMuted} />}
+          <Pressable
+            onPress={(e: any) => { e?.stopPropagation?.(); toggleJoin(); }}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: radius.full,
+              backgroundColor: joined ? 'transparent' : colors.accent,
+              borderWidth: joined ? 1 : 0, borderColor: colors.borderSubtle,
+            }}
+          >
+            <Ionicons name={joined ? 'checkmark' : 'add'} size={13} color={joined ? colors.textSecondary : colors.textOnAccent} />
+            <Text variant="caption" color={joined ? colors.textSecondary : colors.textOnAccent} style={{ fontWeight: '600' }}>
+              {joined ? 'Joined' : 'Join'}
+            </Text>
+          </Pressable>
         </View>
         {description ? <Text variant="body" color={colors.textSecondary} numberOfLines={3} style={{ marginTop: spacing.xs, lineHeight: 20 }}>{description}</Text> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, flexWrap: 'wrap' }}>
