@@ -18,6 +18,7 @@ import { ensureIntroDM } from '../../lib/agentIntro';
 import { captureException } from '../../lib/monitoring';
 import { connectRealtime } from '../../lib/realtime';
 import { conversationUnreadCount, isAiActor } from '../../lib/models';
+import { stripMarkdown } from '../../lib/text';
 import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
 import { publishLocalChat } from '../../lib/chatEvents';
 
@@ -252,12 +253,12 @@ export default function ChatScreen() {
           })}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            const other = item.participants?.find((p: any) => p.id !== user?.id) || item.participants?.[0];
-            const name = item.name || other?.name || 'Conversation';
-            const avatar = other?.image || null;
+            const other = item.participants?.find((p: any) => (p?.id ?? p?.userId) !== user?.id) || item.participants?.[0];
+            const name = item.name || other?.name || other?.username || 'Conversation';
+            const avatar = other?.image || other?.avatar || other?.user?.image || other?.profile?.image || item.image || item.avatar || null;
             const isAgentConvo = isAiActor(other);
             const lastMsg = item.lastMessage || item.last_message;
-            const lastText = lastMsg?.content || lastMsg?.text || '';
+            const lastText = stripMarkdown(lastMsg?.content || lastMsg?.text || '');
             const time = lastMsg?.createdAt || lastMsg?.created_at || item.updatedAt || '';
             const unread = conversationUnreadCount(item);
 
