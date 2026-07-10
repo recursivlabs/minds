@@ -309,7 +309,14 @@ export default function ChatScreen() {
                   gap: spacing.md,
                   paddingHorizontal: spacing.xl,
                   paddingVertical: spacing.lg,
-                  backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+                  // In the 2-pane view, highlight the thread you're actively
+                  // viewing (like the nav) so it's clear which is open.
+                  backgroundColor: (isWide && item.id === activeConvoId)
+                    ? colors.accentSubtle
+                    : pressed ? colors.surfaceHover : 'transparent',
+                  ...(isWide && item.id === activeConvoId
+                    ? { borderLeftWidth: 3, borderLeftColor: colors.accent } as any
+                    : { borderLeftWidth: 3, borderLeftColor: 'transparent' } as any),
                 })}
               >
                 <Avatar uri={avatar} name={name} size="lg" />
@@ -1271,7 +1278,9 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          // Center the send button vertically against the input (iMessage/Signal)
+          // instead of pinning it to the bottom line of a 2-line field.
+          alignItems: 'center',
           gap: spacing.sm,
           paddingHorizontal: spacing.xl,
           paddingVertical: spacing.md,

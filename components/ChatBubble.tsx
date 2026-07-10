@@ -114,12 +114,18 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
           backgroundColor: isOwn
             ? (isFailed ? colors.error : colors.accent)
             : colors.surfaceRaised,
+          // Own bubble: a subtle diagonal light-sheen over the accent (web) gives
+          // it a lighter, more dimensional, "futuristic" feel than the flat gold —
+          // theme-safe (works on any accent, light or dark) with no gradient dep.
+          ...(Platform.OS === 'web' && isOwn && !isFailed
+            ? { backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.04) 45%, rgba(0,0,0,0.06) 100%)' } as any
+            : {}),
           opacity: isPending ? 0.6 : 1,
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.md,
-          borderRadius: radius.lg,
-          borderBottomRightRadius: isOwn ? radius.sm : radius.lg,
-          borderBottomLeftRadius: isOwn ? radius.lg : radius.sm,
+          borderRadius: 20,
+          borderBottomRightRadius: isOwn ? radius.sm : 20,
+          borderBottomLeftRadius: isOwn ? 20 : radius.sm,
           flexDirection: 'row',
           alignItems: 'flex-end',
         }}
