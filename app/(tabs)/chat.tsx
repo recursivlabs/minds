@@ -533,6 +533,13 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
   const resolveQuoted = React.useCallback((m: any) => {
     const rid = m?.reply_to_id || m?.replyToId;
     if (!rid) return null;
+    // Prefer the server-embedded preview (survives even when the original is
+    // outside the loaded window); fall back to finding it in the loaded set
+    // (covers optimistic replies sent this session before the refetch).
+    const embedded = m?.reply_to || m?.replyTo;
+    if (embedded) {
+      return { name: embedded.sender_name || embedded.senderName || '', text: String(embedded.content || '').slice(0, 90) };
+    }
     const q = messages.find(x => x.id === rid);
     if (!q) return null;
     const qid = q.sender?.id || q.senderId || q.sender_id;
