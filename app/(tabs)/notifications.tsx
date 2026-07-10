@@ -4,7 +4,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Avatar, Skeleton } from '../../components';
+import { Text, Avatar, Skeleton, RightRailLayout } from '../../components';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
@@ -163,6 +163,7 @@ export default function NotificationsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      <RightRailLayout context="notifications">
       <ScreenHeader
         title="Notifications"
         right={unreadCount > 0 ? (
@@ -332,6 +333,7 @@ export default function NotificationsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      </RightRailLayout>
     </View>
   );
 }

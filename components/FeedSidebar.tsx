@@ -1,17 +1,27 @@
-import type * as React from 'react';
+import * as React from 'react';
 import { View, Pressable, Platform, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
 import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents } from '../lib/hooks';
-import { profileFollowerCount, profilePostCount } from '../lib/models';
-import { hotScore, cardLabel, postTitle, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
+import { profileFollowerCount } from '../lib/models';
+import { hotScore, cardLabel, postTitle, postThumb, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
 const HIDDEN_AGENT_IDS = ['411ac3a9-dfbc-4463-8963-2e26a645211e'];
+
+// Exclude AI agents (they have their own section) and simulator/QA/parody bot
+// accounts from the human "Creators" rail — those test accounts post/engage a
+// lot and used to dominate it.
+function isJunkCreator(u: any): boolean {
+  if (u?.is_ai || u?.isAi || u?.agent_type) return true;
+  const s = `${u?.username || ''} ${u?.name || ''}`.toLowerCase();
+  return /(^|[^a-z])(betabot|parody|test|qa|demo|simulator|dummy|sample|fixture|bot)([^a-z]|\d|$)/.test(s);
+}
 
 function SidebarSection({ title, icon, children, onSeeAll }: {
   title: string;
@@ -84,7 +94,13 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge }: {
   );
 }
 
-export function FeedSidebar() {
+// Which page the rail is on — used to reorder the widgets so the most relevant
+// "next step" leads. The rail shows the same 4 discovery widgets everywhere, but
+// context decides which one is on top (e.g. a community page leads with more
+// communities; a profile leads with more creators to follow).
+export type SidebarContext = 'feed' | 'discover' | 'profile' | 'community' | 'communities' | 'wallet' | 'notifications';
+
+export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } = {}) {
   const router = useRouter();
   const colors = useColors();
   // The sidebar is a mini-version of the same engagement-quality system as the
@@ -98,54 +114,45 @@ export function FeedSidebar() {
   // so the rail is NEVER silently empty when posts exist (the root cause of the
   // blank widget — Hot was the sole source). We still re-rank by the
   // time-decayed hotScore client-side so the order favors recent, engaged posts.
-  const { posts } = useTrendingPosts(5);
-  // People → directory + engagement leaderboard, ranked by activity. Mirrors the
-  // People tab's "Most active" sort (post engagement, falling back to followers).
-  const { profiles } = useProfiles(60);
-  const { byId: engagementById } = useProfileLeaderboard(100);
+  const { posts } = useTrendingPosts(20);
+  // Creators → the server-ranked FOLLOWER leaderboard (real reach, the People
+  // tab's authoritative top-N), hydrated with directory identity and filtered of
+  // AI/bot accounts. The old post-count sort let simulator/parody accounts win.
+  const { profiles } = useProfiles(120);
+  const { entries: creatorBoard } = useProfileLeaderboard(100, 'followers');
   // Communities → members + recent activity (members + posts*2): the Communities
   // tab's "Most active" sort.
   const { communities } = useCommunities(60);
   // Agents → "Popular": native featured order lifted by any usage signal.
   const { agents } = useAgents(40);
 
-  // Activity score for a person, identical to the Discover People "Most active"
-  // chip: prefer any post count on the profile payload, else the leaderboard's
-  // engagement/post_count joined by id.
-  const activityScore = (p: any): number => {
-    const own = profilePostCount(p);
-    if (own) return own;
-    return engagementById.get(p?.id)?.engagement ?? engagementById.get(p?.id)?.postCount ?? 0;
-  };
+  const profileById = React.useMemo(() => {
+    const m = new Map<string, any>();
+    for (const p of profiles || []) if (p?.id) m.set(p.id, p);
+    return m;
+  }, [profiles]);
 
-  // Follower signal for the tie-break. The /profiles directory list returns
-  // identity columns only (no follower counts), so a raw profileFollowerCount
-  // is 0 for everyone and the tie-break degrades to array (signup) order — join
-  // the leaderboard's follower_count by id so equally-active creators still sort
-  // by reach, keeping the rail relevant rather than chronological.
-  const followerSignal = (p: any): number => {
-    const own = profileFollowerCount(p);
-    if (own) return own;
-    return engagementById.get(p?.id)?.followerCount ?? 0;
-  };
-
-  // useTrendingPosts already returns a non-empty pool whenever any posts exist
-  // (hot, with a score fallback). Re-rank by the time-decayed HOT score, THEN
-  // dedup (dedupePosts keeps the first occurrence, so it must run on an
-  // already-ranked list to keep the best one). On a legacy corpus every hotScore
-  // can collapse toward ~0 (all posts are ancient), so guard against a degenerate
-  // ranking by falling back to the raw server order whenever ranking thins out.
+  // POSTS: hot-rank, dedup, then keep AT MOST ONE post per author so a single
+  // prolific poster can't fill the entire rail (the "5 posts from one account"
+  // problem). Fall back to raw order if hot-ranking collapses on a legacy corpus.
   const pool = posts || [];
-  const ranked = dedupePosts([...pool].sort((a: any, b: any) => hotScore(b) - hotScore(a)));
-  const trending = (ranked.length >= 3 ? ranked : dedupePosts([...pool])).slice(0, 5);
-  // Rank by engagement (Most active), ties fall back to follower reach — same as
-  // the People tab so the rail is a mini-leaderboard, not a signup-order list.
-  const topPeople = [...(profiles || [])]
-    .sort((a: any, b: any) => {
-      const e = activityScore(b) - activityScore(a);
-      if (e) return e;
-      return followerSignal(b) - followerSignal(a);
-    })
+  const rankedPosts = dedupePosts([...pool].sort((a: any, b: any) => hotScore(b) - hotScore(a)));
+  const trending: any[] = [];
+  const seenAuthors = new Set<string>();
+  for (const p of (rankedPosts.length >= 3 ? rankedPosts : dedupePosts([...pool]))) {
+    const aid = String(p?.author?.id || p?.author?.username || p?.owner_guid || p?.ownerGuid || '');
+    if (aid && seenAuthors.has(aid)) continue;
+    if (aid) seenAuthors.add(aid);
+    trending.push(p);
+    if (trending.length >= 5) break;
+  }
+
+  // CREATORS: present the follower board's exact order (already ranked, real
+  // counts), hydrated with directory bio/identity, minus AI/bot/test accounts.
+  const topPeople = ((creatorBoard || []).length
+    ? (creatorBoard || []).map((row: any) => { const p = profileById.get(row?.id); return p ? { ...p, ...row } : row; })
+    : [...(profiles || [])])
+    .filter((u: any) => !isJunkCreator(u))
     .slice(0, 5);
   const topCommunities = [...(communities || [])]
     .sort((a: any, b: any) => communityActivity(b) - communityActivity(a))
@@ -154,6 +161,137 @@ export function FeedSidebar() {
     .filter((a: any) => !HIDDEN_AGENT_IDS.includes(a.id))
     .sort((a: any, b: any) => agentPopularity(b) - agentPopularity(a))
     .slice(0, 5);
+
+  // The four discovery widgets. Rendered in a context-dependent order so the
+  // most relevant "next step" leads on each page (below).
+  const sections: Record<string, React.ReactNode> = {
+    posts: (
+      <SidebarSection
+        title="Trending Posts"
+        icon="flame-outline"
+        onSeeAll={() => router.push('/(tabs)/discover/posts?sort=hot' as any)}
+      >
+        {trending.length === 0 ? (
+          <Text variant="caption" color={colors.textMuted}>No trending posts yet</Text>
+        ) : (
+          trending.map((post: any) => (
+            <Pressable
+              key={post.id}
+              onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
+              style={({ pressed, hovered }: any) => ({
+                paddingVertical: spacing.sm,
+                marginHorizontal: -spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.sm,
+                backgroundColor: hovered ? colors.glass : 'transparent',
+                opacity: pressed ? 0.7 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
+              })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text variant="body" numberOfLines={2} style={{ fontSize: 13 }}>
+                    {cardLabel(post, postTitle(post).slice(0, 80))}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 }}>
+                    <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 11, flexShrink: 1 }}>
+                      {post.author?.name || 'Anonymous'}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
+                      · {post.score || 0} pts
+                    </Text>
+                  </View>
+                </View>
+                {(() => {
+                  const thumb = postThumb(post);
+                  if (!thumb.url) return null;
+                  return (
+                    <View style={{ width: 44, height: 44, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: colors.surface }}>
+                      <Image source={{ uri: thumb.url }} style={{ width: 44, height: 44 }} contentFit="cover" transition={120} />
+                      {thumb.hasVideo && (
+                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
+                          <Ionicons name="play" size={16} color="#fff" />
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+            </Pressable>
+          ))
+        )}
+      </SidebarSection>
+    ),
+    creators: topPeople.length > 0 ? (
+      <SidebarSection
+        title="Trending Creators"
+        icon="person-outline"
+        onSeeAll={() => router.push('/(tabs)/discover/people?sort=followers' as any)}
+      >
+        {topPeople.map((u: any) => {
+          const followers = profileFollowerCount(u);
+          return (
+            <SidebarItem
+              key={u.id}
+              avatar={u.image}
+              name={u.name || 'User'}
+              subtitle={followers > 0
+                ? `${followers.toLocaleString()} ${followers === 1 ? 'follower' : 'followers'}`
+                : (u.username ? `@${u.username}` : undefined)}
+              description={u.bio || u.description}
+              onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
+            />
+          );
+        })}
+      </SidebarSection>
+    ) : null,
+    communities: topCommunities.length > 0 ? (
+      <SidebarSection
+        title="Trending Communities"
+        icon="people-outline"
+        onSeeAll={() => router.push('/(tabs)/discover/communities' as any)}
+      >
+        {topCommunities.map((c: any) => (
+          <SidebarItem
+            key={c.id}
+            avatar={c.image}
+            name={c.name || 'Community'}
+            subtitle={`${(c.memberCount || c.member_count || 0).toLocaleString()} ${(c.memberCount || c.member_count || 0) === 1 ? 'member' : 'members'}`}
+            description={c.description || c.bio}
+            onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
+          />
+        ))}
+      </SidebarSection>
+    ) : null,
+    agents: visibleAgents.length > 0 ? (
+      <SidebarSection
+        title="Trending Agents"
+        icon="hardware-chip-outline"
+        onSeeAll={() => router.push('/(tabs)/discover/agents' as any)}
+      >
+        {visibleAgents.map((a: any) => (
+          <SidebarItem
+            key={a.id}
+            avatar={a.image || a.avatar}
+            name={a.name || 'Agent'}
+            description={a.bio || a.description}
+            badge="AI"
+            onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
+          />
+        ))}
+      </SidebarSection>
+    ) : null,
+  };
+
+  // Contextual order — lead with the most relevant "next step" for the page.
+  const ORDERS: Record<SidebarContext, string[]> = {
+    feed: ['posts', 'creators', 'communities', 'agents'],
+    discover: ['posts', 'creators', 'communities', 'agents'],
+    notifications: ['posts', 'creators', 'communities', 'agents'],
+    profile: ['creators', 'communities', 'posts', 'agents'],
+    community: ['communities', 'creators', 'posts', 'agents'],
+    communities: ['communities', 'creators', 'agents', 'posts'],
+    wallet: ['creators', 'communities', 'agents', 'posts'],
+  };
+  const sectionOrder = ORDERS[context] || ORDERS.feed;
 
   return (
     <ScrollView
@@ -199,114 +337,9 @@ export function FeedSidebar() {
         </Pressable>
       )}
 
-      {/* Trending Posts */}
-      <SidebarSection
-        title="Trending Posts"
-        icon="flame-outline"
-        // The widget re-ranks by the time-decayed hotScore, so deep-link to
-        // ?sort=hot to land on the MATCHING ranking (the discover Posts tab
-        // defaults to 'top'/all-time, which is a different order).
-        onSeeAll={() => router.push('/(tabs)/discover/posts?sort=hot' as any)}
-      >
-        {trending.length === 0 ? (
-          <Text variant="caption" color={colors.textMuted}>No trending posts yet</Text>
-        ) : (
-          trending.map((post: any) => (
-            <Pressable
-              key={post.id}
-              onPress={() => router.push(`/(tabs)/post/${post.id}` as any)}
-              style={({ pressed, hovered }: any) => ({
-                paddingVertical: spacing.sm,
-                marginHorizontal: -spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.sm,
-                backgroundColor: hovered ? colors.glass : 'transparent',
-                opacity: pressed ? 0.7 : 1,
-                ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.15s ease' } as any : {}),
-              })}
-            >
-              <Text variant="body" numberOfLines={2} style={{ fontSize: 13 }}>
-                {cardLabel(post, postTitle(post).slice(0, 80))}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 }}>
-                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
-                  {post.author?.name || 'Anonymous'}
-                </Text>
-                <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
-                  · {post.score || 0} pts
-                </Text>
-              </View>
-            </Pressable>
-          ))
-        )}
-      </SidebarSection>
-
-      {/* Trending People — ranked by follower count */}
-      {topPeople.length > 0 && (
-        <SidebarSection
-          title="Trending Creators"
-          icon="person-outline"
-          // The widget ranks by engagement (activityScore) — the same signal as
-          // the People tab's "Most active" leaderboard — so "See all" deep-links
-          // to ?sort=active to land on the MATCHING ranking (not the default
-          // Most-followers tab, which shows a different order).
-          onSeeAll={() => router.push('/(tabs)/discover/people?sort=active' as any)}
-        >
-          {topPeople.map((u: any) => {
-            const followers = profileFollowerCount(u);
-            return (
-              <SidebarItem
-                key={u.id}
-                avatar={u.image}
-                name={u.name || 'User'}
-                subtitle={followers > 0
-                  ? `${followers.toLocaleString()} ${followers === 1 ? 'follower' : 'followers'}`
-                  : (u.username ? `@${u.username}` : undefined)}
-                description={u.bio || u.description}
-                onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
-              />
-            );
-          })}
-        </SidebarSection>
-      )}
-
-      {/* Trending Communities — ranked by members + activity */}
-      {topCommunities.length > 0 && (
-        <SidebarSection
-          title="Trending Communities"
-          icon="people-outline"
-          onSeeAll={() => router.push('/(tabs)/discover/communities' as any)}
-        >
-          {topCommunities.map((c: any) => (
-            <SidebarItem
-              key={c.id}
-              avatar={c.image}
-              name={c.name || 'Community'}
-              subtitle={`${(c.memberCount || c.member_count || 0).toLocaleString()} ${(c.memberCount || c.member_count || 0) === 1 ? 'member' : 'members'}`}
-              description={c.description || c.bio}
-              onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
-            />
-          ))}
-        </SidebarSection>
-      )}
-
-      {/* Trending Agents */}
-      {visibleAgents.length > 0 && (
-        <SidebarSection
-          title="Trending Agents"
-          icon="hardware-chip-outline"
-          onSeeAll={() => router.push('/(tabs)/discover/agents' as any)}
-        >
-          {visibleAgents.map((a: any) => (
-            <SidebarItem
-              key={a.id}
-              avatar={a.image || a.avatar}
-              name={a.name || 'Agent'}
-              description={a.bio || a.description}
-              badge="AI"
-              onPress={() => router.push(`/(tabs)/user/${a.username || a.id}` as any)}
-            />
-          ))}
-        </SidebarSection>
-      )}
+      {sectionOrder.map((key) => (
+        <React.Fragment key={key}>{sections[key]}</React.Fragment>
+      ))}
     </ScrollView>
   );
 }
