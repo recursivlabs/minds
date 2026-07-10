@@ -8,7 +8,7 @@ import { Card } from './Card';
 import { Avatar } from './Avatar';
 import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
-import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents } from '../lib/hooks';
+import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents, useFollowingIds } from '../lib/hooks';
 import { profileFollowerCount } from '../lib/models';
 import { hotScore, cardLabel, postTitle, postThumb, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
 import { spacing, radius } from '../constants/theme';
@@ -125,21 +125,31 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
   const router = useRouter();
   const colors = useColors();
   const { sdk } = useAuth();
+  // The viewer's real follow graph — so the CTA shows "following" for people you
+  // already follow instead of a misleading "+".
+  const { followingIds } = useFollowingIds();
 
-  // One-tap CTAs on the rail rows. Optimistic sets so the affordance flips to a
-  // confirmed state immediately; revert on failure.
-  const [followed, setFollowed] = React.useState<Set<string>>(new Set());
-  const [joined, setJoined] = React.useState<Set<string>>(new Set());
-  const follow = React.useCallback((id: string) => {
-    if (!sdk || followed.has(id)) return;
-    setFollowed((p) => new Set(p).add(id));
-    Promise.resolve(sdk.profiles.follow(id)).catch(() => setFollowed((p) => { const n = new Set(p); n.delete(id); return n; }));
-  }, [sdk, followed]);
-  const join = React.useCallback((id: string) => {
-    if (!sdk || joined.has(id)) return;
-    setJoined((p) => new Set(p).add(id));
-    Promise.resolve((sdk as any).communities.join(id)).catch(() => setJoined((p) => { const n = new Set(p); n.delete(id); return n; }));
-  }, [sdk, joined]);
+  // Override maps: id -> desired state. Seeded from the real follow graph /
+  // community membership; a tap writes the toggled state optimistically and
+  // reverts on failure.
+  const [followOverride, setFollowOverride] = React.useState<Map<string, boolean>>(new Map());
+  const [joinOverride, setJoinOverride] = React.useState<Map<string, boolean>>(new Map());
+  const isFollowing = (id: string) => followOverride.has(id) ? !!followOverride.get(id) : (followingIds?.has(id) ?? false);
+  const isJoined = (c: any) => joinOverride.has(c.id) ? !!joinOverride.get(c.id) : !!(c.is_member ?? c.isMember);
+  const toggleFollow = React.useCallback((id: string, currently: boolean) => {
+    if (!sdk) return;
+    const next = !currently;
+    setFollowOverride((p) => new Map(p).set(id, next));
+    Promise.resolve(next ? sdk.profiles.follow(id) : sdk.profiles.unfollow(id))
+      .catch(() => setFollowOverride((p) => new Map(p).set(id, currently)));
+  }, [sdk]);
+  const toggleJoin = React.useCallback((id: string, currently: boolean) => {
+    if (!sdk) return;
+    const next = !currently;
+    setJoinOverride((p) => new Map(p).set(id, next));
+    Promise.resolve(next ? (sdk as any).communities.join(id) : (sdk as any).communities.leave(id))
+      .catch(() => setJoinOverride((p) => new Map(p).set(id, currently)));
+  }, [sdk]);
   const message = React.useCallback(async (agentId: string) => {
     if (!sdk) return;
     try {
@@ -284,7 +294,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
                 : (u.username ? `@${u.username}` : undefined)}
               description={u.bio || u.description}
               onPress={() => router.push(`/(tabs)/user/${u.username || u.id}` as any)}
-              action={{ icon: followed.has(u.id) ? 'checkmark' : 'add', active: followed.has(u.id), label: 'Follow', onPress: () => follow(u.id) }}
+              action={{ icon: isFollowing(u.id) ? 'checkmark' : 'add', active: isFollowing(u.id), label: isFollowing(u.id) ? 'Following' : 'Follow', onPress: () => toggleFollow(u.id, isFollowing(u.id)) }}
             />
           );
         })}
@@ -304,7 +314,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
             subtitle={`${(c.memberCount || c.member_count || 0).toLocaleString()} ${(c.memberCount || c.member_count || 0) === 1 ? 'member' : 'members'}`}
             description={c.description || c.bio}
             onPress={() => router.push(`/(tabs)/community/${c.slug || c.id}` as any)}
-            action={{ icon: joined.has(c.id) ? 'checkmark' : 'add', active: joined.has(c.id), label: 'Join', onPress: () => join(c.id) }}
+            action={{ icon: isJoined(c) ? 'checkmark' : 'add', active: isJoined(c), label: isJoined(c) ? 'Joined' : 'Join', onPress: () => toggleJoin(c.id, isJoined(c)) }}
           />
         ))}
       </SidebarSection>

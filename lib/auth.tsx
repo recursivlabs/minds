@@ -311,9 +311,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       image: newUser.image ?? null,
       bio: newUser.bio || '',
     });
-    // Load the canonical profile for the account we just switched into.
-    await refreshUser();
-  }, [refreshUser]);
+    // NOTE: do NOT call refreshUser() here. persistSession already fetched the
+    // canonical user with the NEW api key. refreshUser closes over the previous
+    // render's `authedSdk` (state updates are async), so it would re-fetch the
+    // OLD account and clobber the just-switched identity — the exact bug where
+    // the feeds/inbox switched but the profile stayed on the original account.
+  }, []);
 
   const sendOtp = React.useCallback(async (email: string) => {
     await anonSdk.auth.sendOtp({ email });
