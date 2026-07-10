@@ -25,6 +25,7 @@ import { ArticleCard } from './ArticleCard';
 import { Badge, getBadges } from './Badge';
 import { spacing, radius, borders, typography } from '../constants/theme';
 import { useColors } from '../lib/theme';
+import { formatTimestamp } from '../lib/time';
 import { renderMarkdownToHtml, parseMarkdownSegments, isSafeUrl, looksLikeLegacyHtml, stripHtmlToText, sanitizeLegacyHtml } from '../lib/markdown';
 
 interface Props {
@@ -35,16 +36,9 @@ interface Props {
   compact?: boolean;
 }
 
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const date = new Date(dateStr).getTime();
-  const diff = Math.floor((now - date) / 1000);
-  if (diff < 60) return 'now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
-  return `${Math.floor(diff / 604800)}w`;
-}
+// Unified app-wide time format: <24h relative (30m/2h/23h), older = date only
+// ("Jun 3" this year, "Jun 3, 2021" prior). See lib/time.
+const timeAgo = (dateStr: string) => formatTimestamp(dateStr);
 
 // ── Embedded quote card (X "quote tweet"). A bordered, tappable card showing
 // the quoted post's author + a truncated preview of its content, with a small

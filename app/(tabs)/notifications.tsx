@@ -8,17 +8,13 @@ import { Text, Avatar, Skeleton, RightRailLayout } from '../../components';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { ORG_ID } from '../../lib/recursiv';
+import { formatTimestamp } from '../../lib/time';
 import { invalidate } from '../../lib/cache';
 import { spacing } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
 
-function timeAgo(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60) return 'now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}d`;
-}
+// Unified app-wide format (see lib/time): <24h relative, older = date only.
+const timeAgo = (dateStr: string) => formatTimestamp(dateStr);
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();

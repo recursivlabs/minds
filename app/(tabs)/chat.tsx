@@ -5,6 +5,7 @@ import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button, AgentBadge } from '../../components';
 import { MessageActions } from '../../components/MessageActions';
+import { formatTimestamp, formatDayLabel, isNewDay } from '../../lib/time';
 import * as Clipboard from 'expo-clipboard';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
@@ -38,6 +39,7 @@ export default function ChatScreen() {
   const focusedMode = !!params.focused && !!params.id;
   const [activeConvoId, setActiveConvoId] = React.useState<string | null>(params.id || null);
   const [showNewChat, setShowNewChat] = React.useState(false);
+  const [convoSearch, setConvoSearch] = React.useState('');
   // Conversations opened this session → their list unread badge clears
   // immediately (the open thread also marks read server-side; this bridges the
   // gap until the refetch, so a thread you're actively in never shows unread).
@@ -192,6 +194,25 @@ export default function ChatScreen() {
         </Pressable>
       </View>
 
+      {/* Search / filter the conversation list */}
+      <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 7 }}>
+          <Ionicons name="search" size={16} color={colors.textMuted} />
+          <TextInput
+            placeholder="Search messages"
+            placeholderTextColor={colors.textMuted}
+            value={convoSearch}
+            onChangeText={setConvoSearch}
+            style={{ flex: 1, color: colors.text, ...typography.body, paddingVertical: 0, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+          />
+          {convoSearch ? (
+            <Pressable onPress={() => setConvoSearch('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
       {/* New chat */}
       {showNewChat && (
         <>
@@ -280,6 +301,12 @@ export default function ChatScreen() {
             const others = participants.filter((p: any) => (p?.id ?? p?.userId) && (p?.id ?? p?.userId) !== user?.id);
             const type = c.type || (others.length <= 1 ? 'one_on_one' : 'group');
             if (type === 'one_on_one' && others.length === 0) return false;
+            // Filter by the search box (matches the resolved DM/group name).
+            if (convoSearch.trim()) {
+              const om = participants.find((p: any) => (p?.user?.id ?? p?.id ?? p?.userId) !== user?.id);
+              const nm = (c.name || om?.user?.name || om?.name || om?.user?.username || om?.username || '').toLowerCase();
+              if (!nm.includes(convoSearch.trim().toLowerCase())) return false;
+            }
             return true;
           })}
           keyExtractor={(item) => item.id}
@@ -330,17 +357,7 @@ export default function ChatScreen() {
                     </View>
                     {time ? (
                       <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
-                        {(() => {
-                          // iMessage-style relative time: now / 5m / 2h /
-                          // Wed (this week) / Apr 21 (older).
-                          const t = new Date(time);
-                          const diff = Math.floor((Date.now() - t.getTime()) / 1000);
-                          if (diff < 60) return 'now';
-                          if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-                          if (diff < 86_400) return `${Math.floor(diff / 3600)}h`;
-                          if (diff < 7 * 86_400) return t.toLocaleDateString([], { weekday: 'short' });
-                          return t.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                        })()}
+                        {formatTimestamp(time)}
                       </Text>
                     ) : null}
                   </View>
@@ -1172,9 +1189,25 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
           ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             const senderId = item.sender?.id || item.senderId || item.sender_id;
-            return <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} onLongPress={setActionMsg} onReactPill={handleReact} quoted={resolveQuoted(item)} myUserId={user?.id} />;
+            const prev = index > 0 ? messages[index - 1] : null;
+            const ts = item.createdAt || item.created_at;
+            // Day separator when the calendar day changes — Today / Yesterday /
+            // "Jun 3", best-in-class chat history legibility.
+            const showDay = isNewDay(ts, prev?.createdAt || prev?.created_at);
+            return (
+              <>
+                {showDay ? (
+                  <View style={{ alignItems: 'center', marginVertical: spacing.md }}>
+                    <View style={{ backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.full }}>
+                      <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11, fontWeight: '600' }}>{formatDayLabel(ts)}</Text>
+                    </View>
+                  </View>
+                ) : null}
+                <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} onLongPress={setActionMsg} onReactPill={handleReact} quoted={resolveQuoted(item)} myUserId={user?.id} />
+              </>
+            );
           }}
           contentContainerStyle={{
             paddingVertical: spacing.xl,
