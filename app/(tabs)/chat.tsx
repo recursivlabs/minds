@@ -339,13 +339,11 @@ export default function ChatScreen() {
                   paddingHorizontal: spacing.xl,
                   paddingVertical: spacing.lg,
                   // In the 2-pane view, highlight the thread you're actively
-                  // viewing (like the nav) so it's clear which is open.
+                  // viewing with a soft background tint only — no hard accent
+                  // bar, so the list stays clean and borderless.
                   backgroundColor: (isWide && item.id === activeConvoId)
                     ? colors.accentSubtle
                     : pressed ? colors.surfaceHover : 'transparent',
-                  ...(isWide && item.id === activeConvoId
-                    ? { borderLeftWidth: 3, borderLeftColor: colors.accent } as any
-                    : { borderLeftWidth: 3, borderLeftColor: 'transparent' } as any),
                 })}
               >
                 <Avatar uri={avatar} name={name} size="lg" />
