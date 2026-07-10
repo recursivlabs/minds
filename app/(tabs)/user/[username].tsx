@@ -148,6 +148,7 @@ export default function UserProfileScreen() {
   const [editName, setEditName] = React.useState('');
   const [editUsername, setEditUsername] = React.useState('');
   const [editBio, setEditBio] = React.useState('');
+  const [bioExpanded, setBioExpanded] = React.useState(false);
   const [editSaving, setEditSaving] = React.useState(false);
   const [editAvatarUri, setEditAvatarUri] = React.useState<string | null>(null);
 
@@ -461,9 +462,17 @@ export default function UserProfileScreen() {
           )}
 
           {profile.bio && (
-            <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.md, lineHeight: 22 }}>
-              {profile.bio}
-            </Text>
+            <View style={{ marginTop: spacing.md }}>
+              <Text variant="body" color={colors.textSecondary} numberOfLines={bioExpanded ? undefined : 4} style={{ lineHeight: 22 }}>
+                {profile.bio}
+              </Text>
+              {/* Long bios truncate with a toggle so the profile header stays tidy. */}
+              {String(profile.bio).length > 160 ? (
+                <Pressable onPress={() => setBioExpanded(v => !v)} hitSlop={6} style={{ marginTop: 2 }}>
+                  <Text variant="caption" color={colors.accent}>{bioExpanded ? 'Show less' : 'Show more'}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           )}
 
           {/* Follower/Following counts */}

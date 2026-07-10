@@ -3,6 +3,7 @@ import { View, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { MediaViewer } from './MediaViewer';
+import { SharedPostCard } from './SharedPostCard';
 import { parseMarkdownSegments, renderMarkdownToHtml } from '../lib/markdown';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
@@ -55,7 +56,10 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
   const mediaUrl: string | null = mediaArr?.length
     ? (typeof mediaArr[0] === 'string' ? mediaArr[0] : mediaArr[0]?.url) || null
     : (content.match(MEDIA_RE)?.[0] || null);
-  const bodyText = mediaUrl && !mediaArr ? content.replace(mediaUrl, '').trim() : content;
+  // A shared Minds post → render a rich embed, tappable back to the post.
+  const sharedPostId: string | null = content.match(/\/post\/([0-9a-fA-F-]{8,})/)?.[1] || null;
+  let bodyText = mediaUrl && !mediaArr ? content.replace(mediaUrl, '').trim() : content;
+  if (sharedPostId) bodyText = bodyText.replace(/\S*\/post\/[0-9a-fA-F-]{8,}\S*/, '').trim();
   // Never render an empty bubble. A streaming placeholder legitimately starts
   // empty (caret only), but a non-streaming empty message with no media is a
   // tool-only agent turn or a glitch and must not show as a blank box.
@@ -172,6 +176,12 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
         {mediaUrl ? (
           <View style={{ marginBottom: bodyText ? spacing.xs : 0, marginHorizontal: -spacing.xs, borderRadius: radius.md, overflow: 'hidden', minWidth: 180 }}>
             <MediaViewer media={mediaUrl} />
+          </View>
+        ) : null}
+        {/* Shared Minds post embed. */}
+        {sharedPostId ? (
+          <View style={{ marginBottom: bodyText ? spacing.xs : 0 }}>
+            <SharedPostCard postId={sharedPostId} />
           </View>
         ) : null}
         {(bodyText || isStreaming) ? (

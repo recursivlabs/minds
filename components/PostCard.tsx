@@ -21,6 +21,7 @@ import { getCached } from '../lib/cache';
 import { askAgent, buildPostContextPrompt } from '../lib/askAgent';
 import { LinkPreview } from './LinkPreview';
 import { MediaViewer } from './MediaViewer';
+import { SharePostSheet } from './SharePostSheet';
 import { ArticleCard } from './ArticleCard';
 import { Badge, getBadges } from './Badge';
 import { spacing, radius, borders, typography } from '../constants/theme';
@@ -120,6 +121,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(postUserVote(post));
   const [score, setScore] = React.useState(postScore(post));
   const [showMenu, setShowMenu] = React.useState(false);
+  const [showShare, setShowShare] = React.useState(false);
   const [menuPos, setMenuPos] = React.useState<{ x: number; y: number } | null>(null);
   // Repost action sheet (X-style: "Repost" + "Quote Post"). Opens on tapping
   // the repost icon; `repostMenuPos` anchors it next to the icon.
@@ -918,14 +920,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         <Pressable
           onPress={(e: any) => {
             e?.stopPropagation?.();
-            logSignal('ask_agent', { postId: actionPostId, metadata: { source: 'postcard_ask_agent' } });
-            const author = (displayPost as any)?.author?.username || (displayPost as any)?.author?.name
-              || (post as any)?.author?.username || 'someone';
-            askAgent(sdk, router, buildPostContextPrompt({
-              author,
-              content: rawContent,
-              url: `${SITE_URL}/post/${actionPostId}`,
-            }));
+            setShowShare(true);
           }}
           hitSlop={8}
           style={({ hovered }: any) => ({
@@ -934,7 +929,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             ...(Platform.OS === 'web' ? { transition: 'background-color 0.15s ease', cursor: 'pointer' } as any : {}),
           })}
         >
-          <Ionicons name="sparkles-outline" size={16} color={colors.textMuted} />
+          <Ionicons name="paper-plane-outline" size={16} color={colors.textMuted} />
         </Pressable>
 
         <Pressable
@@ -1202,6 +1197,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         onClose={() => setShowReport(false)}
         onSubmit={handleReport}
       />
+      <SharePostSheet visible={showShare} post={displayPost} onClose={() => setShowShare(false)} />
     </Pressable>
   );
 });
