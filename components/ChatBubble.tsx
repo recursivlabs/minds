@@ -2,6 +2,7 @@ import * as React from 'react';
 import { View, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
+import { MediaViewer } from './MediaViewer';
 import { parseMarkdownSegments, renderMarkdownToHtml } from '../lib/markdown';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
@@ -28,6 +29,10 @@ interface Props {
   myUserId?: string;
 }
 
+// A message can carry media two ways: a structured `media` array (server) or a
+// bare uploaded URL in the content (client attachment path). Detect either.
+const MEDIA_RE = /(https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp|mp4|webm|mov|m4v|m4a|mp3|wav|ogg)(?:\?\S*)?|https?:\/\/pub-[a-z0-9]+\.r2\.dev\/\S+|https?:\/\/[a-z0-9.-]*minds-uploads[^\s]*)/i;
+
 export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agentChat, onRetry, onLongPress, onReactPill, quoted, myUserId }: Props) {
   const colors = useColors();
   // Aggregate reactions by emoji: { '❤️': { count, mine } }.
@@ -44,16 +49,23 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
     return [...m.entries()];
   }, [message.reactions, myUserId]);
   const content = message.content || message.text || message.body || '';
+  // Attachment: prefer a structured media array (server), else a bare uploaded
+  // URL in the content (client attachment path). bodyText hides the raw URL.
+  const mediaArr = Array.isArray(message.media) ? message.media : null;
+  const mediaUrl: string | null = mediaArr?.length
+    ? (typeof mediaArr[0] === 'string' ? mediaArr[0] : mediaArr[0]?.url) || null
+    : (content.match(MEDIA_RE)?.[0] || null);
+  const bodyText = mediaUrl && !mediaArr ? content.replace(mediaUrl, '').trim() : content;
   // Never render an empty bubble. A streaming placeholder legitimately starts
-  // empty (caret only), but a non-streaming empty message is a tool-only agent
-  // turn or a glitch and must not show as a blank box.
-  if (!content.trim() && message.streaming !== true) return null;
+  // empty (caret only), but a non-streaming empty message with no media is a
+  // tool-only agent turn or a glitch and must not show as a blank box.
+  if (!content.trim() && !mediaUrl && message.streaming !== true) return null;
   const timestamp = message.createdAt || message.created_at || '';
   // Render markdown LIVE, even while streaming — bold/lists/code form as the
   // text types out, the way Claude does it (not raw markdown that snaps to
   // formatted only when finished). The reveal is rAF-paced so the per-frame
   // re-parse stays cheap for normal message lengths.
-  const hasMarkdown = /[*`#\[\]]/.test(content);
+  const hasMarkdown = /[*`#\[\]]/.test(bodyText);
   // Streaming bubbles show a caret + skip the trailing timestamp so the
   // bubble doesn't bounce-resize as new chunks land. Once `streaming`
   // goes false the timestamp + final layout render normally.
@@ -75,12 +87,12 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
 
   const renderContent = () => {
     if (!hasMarkdown) {
-      return <Text variant="body" color={textColor}>{content}</Text>;
+      return <Text variant="body" color={textColor}>{bodyText}</Text>;
     }
 
     // Web: render as HTML for full markdown support
     if (Platform.OS === 'web') {
-      const html = renderMarkdownToHtml(content)
+      const html = renderMarkdownToHtml(bodyText)
         .replace(/color:#d4a844/g, `color:${linkColor}`)
         .replace(/color:#a0a0a8/g, `color:${isOwn ? '#ffffffaa' : '#a0a0a8'}`);
       return (
@@ -93,7 +105,7 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
     }
 
     // Native: use segment parser
-    const segments = parseMarkdownSegments(content);
+    const segments = parseMarkdownSegments(bodyText);
     return (
       <Text variant="body" color={textColor}>
         {segments.map((seg, i) => {
@@ -156,10 +168,18 @@ export const ChatBubble = React.memo(function ChatBubble({ message, isOwn, agent
             <Text variant="caption" color={textColor} numberOfLines={1} style={{ opacity: 0.8 }}>{quoted.text}</Text>
           </View>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-          <View style={{ flexShrink: 1 }}>{renderContent()}</View>
-          {isStreaming ? <StreamingCaret color={textColor} /> : null}
-        </View>
+        {/* Attachment media (image / video / audio), rendered like the feed. */}
+        {mediaUrl ? (
+          <View style={{ marginBottom: bodyText ? spacing.xs : 0, marginHorizontal: -spacing.xs, borderRadius: radius.md, overflow: 'hidden', minWidth: 180 }}>
+            <MediaViewer media={mediaUrl} />
+          </View>
+        ) : null}
+        {(bodyText || isStreaming) ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+            <View style={{ flexShrink: 1 }}>{renderContent()}</View>
+            {isStreaming ? <StreamingCaret color={textColor} /> : null}
+          </View>
+        ) : null}
       </Pressable>
       {/* Reaction pills — tap one to toggle your own reaction. */}
       {reactionGroups.length > 0 ? (

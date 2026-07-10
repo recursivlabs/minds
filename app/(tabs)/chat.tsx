@@ -541,6 +541,7 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
   const [loading, setLoading] = React.useState(cachedSorted.length === 0);
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  const [attaching, setAttaching] = React.useState(false);
   // Prompt handed in via route params by the "Ask my agent" button / command
   // palette. We send it from HERE (via handleSend → agents.chatStream), not
   // from askAgent(), because that path used chat.send which only inserts the
@@ -1130,6 +1131,29 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
   // Retry a failed send: drop the failed optimistic row and re-run handleSend
   // with its original text. Mirrors iMessage's tap-to-retry on a "Not
   // delivered" bubble.
+  // Attachment: pick image/video → upload to R2 → send the URL as the message.
+  // The bubble detects the media URL and renders it inline (like the feed).
+  const handleAttach = React.useCallback(async () => {
+    if (!sdk || attaching) return;
+    try {
+      const picker: any = await import('expo-image-picker');
+      const res = await picker.launchImageLibraryAsync({ mediaTypes: picker.MediaTypeOptions.All, quality: 0.85 });
+      if (res.canceled || !res.assets?.length) return;
+      setAttaching(true);
+      const asset = res.assets[0];
+      const contentType = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+      const blob = await (await fetch(asset.uri)).blob();
+      const up = await (sdk as any).uploads.getMediaUploadUrl({ content_type: contentType, content_length: blob.size });
+      const uploadUrl = up?.data?.upload_url || up?.data?.url;
+      if (!uploadUrl) return;
+      const put = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
+      if (!put.ok) return;
+      const publicUrl = up?.data?.public_url || String(uploadUrl).split('?')[0];
+      await handleSend(publicUrl);
+    } catch {}
+    finally { setAttaching(false); }
+  }, [sdk, attaching]);
+
   const retryMessage = React.useCallback((msg: any) => {
     const body = (msg?.content || '').trim();
     if (!body) return;
@@ -1393,6 +1417,10 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
           ...(Platform.OS === 'web' ? { maxWidth: 760, width: '100%', alignSelf: 'center' } as any : {}),
         }}
       >
+        {/* Attach media (image / video). */}
+        <Pressable onPress={handleAttach} disabled={attaching} hitSlop={8} style={{ opacity: attaching ? 0.5 : 1, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) }}>
+          <Ionicons name={attaching ? 'ellipsis-horizontal' : 'add-circle-outline'} size={26} color={colors.accent} />
+        </Pressable>
         <TextInput
           placeholder="Type a message..."
           placeholderTextColor={colors.textMuted}
