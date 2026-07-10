@@ -782,6 +782,12 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
     };
   }, [conversationId, sdk, startPolling, stopPolling]);
 
+  // The id of the last message we sent a markAsRead for — dedupes the effect
+  // below so a streaming reply (which mutates `messages` rapidly) can't spam
+  // /read. Reset when the open conversation changes so the new thread marks.
+  const lastMarkedReadIdRef = React.useRef<string | null>(null);
+  React.useEffect(() => { lastMarkedReadIdRef.current = null; }, [conversationId]);
+
   // Mark as read — ONLY while the screen is actually focused. If the agent's
   // reply streams in while you're on another tab (this screen stays mounted),
   // marking it read in the background would advance the server cursor and the
@@ -804,7 +810,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           break;
         }
       }
-      if (lastReal?.id) {
+      // CRITICAL: `messages` mutates many times per second during an agent reply
+      // (each streaming token re-renders). Only fire markAsRead when the newest
+      // real message id ACTUALLY CHANGES — else we spam /read dozens of times per
+      // conversation, burn the API rate limit (429), and the 429 (which drops CORS
+      // headers) surfaces as a "CORS error" that breaks the whole chat. Dedupe by
+      // the last id we marked so it fires at most once per genuinely-new message.
+      if (lastReal?.id && lastReal.id !== lastMarkedReadIdRef.current) {
+        lastMarkedReadIdRef.current = lastReal.id;
         sdk.chat.markAsRead(conversationId, { message_id: lastReal.id }).catch(() => {});
       }
     }
