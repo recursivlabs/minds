@@ -14,7 +14,7 @@ import { useTheme } from '../lib/theme';
 import { conversationUnreadCount } from '../lib/models';
 import { useConversations, useCommunities } from '../lib/hooks';
 import { ensureIntroDM } from '../lib/agentIntro';
-import { invalidate } from '../lib/cache';
+import { invalidate, subscribeToInvalidations } from '../lib/cache';
 import { getPreference } from '../lib/preferences';
 import { useActiveConvoId } from '../lib/activeConvo';
 import { subscribeLocalChat } from '../lib/chatEvents';
@@ -117,6 +117,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
       setUnreadNotifs(notifs.filter((n: any) => n.status === 'unread').length);
     } catch {}
   }, [sdk]);
+
+  // When ANY screen marks notifications read (markAsRead/markAllAsRead fire
+  // invalidate('notifications')), reconcile the dot immediately instead of
+  // waiting for the next throttled nav-refetch — otherwise the gold dot lingers
+  // after you've cleared the notifications list.
+  React.useEffect(() => subscribeToInvalidations((key) => {
+    if (key === 'notifications') refreshNotifs();
+  }), [refreshNotifs]);
 
   // Navigation-triggered refetches are throttled: neither call below is
   // actually cached (refreshNotifs hits notifications.list directly, and the

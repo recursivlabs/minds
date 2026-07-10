@@ -36,6 +36,14 @@ export default function ChatScreen() {
   const focusedMode = !!params.focused && !!params.id;
   const [activeConvoId, setActiveConvoId] = React.useState<string | null>(params.id || null);
   const [showNewChat, setShowNewChat] = React.useState(false);
+  // Conversations opened this session → their list unread badge clears
+  // immediately (the open thread also marks read server-side; this bridges the
+  // gap until the refetch, so a thread you're actively in never shows unread).
+  const [readConvos, setReadConvos] = React.useState<Set<string>>(new Set());
+  const openConvo = React.useCallback((id: string) => {
+    setActiveConvoId(id);
+    setReadConvos((prev) => prev.has(id) ? prev : new Set(prev).add(id));
+  }, []);
   const [dmUsername, setDmUsername] = React.useState('');
   const [dmError, setDmError] = React.useState<string | null>(null);
 
@@ -45,6 +53,11 @@ export default function ChatScreen() {
       setActiveConvoId(params.id);
     }
   }, [params.id]);
+
+  // Any active conversation counts as locally read (deep-link or selection).
+  React.useEffect(() => {
+    if (activeConvoId) setReadConvos((p) => p.has(activeConvoId) ? p : new Set(p).add(activeConvoId));
+  }, [activeConvoId]);
 
   // Conversation-list live updates. The active-conversation view already
   // subscribes to realtime for its own messages, but the LIST view used
@@ -285,11 +298,11 @@ export default function ChatScreen() {
             const lastMsg = item.lastMessage || item.last_message;
             const lastText = stripMarkdown(lastMsg?.content || lastMsg?.text || '');
             const time = lastMsg?.createdAt || lastMsg?.created_at || item.updatedAt || '';
-            const unread = conversationUnreadCount(item);
+            const unread = readConvos.has(item.id) ? 0 : conversationUnreadCount(item);
 
             return (
               <Pressable
-                onPress={() => setActiveConvoId(item.id)}
+                onPress={() => openConvo(item.id)}
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
