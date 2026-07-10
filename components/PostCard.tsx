@@ -512,6 +512,10 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             dangerouslySetInnerHTML={{ __html: html }}
             style={{
               color: colors.text,
+              // The HTML render path didn't set a family, so the post body fell
+              // back to the browser default font — looking different from the
+              // rest of the app (which is Roboto). Pin it to match.
+              fontFamily: typography.body.fontFamily,
               fontSize: typography.body.fontSize,
               lineHeight: `${typography.body.lineHeight}px`,
               marginBottom: (media && !truncated) ? spacing.md : 0,
