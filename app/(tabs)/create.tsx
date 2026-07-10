@@ -921,6 +921,31 @@ export default function CreateScreen() {
 
           {mode === 'article' && (
             <>
+              {/* Cover leads as a full-width top banner (upload once), then the
+                  title, then the body — the classic article layout. */}
+              <Pressable
+                onPress={() => handlePickImage()}
+                style={{
+                  backgroundColor: colors.surface,
+                  borderWidth: mediaUri ? 0 : 1,
+                  borderColor: colors.glassBorder,
+                  borderRadius: radius.md,
+                  padding: mediaUri ? 0 : spacing.xl,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: spacing.lg,
+                  overflow: 'hidden',
+                }}
+              >
+                {mediaUri ? (
+                  <Image source={{ uri: mediaUri }} style={{ width: '100%', height: 200, borderRadius: radius.md }} resizeMode="cover" />
+                ) : (
+                  <View style={{ alignItems: 'center', gap: spacing.sm }}>
+                    <Ionicons name="image-outline" size={28} color={colors.textMuted} />
+                    <Text variant="caption" color={colors.textMuted}>Add cover image</Text>
+                  </View>
+                )}
+              </Pressable>
               <TextInput
                 placeholder="Article title"
                 placeholderTextColor={colors.textMuted}
@@ -936,29 +961,6 @@ export default function CreateScreen() {
                   ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
                 }}
               />
-              <Pressable
-                onPress={() => handlePickImage()}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.glassBorder,
-                  borderRadius: radius.md,
-                  padding: mediaUri ? 0 : spacing.xl,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: spacing.lg,
-                  overflow: 'hidden',
-                }}
-              >
-                {mediaUri ? (
-                  <Image source={{ uri: mediaUri }} style={{ width: '100%', height: 180, borderRadius: radius.md }} resizeMode="cover" />
-                ) : (
-                  <View style={{ alignItems: 'center', gap: spacing.sm }}>
-                    <Ionicons name="image-outline" size={28} color={colors.textMuted} />
-                    <Text variant="caption" color={colors.textMuted}>Add cover image</Text>
-                  </View>
-                )}
-              </Pressable>
             </>
           )}
 
@@ -1026,7 +1028,10 @@ export default function CreateScreen() {
             </View>
           )}
 
-          {mediaUris.length > 0 && (
+          {/* Article mode shows its cover via the banner Pressable above; this
+              general preview is post-only, else the cover renders twice and the
+              big preview overlays the article editor. */}
+          {mode !== 'article' && mediaUris.length > 0 && (
             <View style={{ marginTop: spacing.lg }}>
               {mediaIsAudio ? (
                 // Audio: a compact chip (music glyph + filename + remove). The
@@ -1140,11 +1145,15 @@ export default function CreateScreen() {
                     const n = items.length;
 
                     if (n === 1) {
+                      // Match the FEED exactly: box takes the image's natural
+                      // aspect (clamped) and the image hugs the leading edge, so
+                      // the composer is an accurate WYSIWYG preview — not a
+                      // full-width cover-cropped box.
                       return (
-                        <View style={{ width: '100%', position: 'relative', overflow: 'hidden' }}>
+                        <View style={{ width: '100%', aspectRatio: media1Aspect || 1.5, maxHeight: 440, position: 'relative', overflow: 'hidden', alignItems: 'flex-start', backgroundColor: 'transparent' }}>
                           <Image
                             source={{ uri: items[0] }}
-                            style={{ width: '100%', aspectRatio: media1Aspect || 1.5, maxHeight: 440, backgroundColor: colors.surfaceHover }}
+                            style={{ height: '100%', aspectRatio: media1Aspect || 1.5, alignSelf: 'flex-start', backgroundColor: colors.surfaceHover }}
                             resizeMode="cover"
                             onLoad={(e: any) => {
                               const src = e?.source || e?.nativeEvent?.source;

@@ -76,11 +76,22 @@ function scheduleFlush() {
 // yet (probed once). Batch endpoint is filed under platform asks.
 let batchSupported: boolean | null = null;
 let flushInFlight = false;
+// CIRCUIT BREAKER: if the signals endpoint is forbidden for this key (403) or
+// unauthorized (401), telemetry can NEVER succeed — so stop entirely for the
+// session instead of retrying every event forever. That old retry-loop fired
+// one 403 per post view, flooding the console AND burning the key's rate budget
+// so real requests (feed "load more") got throttled and hung.
+let signalsDisabled = false;
+function isForbidden(e: any): boolean {
+  const s = e?.status ?? e?.statusCode ?? e?.response?.status;
+  return s === 403 || s === 401;
+}
 
 async function flush() {
   // Serialize flushes: logSignal can call flush() directly when the queue
   // hits MAX_QUEUE while a previous flush is still awaiting — interleaved
   // drains used to send overlapping per-event loops.
+  if (signalsDisabled) { queue.length = 0; return; }
   if (flushInFlight) { scheduleFlush(); return; }
   if (queue.length === 0) return;
   flushInFlight = true;
@@ -98,13 +109,15 @@ async function flush() {
         await httpClient.post('/signals/batch', { events: batch });
         batchSupported = true;
         return;
-      } catch {
+      } catch (e) {
+        if (isForbidden(e)) { signalsDisabled = true; return; } // forbidden -> never retry
         if (batchSupported === true) return; // transient failure — loss is OK
         batchSupported = false; // endpoint not deployed yet — fall back
       }
     }
     for (const ev of batch) {
-      try { await httpClient.post('/signals/post', ev); } catch {}
+      try { await httpClient.post('/signals/post', ev); }
+      catch (e) { if (isForbidden(e)) { signalsDisabled = true; return; } }
     }
   } catch {
     // Discard on hard failure; another signal will come along.
@@ -114,6 +127,7 @@ async function flush() {
 }
 
 export function logSignal(type: SignalType, input: SignalInput = {}) {
+  if (signalsDisabled) return; // circuit-breaker tripped — telemetry is off for the session
   if (type === 'view' && input.postId) {
     if (viewedPosts.has(input.postId)) return;
     // Bound session memory: a long doomscroll otherwise grows this Set
