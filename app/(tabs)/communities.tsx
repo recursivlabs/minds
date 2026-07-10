@@ -111,7 +111,10 @@ export default function CommunitiesScreen() {
 
       {searchBar}
 
-      {loading && mine.length === 0 ? (
+      {/* Show the skeleton until the FIRST fetch actually resolves (fetchedOnce),
+         not just while `loading` — otherwise the empty state flashes for a frame
+         before the joined list arrives. */}
+      {(!fetchedOnce || loading) && mine.length === 0 ? (
         <View style={{ padding: spacing.xl, gap: spacing.lg }}>
           {[0, 1, 2, 3].map((i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
