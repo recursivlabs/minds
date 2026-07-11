@@ -5,13 +5,14 @@ import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button, AgentBadge } from '../../components';
 import { MessageActions } from '../../components/MessageActions';
+import { ChatSettingsSheet } from '../../components/ChatSettingsSheet';
 import { formatTimestamp, formatDayLabel, isNewDay } from '../../lib/time';
 import { useVoiceRecorder } from '../../lib/useVoiceRecorder';
 import * as Clipboard from 'expo-clipboard';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { useConversations } from '../../lib/hooks';
-import { getPreference } from '../../lib/preferences';
+import { getPreference, isConversationMuted } from '../../lib/preferences';
 import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors } from '../../lib/theme';
@@ -124,6 +125,14 @@ export default function ChatScreen() {
     return () => { cancelled = true; };
   }, [sdk]);
 
+  // Unread count for a conversation at open time — feeds the thread's
+  // "unread messages" divider + scroll-to-last-read. 0 once locally read.
+  const unreadFor = React.useCallback((cid: string | null) => {
+    if (!cid || readConvos.has(cid)) return 0;
+    const conv = (conversations || []).find((c: any) => c.id === cid);
+    return conv ? conversationUnreadCount(conv) : 0;
+  }, [conversations, readConvos]);
+
   // Full-bleed single thread when deep-linked from the sidebar inbox
   // (focusedMode), or on mobile/narrow where a 2-pane layout doesn't fit. On
   // wide web without `focused`, fall through to the 2-pane list+thread below.
@@ -131,6 +140,7 @@ export default function ChatScreen() {
     return (
       <ConversationView
         conversationId={activeConvoId}
+        initialUnread={unreadFor(activeConvoId)}
         onBack={() => {
           // From a sidebar deep-link, "back" opens the full 2-pane list; on
           // mobile it just returns to the list in place.
@@ -329,6 +339,7 @@ export default function ChatScreen() {
             const lastText = stripMarkdown(lastMsg?.content || lastMsg?.text || '');
             const time = lastMsg?.createdAt || lastMsg?.created_at || item.updatedAt || '';
             const unread = readConvos.has(item.id) ? 0 : conversationUnreadCount(item);
+            const muted = isConversationMuted(item.id);
 
             return (
               <Pressable
@@ -364,7 +375,18 @@ export default function ChatScreen() {
                     <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ flex: 1 }}>
                       {lastText || 'No messages yet'}
                     </Text>
-                    {unread > 0 && (
+                    {muted ? (
+                      // Muted: no attention-grabbing accent badge — a quiet bell
+                      // glyph, and an unread count only as a subdued pill.
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="notifications-off-outline" size={14} color={colors.textMuted} />
+                        {unread > 0 && (
+                          <View style={{ backgroundColor: colors.surfaceHover, borderRadius: radius.full, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
+                            <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11, fontWeight: '700' }}>{unread}</Text>
+                          </View>
+                        )}
+                      </View>
+                    ) : unread > 0 ? (
                       <View
                         style={{
                           backgroundColor: colors.accent,
@@ -378,7 +400,7 @@ export default function ChatScreen() {
                       >
                         <Text variant="caption" color={colors.textOnAccent} style={{ fontSize: 11, fontWeight: '700' }}>{unread}</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </View>
               </Pressable>
@@ -403,6 +425,7 @@ export default function ChatScreen() {
           {activeConvoId ? (
             <ConversationView
               conversationId={activeConvoId}
+              initialUnread={unreadFor(activeConvoId)}
               onBack={() => { setActiveConvoId(null); refresh(); }}
               hideBack
             />
@@ -478,7 +501,7 @@ function TypingIndicator() {
   );
 }
 
-function ConversationView({ conversationId, onBack, hideBack }: { conversationId: string; onBack: () => void; hideBack?: boolean }) {
+function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 }: { conversationId: string; onBack: () => void; hideBack?: boolean; initialUnread?: number }) {
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
   const colors = useColors();
@@ -562,6 +585,37 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
   const [agentStatus, setAgentStatus] = React.useState<'thinking' | 'generating' | 'done' | null>(null);
   const [humanTyping, setHumanTyping] = React.useState<{ userId: string; userName: string } | null>(null);
   const flatListRef = React.useRef<FlatList>(null);
+
+  // Scroll-to-last-read: place an "Unread messages" divider before the first
+  // unread message and land the view there on open, instead of jamming you to
+  // the very bottom. The unread messages are the last `initialUnread` messages
+  // from OTHER members (own messages are always read). Computed once per open.
+  const [unreadAnchorId, setUnreadAnchorId] = React.useState<string | null>(null);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const anchorComputedRef = React.useRef(false);
+  React.useEffect(() => { anchorComputedRef.current = false; setUnreadAnchorId(null); }, [conversationId]);
+  React.useEffect(() => {
+    if (anchorComputedRef.current || !messages.length) return;
+    anchorComputedRef.current = true;
+    const n = Math.min(initialUnread, messages.length);
+    if (n <= 0) return;
+    const myId = user?.id;
+    let count = 0, anchorIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const sid = messages[i].sender?.id || messages[i].senderId || messages[i].sender_id;
+      if (sid && sid !== myId) { count++; if (count >= n) { anchorIdx = i; break; } }
+    }
+    // Only worth a divider/scroll if we're not already essentially at the top.
+    if (anchorIdx <= 0) return;
+    setUnreadAnchorId(messages[anchorIdx].id);
+    // Don't let onContentSizeChange yank us to the bottom — we're positioning
+    // deliberately at the unread boundary.
+    atBottomRef.current = false;
+    requestAnimationFrame(() => {
+      try { flatListRef.current?.scrollToIndex({ index: anchorIdx, animated: false, viewPosition: 0.25 }); } catch {}
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, initialUnread, conversationId]);
   // Throttle outbound chat_typing events. Fires every 3s while the
   // user is actively typing, not on every keystroke (which would
   // hammer the WS and the other side's UI).
@@ -1229,9 +1283,29 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
         )}
-        <Avatar uri={partnerInfo?.image || partnerInfo?.user?.image} name={partnerName} size="sm" />
-        <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>{partnerName}</Text>
+        {/* Tapping the name/avatar opens per-chat settings (Signal-style). */}
+        <Pressable onPress={() => setShowSettings(true)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) }}>
+          <Avatar uri={partnerInfo?.image || partnerInfo?.user?.image} name={partnerName} size="sm" />
+          <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>{partnerName}</Text>
+        </Pressable>
+        <Pressable onPress={() => setShowSettings(true)} hitSlop={10} style={Platform.OS === 'web' ? { cursor: 'pointer' } as any : undefined}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.textMuted} />
+        </Pressable>
       </View>
+
+      <ChatSettingsSheet
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        conversationId={conversationId}
+        partner={{
+          id: partnerInfo?.id || partnerInfo?.user?.id || partnerInfo?.userId,
+          name: partnerName,
+          username: partnerInfo?.username || partnerInfo?.user?.username,
+          image: partnerInfo?.image || partnerInfo?.user?.image,
+          isAgent: partnerInfo?.isAi || partnerInfo?.is_ai || partnerInfo?.user?.isAi || partnerInfo?.user?.is_ai,
+        }}
+        onDeleted={onBack}
+      />
 
       {/* Messages */}
       {loading ? (
@@ -1257,6 +1331,13 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
                     <View style={{ backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.full }}>
                       <Text variant="caption" color={colors.textMuted} style={{ fontSize: 11, fontWeight: '600' }}>{formatDayLabel(ts)}</Text>
                     </View>
+                  </View>
+                ) : null}
+                {item.id === unreadAnchorId ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md }}>
+                    <View style={{ flex: 1, height: 0.5, backgroundColor: colors.accent, opacity: 0.5 }} />
+                    <Text variant="caption" color={colors.accent} style={{ fontSize: 11, fontWeight: '700' }}>Unread messages</Text>
+                    <View style={{ flex: 1, height: 0.5, backgroundColor: colors.accent, opacity: 0.5 }} />
                   </View>
                 ) : null}
                 <ChatBubble message={item} isOwn={senderId === user?.id} agentChat={isAgentChat} onRetry={retryMessage} onLongPress={openActions} onReactPill={handleReact} quoted={resolveQuoted(item)} myUserId={user?.id} />
@@ -1291,6 +1372,14 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
             const node: any = (flatListRef.current as any)?.getScrollableNode?.();
             if (node && typeof node.scrollHeight === 'number') node.scrollTop = node.scrollHeight;
             else flatListRef.current?.scrollToEnd({ animated: false });
+          }}
+          // Variable-height rows mean an unread-anchor index may not be measured
+          // yet; approximate by offset then retry once laid out.
+          onScrollToIndexFailed={(info) => {
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => {
+              try { flatListRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 0.25 }); } catch {}
+            }, 140);
           }}
           ListFooterComponent={
             <>

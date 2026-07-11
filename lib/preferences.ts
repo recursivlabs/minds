@@ -25,6 +25,13 @@ interface Preferences {
    * stream as their main loop.
    */
   defaultFeed: DefaultFeed;
+  /**
+   * Conversation ids the user has muted (device-local). A muted thread still
+   * receives messages but its unread badge is dimmed and it doesn't draw
+   * attention — Signal-style per-chat mute. Server-side mute (cross-device +
+   * push suppression) is a follow-up; this is the local layer.
+   */
+  mutedConversations: string[];
 }
 
 const defaults: Preferences = {
@@ -32,6 +39,7 @@ const defaults: Preferences = {
   autoplayVideo: true,
   aiEnabled: true,
   defaultFeed: 'foryou',
+  mutedConversations: [],
 };
 
 let prefs: Preferences = { ...defaults };
@@ -56,4 +64,19 @@ export function getPreference<K extends keyof Preferences>(key: K): Preferences[
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
   prefs[key] = value;
   persist();
+}
+
+// ── Per-conversation mute (device-local) ──
+export function isConversationMuted(conversationId: string): boolean {
+  return prefs.mutedConversations.includes(conversationId);
+}
+
+/** Toggle mute for a conversation; returns the new muted state. */
+export function toggleConversationMute(conversationId: string): boolean {
+  const set = new Set(prefs.mutedConversations);
+  const muted = !set.has(conversationId);
+  if (muted) set.add(conversationId); else set.delete(conversationId);
+  prefs.mutedConversations = Array.from(set);
+  persist();
+  return muted;
 }
