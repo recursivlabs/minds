@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Avatar, Skeleton, ChatBubble, Button, AgentBadge } from '../../components';
 import { MessageActions } from '../../components/MessageActions';
 import { formatTimestamp, formatDayLabel, isNewDay } from '../../lib/time';
+import { useVoiceRecorder } from '../../lib/useVoiceRecorder';
 import * as Clipboard from 'expo-clipboard';
 import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
@@ -549,6 +550,7 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
   const [attaching, setAttaching] = React.useState(false);
+  const voice = useVoiceRecorder();
   // Prompt handed in via route params by the "Ask my agent" button / command
   // palette. We send it from HERE (via handleSend → agents.chatStream), not
   // from askAgent(), because that path used chat.send which only inserts the
@@ -1161,6 +1163,27 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
     finally { setAttaching(false); }
   }, [sdk, attaching]);
 
+  // Voice notes (web MediaRecorder). Stop the recording, upload the audio blob
+  // through the same media-upload flow as attachments, and send the resulting
+  // URL — the server maps audio/webm -> .weba so it renders as an audio note.
+  const handleSendVoice = React.useCallback(async () => {
+    if (!sdk) return;
+    const rec = await voice.stop();
+    if (!rec || rec.durationMs < 700) return; // ignore accidental sub-second taps
+    setAttaching(true);
+    try {
+      const up = await (sdk as any).uploads.getMediaUploadUrl({ content_type: rec.mime, content_length: rec.blob.size });
+      const uploadUrl = up?.data?.upload_url || up?.data?.url;
+      if (!uploadUrl) return;
+      const put = await fetch(uploadUrl, { method: 'PUT', body: rec.blob, headers: { 'Content-Type': rec.mime } });
+      if (!put.ok) return;
+      const publicUrl = up?.data?.public_url || String(uploadUrl).split('?')[0];
+      await handleSend(publicUrl);
+    } catch {}
+    finally { setAttaching(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sdk]);
+
   const retryMessage = React.useCallback((msg: any) => {
     const body = (msg?.content || '').trim();
     if (!body) return;
@@ -1425,62 +1448,121 @@ function ConversationView({ conversationId, onBack, hideBack }: { conversationId
           ...(Platform.OS === 'web' ? { maxWidth: 760, width: '100%', alignSelf: 'center' } as any : {}),
         }}
       >
-        {/* Attach media (image / video). */}
-        <Pressable onPress={handleAttach} disabled={attaching} hitSlop={8} style={{ opacity: attaching ? 0.5 : 1, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) }}>
-          <Ionicons name={attaching ? 'ellipsis-horizontal' : 'add-circle-outline'} size={18} color={colors.accent} />
-        </Pressable>
-        <TextInput
-          placeholder="Type a message..."
-          placeholderTextColor={colors.textMuted}
-          value={text}
-          onChangeText={(t) => {
-            setText(t);
-            // Emit chat_typing at most once every 3s while the user is
-            // actively typing. Other members see "X is typing…" below
-            // the message list.
-            if (sdk && conversationId && t.trim().length > 0) {
-              const now = Date.now();
-              if (now - lastTypingEmitRef.current > 3000) {
-                lastTypingEmitRef.current = now;
-                try { sdk.realtime.sendTyping?.(conversationId); } catch {}
-              }
-            }
-          }}
-          multiline
-          onKeyPress={(e: any) => {
-            if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-          style={{
-            flex: 1,
-            backgroundColor: colors.surface,
-            borderWidth: 0.5,
-            borderColor: colors.glassBorder,
-            borderRadius: radius.lg,
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.md,
-            color: colors.text,
-            maxHeight: 100,
-            ...typography.body,
-            ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
-          }}
-        />
-        <Pressable
-          onPress={() => handleSend()}
-          disabled={!text.trim() || sending}
-          style={({ pressed }) => ({
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: text.trim() ? (pressed ? colors.accentHover : colors.accent) : colors.surfaceHover,
-            alignItems: 'center',
-            justifyContent: 'center',
-          })}
-        >
-          <Ionicons name="send" size={18} color={text.trim() ? colors.textOnAccent : colors.textMuted} />
-        </Pressable>
+        {voice.recording ? (
+          // Recording bar — WhatsApp/Signal style: discard, live timer, send.
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.md }}>
+            <Pressable onPress={voice.cancel} hitSlop={10} style={Platform.OS === 'web' ? { cursor: 'pointer' } as any : undefined}>
+              <Ionicons name="trash-outline" size={22} color={colors.error || '#ef4444'} />
+            </Pressable>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.sm,
+              backgroundColor: colors.surface, borderRadius: radius.lg,
+              paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+              borderWidth: 0.5, borderColor: colors.glassBorder,
+            }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.error || '#ef4444' }} />
+              <Text variant="body" color={colors.text} style={{ fontVariant: ['tabular-nums'] as any }}>
+                {`${Math.floor(voice.elapsed / 60000)}:${String(Math.floor(voice.elapsed / 1000) % 60).padStart(2, '0')}`}
+              </Text>
+              <Text variant="caption" color={colors.textMuted}>Recording…</Text>
+            </View>
+            <Pressable
+              onPress={handleSendVoice}
+              disabled={attaching}
+              style={({ pressed }) => ({
+                width: 44, height: 44, borderRadius: 22,
+                backgroundColor: pressed ? colors.accentHover : colors.accent,
+                alignItems: 'center', justifyContent: 'center', opacity: attaching ? 0.6 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name="send" size={18} color={colors.textOnAccent} />
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            {/* Attach media (image / video). */}
+            <Pressable onPress={handleAttach} disabled={attaching} hitSlop={8} style={{ opacity: attaching ? 0.5 : 1, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) }}>
+              <Ionicons name={attaching ? 'ellipsis-horizontal' : 'add-circle-outline'} size={18} color={colors.accent} />
+            </Pressable>
+            <TextInput
+              placeholder="Type a message..."
+              placeholderTextColor={colors.textMuted}
+              value={text}
+              onChangeText={(t) => {
+                setText(t);
+                // Emit chat_typing at most once every 3s while the user is
+                // actively typing. Other members see "X is typing…" below
+                // the message list.
+                if (sdk && conversationId && t.trim().length > 0) {
+                  const now = Date.now();
+                  if (now - lastTypingEmitRef.current > 3000) {
+                    lastTypingEmitRef.current = now;
+                    try { sdk.realtime.sendTyping?.(conversationId); } catch {}
+                  }
+                }
+              }}
+              multiline
+              onKeyPress={(e: any) => {
+                if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              style={{
+                flex: 1,
+                backgroundColor: colors.surface,
+                borderWidth: 0.5,
+                borderColor: colors.glassBorder,
+                borderRadius: radius.lg,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                color: colors.text,
+                maxHeight: 100,
+                ...typography.body,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+              }}
+            />
+            {text.trim() ? (
+              // Text present → send button.
+              <Pressable
+                onPress={() => handleSend()}
+                disabled={sending}
+                style={({ pressed }) => ({
+                  width: 44, height: 44, borderRadius: 22,
+                  backgroundColor: pressed ? colors.accentHover : colors.accent,
+                  alignItems: 'center', justifyContent: 'center',
+                })}
+              >
+                <Ionicons name="send" size={18} color={colors.textOnAccent} />
+              </Pressable>
+            ) : voice.supported ? (
+              // Empty input → hold-free tap-to-record mic (web).
+              <Pressable
+                onPress={() => voice.start()}
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  width: 44, height: 44, borderRadius: 22,
+                  backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+                  borderWidth: 0.5, borderColor: colors.glassBorder,
+                  alignItems: 'center', justifyContent: 'center',
+                  ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                })}
+              >
+                <Ionicons name="mic-outline" size={20} color={colors.accent} />
+              </Pressable>
+            ) : (
+              // No mic support (native without recorder) → inert send.
+              <Pressable
+                onPress={() => handleSend()}
+                disabled
+                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceHover, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="send" size={18} color={colors.textMuted} />
+              </Pressable>
+            )}
+          </>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
