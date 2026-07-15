@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator } from 'react-native';
 import { Text, Avatar, Button, PostCard, Skeleton, RightRailLayout, AgentBadge } from '../../../components';
+import { ImageCropper, CROP_AVATAR } from '../../../components/ImageCropper';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TabBar } from '../../../components/TabBar';
@@ -151,6 +152,8 @@ export default function UserProfileScreen() {
   const [bioExpanded, setBioExpanded] = React.useState(false);
   const [editSaving, setEditSaving] = React.useState(false);
   const [editAvatarUri, setEditAvatarUri] = React.useState<string | null>(null);
+  // Uri handed to the ImageCropper; its onDone sets editAvatarUri to the crop.
+  const [cropUri, setCropUri] = React.useState<string | null>(null);
 
   const { communities } = useCommunities(isOwnProfile ? 50 : 0);
 
@@ -265,24 +268,25 @@ export default function UserProfileScreen() {
     }
   };
 
+  // Pick the FULL image (no OS crop) and route it through our own ImageCropper —
+  // the OS `allowsEditing` crop was inconsistent across iOS/Android and absent on
+  // web. Our cropper guarantees a spec-perfect result on every platform.
   const handlePickEditAvatar = async () => {
     try {
       const picker = getImagePicker();
       if (picker) {
         const result = await picker.launchImageLibraryAsync({
           mediaTypes: picker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.8,
+          quality: 1,
         });
-        if (!result.canceled && result.assets[0]) setEditAvatarUri(result.assets[0].uri);
+        if (!result.canceled && result.assets[0]) setCropUri(result.assets[0].uri);
       } else if (Platform.OS === 'web') {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
         input.onchange = (e: any) => {
           const file = e.target?.files?.[0];
-          if (file) setEditAvatarUri(URL.createObjectURL(file));
+          if (file) setCropUri(URL.createObjectURL(file));
         };
         input.click();
       }
@@ -868,6 +872,15 @@ export default function UserProfileScreen() {
           </Pressable>
         </Modal>
       )}
+
+      {/* Full-screen crop step: picking an avatar hands the raw image here; the
+          cropped result becomes editAvatarUri for the existing upload flow. */}
+      <ImageCropper
+        uri={cropUri}
+        spec={CROP_AVATAR}
+        onCancel={() => setCropUri(null)}
+        onDone={(r) => { setEditAvatarUri(r.uri); setCropUri(null); }}
+      />
     </Container>
   );
 }
