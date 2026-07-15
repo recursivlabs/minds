@@ -153,6 +153,13 @@ export default function PostDetailScreen() {
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <View>
+            {/* X-style conversation context: the chain of posts the focal post
+                is replying to (thread root -> direct parent), rendered above it
+                as compact, tappable cards so you never land in a reply blind. */}
+            {Array.isArray((post as any).ancestors) &&
+              (post as any).ancestors.map((a: any) => (
+                <PostCard key={a.id} post={a} compact />
+              ))}
             <PostCard key={post.id} post={post} />
             {replies.length > 0 && (
               <View
