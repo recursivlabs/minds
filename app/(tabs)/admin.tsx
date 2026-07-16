@@ -172,7 +172,7 @@ function IconStat({ icon, label, value }: { icon: any; label: string; value: num
 // Compact number formatting for big metrics (1.2k, 3.4M).
 function fmt(n: number | string | undefined): string {
   const v = typeof n === 'number' ? n : Number(n);
-  if (!isFinite(v)) return String(n ?? '—');
+  if (!Number.isFinite(v)) return String(n ?? '—');
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
   return String(v);
@@ -532,7 +532,7 @@ function UserRapSheet({ user, sdk, allReports }: { user: any; sdk: any; allRepor
     <View style={{ gap: 4, padding: spacing.sm, backgroundColor: colors.surfaceRaised, borderRadius: radius.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <Text variant="label" color={colors.textMuted}>USER SUMMARY</Text>
-        <View style={{ paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radius.full, backgroundColor: riskColor + '22' }}>
+        <View style={{ paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radius.full, backgroundColor: `${riskColor}22` }}>
           <Text variant="caption" color={riskColor}>{a.level} risk</Text>
         </View>
       </View>

@@ -51,8 +51,7 @@ const articlePost = {
   id: 'art_1',
   title: '  The Future of Decentralized Social  ',
   content:
-    '# Why it matters\n\nMinds is **open** like Reddit. Here is a [link](https://minds.com) and `code`.\n\n' +
-    'A second paragraph with more than enough words to push the reading time past a single minute '.repeat(8),
+    `# Why it matters\n\nMinds is **open** like Reddit. Here is a [link](https://minds.com) and \`code\`.\n\n${'A second paragraph with more than enough words to push the reading time past a single minute '.repeat(8)}`,
   content_format: 'markdown',
   media: [{ url: 'https://media.minds.com/legacy-media/ef/01/cover.jpg', type: 'image' }],
   author: { name: 'Bill Ottman' },

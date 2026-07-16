@@ -6,7 +6,7 @@
 function toDate(input: string | number | Date | undefined | null): Date | null {
   if (!input) return null;
   const d = input instanceof Date ? input : new Date(input);
-  return isNaN(d.getTime()) ? null : d;
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /** Compact timestamp for list/feed surfaces. */

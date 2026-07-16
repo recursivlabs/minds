@@ -186,7 +186,7 @@ export function hotScore(post: any): number {
   const eng = engagementScore(post);
   const ts = timestampOf(post);
   const ageDays = ts ? Math.max(0, (Date.now() - new Date(ts).getTime()) / 86_400_000) : 3650;
-  return eng / Math.pow(ageDays + 2, 1.5);
+  return eng / (ageDays + 2) ** 1.5;
 }
 
 
@@ -1078,7 +1078,8 @@ export function topicPostCount(t: TopicTag): number {
 // mega-topic doesn't dwarf everything (linear scaling makes the long tail
 // unreadably tiny). Tags with no/equal counts land at the midpoint.
 function cloudWeight(count: number, minCount: number, maxCount: number): { fontSize: number; weight: '400' | '500' | '600' | '700'; opacity: number } {
-  const MIN = 13, MAX = 30;
+  const MIN = 13;
+  const MAX = 30;
   let frac = 0.5;
   if (maxCount > minCount) {
     const lo = Math.sqrt(Math.max(0, minCount));

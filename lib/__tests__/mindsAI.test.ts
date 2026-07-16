@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the welcome-DM poster + cache so we test bootstrap's branding logic.
-const ensureIntroDM = vi.fn(async () => 'conv-1');
+const ensureIntroDM = vi.fn(async (..._a: any[]) => 'conv-1');
 vi.mock('../agentIntro', () => ({ ensureIntroDM: (...a: any[]) => ensureIntroDM(...a) }));
 vi.mock('../cache', () => ({ invalidate: vi.fn() }));
 

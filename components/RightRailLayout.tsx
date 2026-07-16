@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import { View, Platform, useWindowDimensions } from 'react-native';
 import { FeedSidebar, type SidebarContext } from './FeedSidebar';
 import { spacing } from '../constants/theme';

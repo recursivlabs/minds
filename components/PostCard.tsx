@@ -65,7 +65,7 @@ function QuoteEmbed({
     quoted.image ||
     quoted.thumbnail ||
     null;
-  const preview = qText.length > 200 ? qText.slice(0, 200).trimEnd() + '…' : qText;
+  const preview = qText.length > 200 ? `${qText.slice(0, 200).trimEnd()}…` : qText;
 
   return (
     <Pressable
@@ -453,7 +453,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
       pathname: '/(tabs)/create',
       params: {
         quotePostId: actionPostId,
-        quoteAuthor: (quoted.author || quoted.user || {})?.name || (quoted.author || quoted.user || {})?.username || '',
+        quoteAuthor: (quoted.author || quoted.user)?.name || (quoted.author || quoted.user)?.username || '',
         quoteContent: (quoted.content || quoted.body || '').slice(0, 280),
       },
     } as any);
@@ -483,7 +483,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
     // Feed cards preview long posts; "Show more" expands the body inline
     // (the detail view already shows it in full) rather than a bare cut-off.
     const truncated = compact && !expanded && plain.length > 300;
-    const shown = truncated ? plain.slice(0, 300).trimEnd() + '…' : plain;
+    const shown = truncated ? `${plain.slice(0, 300).trimEnd()}…` : plain;
     const seeMore = truncated ? (
       <Pressable
         onPress={(e: any) => { e?.stopPropagation?.(); setExpanded(true); }}

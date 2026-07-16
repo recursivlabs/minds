@@ -32,7 +32,7 @@ if (isWeb) {
     const stale: string[] = [];
     for (let i = 0; i < window.localStorage.length; i++) {
       const k = window.localStorage.key(i);
-      if (k && k.startsWith('minds:cache:') && !k.startsWith(BASE_KEY)) stale.push(k);
+      if (k?.startsWith('minds:cache:') && !k.startsWith(BASE_KEY)) stale.push(k);
     }
     for (const k of stale) window.localStorage.removeItem(k);
   } catch {}

@@ -600,7 +600,8 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
     const n = Math.min(initialUnread, messages.length);
     if (n <= 0) return;
     const myId = user?.id;
-    let count = 0, anchorIdx = -1;
+    let count = 0;
+    let anchorIdx = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
       const sid = messages[i].sender?.id || messages[i].senderId || messages[i].sender_id;
       if (sid && sid !== myId) { count++; if (count >= n) { anchorIdx = i; break; } }

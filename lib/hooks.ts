@@ -10,7 +10,7 @@ import { captureException } from './monitoring';
 import { dedupePosts } from './models';
 
 // Once-per-session guard for the personal-agent config upsert (see recurate).
-let ensuredPersonalThisSession = false;
+const ensuredPersonalThisSession = false;
 
 /**
  * Fetch posts from the feed.
@@ -407,7 +407,7 @@ export function useTrendingPosts(limit = 5) {
 
   React.useEffect(() => {
     const fresh = getCached(cacheKey);
-    if (fresh && fresh.length) { setPosts(fresh); setLoading(false); }
+    if (fresh?.length) { setPosts(fresh); setLoading(false); }
     let cancelled = false;
     (async () => {
       if (!sdk) return; // identity-scoped; never fall back to the shared app key

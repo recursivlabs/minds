@@ -88,7 +88,7 @@ function RemoveMediaButton({
 
 /** Format seconds → m:ss for the video duration pill. */
 function fmtDuration(secs?: number | null): string | null {
-  if (secs == null || !isFinite(secs) || secs <= 0) return null;
+  if (secs == null || !Number.isFinite(secs) || secs <= 0) return null;
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
@@ -1564,7 +1564,7 @@ function ScheduleModal({
                   let tz = '';
                   try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch {}
                   const m = -new Date().getTimezoneOffset();
-                  const off = `GMT${m >= 0 ? '+' : '-'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
+                  const off = `GMT${m >= 0 ? '+' : '-'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? `:${String(Math.abs(m) % 60).padStart(2, '0')}` : ''}`;
                   return `Your timezone${tz ? ` — ${tz.replace(/_/g, ' ')}` : ''} (${off})`;
                 })()}
               </Text>

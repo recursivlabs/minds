@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
  * Use this everywhere a back affordance lives (ScreenHeader, Header, etc.) so
  * back behaves like a browser/Twitter back — returns to where you were.
  */
-export function useSmartBack(fallback: string = '/(tabs)') {
+export function useSmartBack(fallback = '/(tabs)') {
   const router = useRouter();
   return React.useCallback(() => {
     if (router.canGoBack()) {
