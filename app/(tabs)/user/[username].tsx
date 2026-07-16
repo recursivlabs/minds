@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator } from 'react-native';
 import { Text, Avatar, Button, PostCard, Skeleton, RightRailLayout, AgentBadge } from '../../../components';
 import { ImageCropper, CROP_AVATAR } from '../../../components/ImageCropper';
+import { Badge, getBadges } from '../../../components/Badge';
 import { Container } from '../../../components/Container';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TabBar } from '../../../components/TabBar';
@@ -443,6 +444,8 @@ export default function UserProfileScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }}>
             <Text variant="h2">{profile.name || username}</Text>
             {(profile.isAi || profile.is_ai) && <AgentBadge size={15} />}
+            {/* Tier + Founder badges: gold check (Minds+/Pro), Pro marker, Founder ribbon. */}
+            {getBadges(profile).map((b) => <Badge key={b} type={b} size="sm" />)}
             {profile.role === 'admin' && (
               <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 }}>
                 <Text variant="caption" color={colors.accent} style={{ fontSize: 10 }}>Admin</Text>
