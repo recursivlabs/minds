@@ -154,9 +154,7 @@ export default function DiscoverPosts() {
       onEndReached={onEndReached}
       onEndReachedThreshold={0.6}
       showsVerticalScrollIndicator={false}
-      ListHeaderComponent={
-        <>
-          <FilterBar>
+      ListHeaderComponent=<FilterBar>
             {!isSearching && (
               <FilterMenu
                 options={SORT_CHIPS}
@@ -182,8 +180,6 @@ export default function DiscoverPosts() {
               onPick={(id) => setParam({ tag: id || undefined })}
             />
           </FilterBar>
-        </>
-      }
       ListFooterComponent={showFooter ? (
         <View style={{ padding: spacing.xl, alignItems: 'center' }}>
           <ActivityIndicator color={colors.accent} />
