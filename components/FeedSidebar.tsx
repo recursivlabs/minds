@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents, useFollowingIds } from '../lib/hooks';
 import { profileFollowerCount } from '../lib/models';
-import { hotScore, cardLabel, postTitle, postThumb, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
+import { hotScore, cardLabel, postTitle, postThumb, dedupePosts, communityActivity, agentPopularity, computeTrendingTopics } from '../lib/discover';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
@@ -225,6 +225,8 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
   // prolific poster can't fill the entire rail (the "5 posts from one account"
   // problem). Fall back to raw order if hot-ranking collapses on a legacy corpus.
   const pool = posts || [];
+  // X-style "Trending" — hashtags ranked by frequency across the hot posts.
+  const trendingTopics = computeTrendingTopics(pool, 8);
   const rankedPosts = dedupePosts([...pool].sort((a: any, b: any) => hotScore(b) - hotScore(a)));
   const trending: any[] = [];
   const seenAuthors = new Set<string>();
@@ -257,6 +259,32 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
   // The four discovery widgets. Rendered in a context-dependent order so the
   // most relevant "next step" leads on each page (below).
   const sections: Record<string, React.ReactNode> = {
+    trending: trendingTopics.length > 0 ? (
+      <SidebarSection
+        title="Trending"
+        icon="trending-up-outline"
+        onSeeAll={() => router.push('/(tabs)/discover/posts?sort=hot' as any)}
+      >
+        {trendingTopics.map((t) => (
+          <Pressable
+            key={t.tag}
+            onPress={() => router.push({ pathname: '/(tabs)/discover/posts', params: { q: `#${t.tag}` } } as any)}
+            style={({ pressed, hovered }: any) => ({
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.xs,
+              borderRadius: radius.sm,
+              backgroundColor: pressed || hovered ? colors.surfaceHover : 'transparent',
+              ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+            })}
+          >
+            <Text variant="bodyMedium" color={colors.text} numberOfLines={1}>#{t.tag}</Text>
+            <Text variant="caption" color={colors.textMuted}>
+              {t.count.toLocaleString()} {t.count === 1 ? 'post' : 'posts'}
+            </Text>
+          </Pressable>
+        ))}
+      </SidebarSection>
+    ) : null,
     posts: (
       <SidebarSection
         title="Trending Posts"
@@ -378,13 +406,13 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
 
   // Contextual order — lead with the most relevant "next step" for the page.
   const ORDERS: Record<SidebarContext, string[]> = {
-    feed: ['posts', 'creators', 'communities', 'agents'],
-    discover: ['posts', 'creators', 'communities', 'agents'],
-    notifications: ['posts', 'creators', 'communities', 'agents'],
+    feed: ['trending', 'posts', 'creators', 'communities', 'agents'],
+    discover: ['trending', 'posts', 'creators', 'communities', 'agents'],
+    notifications: ['trending', 'posts', 'creators', 'communities', 'agents'],
     profile: ['creators', 'communities', 'posts', 'agents'],
     community: ['communities', 'creators', 'posts', 'agents'],
     communities: ['communities', 'creators', 'agents', 'posts'],
-    wallet: ['creators', 'communities', 'agents', 'posts'],
+    wallet: ['trending', 'creators', 'communities', 'agents', 'posts'],
   };
   const sectionOrder = ORDERS[context] || ORDERS.feed;
 
