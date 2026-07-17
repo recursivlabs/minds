@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
-import { AgentBadge } from './AgentBadge';
 import { Badge, getBadges } from './Badge';
 import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
@@ -97,7 +96,6 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge, isAg
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Text variant="body" numberOfLines={1} style={{ fontSize: 15, flexShrink: 1 }}>{name}</Text>
           {user && getBadges(user).map((b) => <Badge key={b} type={b} size="sm" />)}
-          {isAgent && <AgentBadge size={13} />}
           {badge && (
             <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: radius.sm }}>
               <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>{badge}</Text>
@@ -251,7 +249,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
     // The official @minds channel is the network's own account, not a creator to
     // follow — keep it out of the human Creators rail.
     .filter((u: any) => (u?.username || '').toLowerCase() !== 'minds');
-  const topPeople = rotateWindow(rankedPeople, 5);
+  const topPeople = rotateWindow(rankedPeople.slice(0, 12), 5);
   const rankedCommunities = [...(communities || [])]
     .sort((a: any, b: any) => communityActivity(b) - communityActivity(a));
   const topCommunities = rotateWindow(rankedCommunities, 5);

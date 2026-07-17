@@ -6,7 +6,6 @@ import { useRouter, usePathname, useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
-import { AgentBadge } from './AgentBadge';
 import { Badge, getBadges } from './Badge';
 import { useAuth } from '../lib/auth';
 import { getReferralLink } from '../lib/referral';
@@ -509,7 +508,6 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               {item.name}
             </Text>
             {(item as any).user && getBadges((item as any).user).map((b) => <Badge key={b} type={b} size="sm" />)}
-            {(item as any).isAgent && <AgentBadge size={13} />}
           </View>
           {item.preview ? (
             <Text
