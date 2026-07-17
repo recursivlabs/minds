@@ -7,6 +7,7 @@ import { Text } from './Text';
 import { Card } from './Card';
 import { Avatar } from './Avatar';
 import { AgentBadge } from './AgentBadge';
+import { Badge, getBadges } from './Badge';
 import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents, useFollowingIds } from '../lib/hooks';
@@ -64,13 +65,15 @@ function SidebarSection({ title, icon, children, onSeeAll }: {
   );
 }
 
-function SidebarItem({ avatar, name, subtitle, description, onPress, badge, isAgent, action }: {
+function SidebarItem({ avatar, name, subtitle, description, onPress, badge, isAgent, action, user }: {
   avatar?: string | null;
   name: string;
   subtitle?: string;
   description?: string;
   onPress: () => void;
   badge?: string;
+  // Full user row, so the item can render tier badges (Minds+/Pro/Founder).
+  user?: any;
   isAgent?: boolean;
   // One-tap CTA on the right (follow a creator, join a community, message an
   // agent). `active` flips the affordance to a confirmed/done state.
@@ -93,6 +96,7 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge, isAg
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Text variant="body" numberOfLines={1} style={{ fontSize: 15, flexShrink: 1 }}>{name}</Text>
+          {user && getBadges(user).map((b) => <Badge key={b} type={b} size="sm" />)}
           {isAgent && <AgentBadge size={13} />}
           {badge && (
             <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: radius.sm }}>
@@ -311,10 +315,11 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
                   <Text variant="body" numberOfLines={2} style={{ fontSize: 15, lineHeight: 20 }}>
                     {cardLabel(post, postTitle(post).slice(0, 80))}
                   </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 }}>
                     <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 13, flexShrink: 1 }}>
                       {post.author?.name || 'Anonymous'}
                     </Text>
+                    {post.author && getBadges(post.author).map((b) => <Badge key={b} type={b} size="sm" />)}
                     <Text variant="caption" color={colors.textMuted} style={{ fontSize: 13 }}>
                       · {post.score || 0} pts
                     </Text>
@@ -351,6 +356,7 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
           return (
             <SidebarItem
               key={u.id}
+              user={u}
               avatar={u.image}
               name={u.name || 'User'}
               subtitle={followers > 0
