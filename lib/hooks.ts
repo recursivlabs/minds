@@ -415,9 +415,16 @@ export function useTrendingPosts(limit = 5) {
       // Over-fetch a real pool so the client ranker + dedup have something to
       // choose from, then the caller slices to `limit`.
       const pool = Math.max(limit * 6, 30);
+      // "Top this week" — window to the last 7 days so the rail shows what's
+      // trending NOW (score-ranked within the window), not the all-time greatest
+      // hits. Coarse day-bucketed `since` so the fetch cache key stays stable
+      // through the day.
+      const since = new Date(Date.now() - 7 * 86_400_000);
+      const sinceIso = since.toISOString();
+      const dayBucket = sinceIso.slice(0, 10);
       const fetchSort = (sort: 'hot' | 'score') =>
-        fetchDeduped(`req:trending-posts:${sort}:${pool}`, () =>
-          s.posts.list({ limit: pool, sort } as any) as Promise<any>);
+        fetchDeduped(`req:trending-posts:${sort}:${pool}:${dayBucket}`, () =>
+          s.posts.list({ limit: pool, sort, since: sinceIso } as any) as Promise<any>);
       try {
         // PRIMARY: score (engagement-ranked). The hot/recency pool is polluted on
         // the relaunch corpus — a simulator floods the newest posts with

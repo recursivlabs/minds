@@ -435,13 +435,15 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         name,
         avatar: ou?.image || other?.image || ou?.avatar || null,
         isAgent: isAiActor(ou) || isAiActor(other),
+        // Keep the other participant's user so the row can render tier badges.
+        user: ou,
         preview: stripMarkdown(useLive ? live.content : (c.lastMessage?.content || c.last_message?.content || '')),
       };
     })
     .filter(Boolean)
     // Show a real inbox, not a teaser. The panel scrolls, so the cap only
     // exists to keep the render light — 4 was hiding active threads.
-    .slice(0, 10) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string; isAgent?: boolean }>;
+    .slice(0, 10) as Array<{ id: string; type: 'dm'; name: string; avatar: string | null; preview: string; isAgent?: boolean; user?: any }>;
   // Communities the user is a member of. Strict is_member check (only true).
   // NOTE: this reflects real communityMember rows — if a community the user
   // never joined appears here, the fix is at the source (an auto-join path
@@ -506,6 +508,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
             >
               {item.name}
             </Text>
+            {(item as any).user && getBadges((item as any).user).map((b) => <Badge key={b} type={b} size="sm" />)}
             {(item as any).isAgent && <AgentBadge size={13} />}
           </View>
           {item.preview ? (
