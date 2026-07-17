@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
 import { Avatar } from './Avatar';
 import { AgentBadge } from './AgentBadge';
+import { Badge, getBadges } from './Badge';
 import { useAuth } from '../lib/auth';
 import { getReferralLink } from '../lib/referral';
 import { showToast } from './Toast';
@@ -779,9 +780,12 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               <Avatar uri={user?.image} name={user?.name} size="xs" />
               {!collapsed && (
                 <View style={{ flex: 1 }}>
-                  <Text variant="caption" numberOfLines={1} style={{ fontWeight: '400' }}>
-                    {user?.name || user?.username || 'Profile'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Text variant="caption" numberOfLines={1} style={{ fontWeight: '400', flexShrink: 1 }}>
+                      {user?.name || user?.username || 'Profile'}
+                    </Text>
+                    {getBadges(user).map((b) => <Badge key={b} type={b} size="sm" />)}
+                  </View>
                   {user?.username && (
                     <Text variant="caption" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 11 }}>
                       @{user.username}
