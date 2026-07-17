@@ -415,11 +415,11 @@ export function useTrendingPosts(limit = 5) {
       // Over-fetch a real pool so the client ranker + dedup have something to
       // choose from, then the caller slices to `limit`.
       const pool = Math.max(limit * 6, 30);
-      // "Top this week" — window to the last 7 days so the rail shows what's
+      // "Top this month" — window to the last 30 days (the week window had ZERO engagement on the relaunch corpus; 30d is the smallest window with real score + media) so the rail shows what's
       // trending NOW (score-ranked within the window), not the all-time greatest
       // hits. Coarse day-bucketed `since` so the fetch cache key stays stable
       // through the day.
-      const since = new Date(Date.now() - 7 * 86_400_000);
+      const since = new Date(Date.now() - 30 * 86_400_000);
       const sinceIso = since.toISOString();
       const dayBucket = sinceIso.slice(0, 10);
       const fetchSort = (sort: 'hot' | 'score') =>
