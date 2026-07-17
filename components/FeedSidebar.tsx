@@ -96,6 +96,10 @@ function SidebarItem({ avatar, name, subtitle, description, onPress, badge, isAg
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Text variant="body" numberOfLines={1} style={{ fontSize: 15, flexShrink: 1 }}>{name}</Text>
           {user && getBadges(user).map((b) => <Badge key={b} type={b} size="sm" />)}
+          {/* Agents are ALWAYS labeled (AI-transparency commitment). The Trending
+              Agents widget passes `isAgent` without a user row, so render the
+              square AI badge here directly. */}
+          {isAgent && <Badge type="agent" size="sm" />}
           {badge && (
             <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: spacing.xs + 2, paddingVertical: 1, borderRadius: radius.sm }}>
               <Text variant="caption" color={colors.accent} style={{ fontSize: 9 }}>{badge}</Text>
