@@ -167,6 +167,41 @@ export function invalidatePrefix(prefix: string): void {
   if (removed.length === 0) notify(prefix); // still wake listeners
 }
 
+/**
+ * Patch a single post wherever it appears in cached LISTS (personal feed,
+ * `profile-posts:*`, discover, etc.), not just the standalone `post:<id>` entry.
+ *
+ * Why: casting a vote only updated `post:<id>`, so the channel/profile and feed
+ * lists — which persist to localStorage for instant loads after refresh —
+ * reloaded their STALE cached copy and the vote appeared lost on refresh. This
+ * walks every cached entry and merges `patch` into the matching post so the cast
+ * vote (and its new score) survives a reload across every view.
+ */
+export function patchPostInCaches(postId: string, patch: Record<string, any>): void {
+  let touched = false;
+  for (const entry of store.values()) {
+    const d = entry.data;
+    if (!d) continue;
+    const arrays: any[][] = [];
+    if (Array.isArray(d)) arrays.push(d);
+    else if (typeof d === 'object') {
+      for (const k of ['items', 'posts', 'data', 'results']) {
+        if (Array.isArray((d as any)[k])) arrays.push((d as any)[k]);
+      }
+    }
+    for (const arr of arrays) {
+      for (let i = 0; i < arr.length; i++) {
+        const p = arr[i];
+        if (p && (p.id === postId || p.guid === postId)) {
+          arr[i] = { ...p, ...patch };
+          touched = true;
+        }
+      }
+    }
+  }
+  if (touched) schedulePersist();
+}
+
 // ── Request deduplication ────────────────────────────────────────────────
 // Concurrent callers fetching the same resource share one promise instead of
 // issuing duplicate requests. Multiple mounted hook instances (e.g. the
