@@ -249,7 +249,13 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
     // The official @minds channel is the network's own account, not a creator to
     // follow — keep it out of the human Creators rail.
     .filter((u: any) => (u?.username || '').toLowerCase() !== 'minds');
-  const topPeople = rotateWindow(rankedPeople.slice(0, 12), 5);
+  // Rotate through the top ~96 creators, but only ones with a real bio/
+  // description — keeps the rail full + varied without surfacing empty-profile
+  // accounts.
+  const creatorPool = rankedPeople
+    .filter((u: any) => ((u?.bio || u?.description || u?.briefdescription || '') as string).trim().length > 0)
+    .slice(0, 96);
+  const topPeople = rotateWindow(creatorPool, 5);
   const rankedCommunities = [...(communities || [])]
     .sort((a: any, b: any) => communityActivity(b) - communityActivity(a));
   const topCommunities = rotateWindow(rankedCommunities, 5);
