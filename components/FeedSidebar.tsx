@@ -12,7 +12,7 @@ import { useAuth } from '../lib/auth';
 import { ORG_ID } from '../lib/recursiv';
 import { useTrendingPosts, useCommunities, useProfiles, useProfileLeaderboard, useAgents, useFollowingIds } from '../lib/hooks';
 import { profileFollowerCount } from '../lib/models';
-import { hotScore, cardLabel, postTitle, postThumb, dedupePosts, communityActivity, agentPopularity, computeTrendingTopics } from '../lib/discover';
+import { engagementScore, cardLabel, postTitle, postThumb, dedupePosts, communityActivity, agentPopularity } from '../lib/discover';
 import { spacing, radius } from '../constants/theme';
 import { useColors } from '../lib/theme';
 
@@ -186,11 +186,11 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
   // everywhere. We fetch a real pool (not 5) so the client-side ranking has
   // something to choose from, then take the top 5.
 
-  // Posts → useTrendingPosts: fetches the Hot path (recency-aware engagement)
-  // with a guaranteed fallback to the all-time Top list when Hot returns empty,
-  // so the rail is NEVER silently empty when posts exist (the root cause of the
-  // blank widget — Hot was the sole source). We still re-rank by the
-  // time-decayed hotScore client-side so the order favors recent, engaged posts.
+  // Posts → useTrendingPosts: fetches the engagement-ranked (score) list, which
+  // is robust to the simulator flooding recent posts with 0-engagement spam
+  // (that polluted the recency/hot pool and left the rail full of "0 pts", no-
+  // media junk). We re-rank the pool by engagementScore client-side so the rail
+  // leads with posts that actually earned reach.
   const { posts } = useTrendingPosts(20);
   // Creators → the server-ranked FOLLOWER leaderboard (real reach, the People
   // tab's authoritative top-N), hydrated with directory identity and filtered of
@@ -229,9 +229,9 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
   // prolific poster can't fill the entire rail (the "5 posts from one account"
   // problem). Fall back to raw order if hot-ranking collapses on a legacy corpus.
   const pool = posts || [];
-  // X-style "Trending" — hashtags ranked by frequency across the hot posts.
-  const trendingTopics = computeTrendingTopics(pool, 8);
-  const rankedPosts = dedupePosts([...pool].sort((a: any, b: any) => hotScore(b) - hotScore(a)));
+  // Rank by real engagement (votes + replies + media), highest first, so the
+  // rail leads with posts that earned reach — not whatever is newest.
+  const rankedPosts = dedupePosts([...pool].sort((a: any, b: any) => engagementScore(b) - engagementScore(a)));
   const trending: any[] = [];
   const seenAuthors = new Set<string>();
   for (const p of (rankedPosts.length >= 3 ? rankedPosts : dedupePosts([...pool]))) {
@@ -263,32 +263,6 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
   // The four discovery widgets. Rendered in a context-dependent order so the
   // most relevant "next step" leads on each page (below).
   const sections: Record<string, React.ReactNode> = {
-    trending: trendingTopics.length > 0 ? (
-      <SidebarSection
-        title="Trending"
-        icon="trending-up-outline"
-        onSeeAll={() => router.push('/(tabs)/discover/posts?sort=hot' as any)}
-      >
-        {trendingTopics.map((t) => (
-          <Pressable
-            key={t.tag}
-            onPress={() => router.push({ pathname: '/(tabs)/discover/posts', params: { q: `#${t.tag}` } } as any)}
-            style={({ pressed, hovered }: any) => ({
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.xs,
-              borderRadius: radius.sm,
-              backgroundColor: pressed || hovered ? colors.surfaceHover : 'transparent',
-              ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-            })}
-          >
-            <Text variant="bodyMedium" color={colors.text} numberOfLines={1}>#{t.tag}</Text>
-            <Text variant="caption" color={colors.textMuted}>
-              {t.count.toLocaleString()} {t.count === 1 ? 'post' : 'posts'}
-            </Text>
-          </Pressable>
-        ))}
-      </SidebarSection>
-    ) : null,
     posts: (
       <SidebarSection
         title="Trending Posts"
@@ -412,13 +386,13 @@ export function FeedSidebar({ context = 'feed' }: { context?: SidebarContext } =
 
   // Contextual order — lead with the most relevant "next step" for the page.
   const ORDERS: Record<SidebarContext, string[]> = {
-    feed: ['trending', 'posts', 'creators', 'communities', 'agents'],
-    discover: ['trending', 'posts', 'creators', 'communities', 'agents'],
-    notifications: ['trending', 'posts', 'creators', 'communities', 'agents'],
+    feed: ['posts', 'creators', 'communities', 'agents'],
+    discover: ['posts', 'creators', 'communities', 'agents'],
+    notifications: ['posts', 'creators', 'communities', 'agents'],
     profile: ['creators', 'communities', 'posts', 'agents'],
     community: ['communities', 'creators', 'posts', 'agents'],
     communities: ['communities', 'creators', 'agents', 'posts'],
-    wallet: ['trending', 'creators', 'communities', 'agents', 'posts'],
+    wallet: ['creators', 'communities', 'agents', 'posts'],
   };
   const sectionOrder = ORDERS[context] || ORDERS.feed;
 

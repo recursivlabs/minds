@@ -419,13 +419,16 @@ export function useTrendingPosts(limit = 5) {
         fetchDeduped(`req:trending-posts:${sort}:${pool}`, () =>
           s.posts.list({ limit: pool, sort } as any) as Promise<any>);
       try {
-        // PRIMARY: hot (recency-aware engagement).
-        let res: any = await fetchSort('hot');
+        // PRIMARY: score (engagement-ranked). The hot/recency pool is polluted on
+        // the relaunch corpus — a simulator floods the newest posts with
+        // 0-engagement emoji/gif spam, so recency-first surfaced junk with "0 pts"
+        // and no media. Engagement-ranked shows posts that actually earned reach
+        // (real score + media previews).
+        let res: any = await fetchSort('score');
         let data: any[] = filterMuted(res?.data || []);
-        // FALLBACK: if hot yields nothing, pull the all-time top so the widget
-        // is populated whenever any posts exist at all.
+        // FALLBACK: hot, if score yields nothing at all.
         if (data.length === 0) {
-          res = await fetchSort('score');
+          res = await fetchSort('hot');
           data = filterMuted(res?.data || []);
         }
         if (cancelled) return;
