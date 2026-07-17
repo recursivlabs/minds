@@ -3,7 +3,7 @@ import { View, FlatList, Pressable, TextInput, KeyboardAvoidingView, Platform, u
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, Avatar, Skeleton, ChatBubble, Button, AgentBadge } from '../../components';
+import { Text, Avatar, Skeleton, ChatBubble, Button, AgentBadge, Badge, getBadges } from '../../components';
 import { MessageActions } from '../../components/MessageActions';
 import { ChatSettingsSheet } from '../../components/ChatSettingsSheet';
 import { formatTimestamp, formatDayLabel, isNewDay } from '../../lib/time';
@@ -363,6 +363,7 @@ export default function ChatScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 }}>
                       <Text variant="bodyMedium" numberOfLines={1} style={{ flexShrink: 1 }}>{name}</Text>
+                      {getBadges(ou).map((b) => <Badge key={b} type={b} size="sm" />)}
                       {isAgentConvo && <AgentBadge size={12} />}
                     </View>
                     {time ? (
