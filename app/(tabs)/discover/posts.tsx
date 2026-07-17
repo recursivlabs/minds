@@ -56,9 +56,16 @@ export default function DiscoverPosts() {
   // Filter state lives in the URL so deep-links + filters are shareable.
   // Default sort is Top (highest-scoring) — absent param → 'top'.
   const sort: PostSort = (params.sort === 'new' || params.sort === 'hot') ? params.sort : 'top';
-  // Default time range is This Week (fresh content) — absent param → 'week'.
+  // Default time range depends on sort. Top means "the best posts" — on the
+  // relaunch corpus the genuinely high-engagement content is all imported
+  // (older than a week), so a default 'week' window hid every top post and left
+  // only this week's low-engagement/spam. Top therefore defaults to ALL-TIME so
+  // it actually shows top posts. New/Hot stay windowed to 'week' for freshness.
+  const rangeDefault: TimeRange = sort === 'top' ? 'all' : 'week';
   const range: TimeRange =
-    (params.range === 'today' || params.range === 'month' || params.range === 'all') ? params.range : 'week';
+    (params.range === 'today' || params.range === 'week' || params.range === 'month' || params.range === 'all')
+      ? (params.range as TimeRange)
+      : rangeDefault;
   const tagId = typeof params.tag === 'string' && params.tag ? params.tag : null;
 
   const setParam = React.useCallback((patch: Record<string, string | undefined>) => {

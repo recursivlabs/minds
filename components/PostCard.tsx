@@ -343,13 +343,16 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
         if (prevVote) await sdk.posts.unreact(actionPostId);
         await sdk.posts.react(actionPostId, type as any);
       }
-      // Update cache so other views of this post show correct vote
+      // Update cache so other views of this post show correct vote — both the
+      // standalone post entry AND every cached list (feed, profile-posts,
+      // discover). Without the list patch, the channel reloads its stale cached
+      // list after a refresh and the vote looks lost (engagement must stick).
       try {
-        const { setCache, getCached } = require('../lib/cache');
+        const { setCache, getCached, patchPostInCaches } = require('../lib/cache');
+        const patch = { score: newScore, userReaction: newVote, user_reaction: newVote };
         const cached = getCached(`post:${actionPostId}`);
-        if (cached) {
-          setCache(`post:${actionPostId}`, { ...cached, score: newScore, userReaction: newVote, user_reaction: newVote });
-        }
+        if (cached) setCache(`post:${actionPostId}`, { ...cached, ...patch });
+        patchPostInCaches(actionPostId, patch);
       } catch {}
     } catch (err: any) {
       toast.show('Vote failed', 'error');

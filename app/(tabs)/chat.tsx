@@ -661,8 +661,20 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
         createdAt: m.createdAt || m.created_at || new Date().toISOString(),
       })).filter((m: any) => m.content); // Skip blank messages
       setMessages(prev => {
+        // Drop optimistic placeholders once the real server row with the same
+        // content has arrived. The WS path already does this, but the poll/
+        // catch-up merge did not — so in AGENT chats (where the user's temp row
+        // is never id-reconciled, because chat.send is skipped) the temp/
+        // streaming row and the reconciled server row BOTH rendered: the
+        // transient double-send that cleared only on refresh.
+        const incomingContents = new Set(incoming.map((m: any) => (m.content || '').trim()));
         const byId = new Map<string, any>();
-        for (const m of prev) byId.set(m.id, m);
+        for (const m of prev) {
+          const isOptimistic = typeof m.id === 'string'
+            && (m.id.startsWith('temp-') || m.id.startsWith('agent-') || m.id.startsWith('streaming-'));
+          if (isOptimistic && incomingContents.has((m.content || '').trim())) continue;
+          byId.set(m.id, m);
+        }
         for (const m of incoming) byId.set(m.id, m);
         return Array.from(byId.values()).sort(
           (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -1571,9 +1583,23 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
           </View>
         ) : (
           <>
-            {/* Attach media (image / video). */}
-            <Pressable onPress={handleAttach} disabled={attaching} hitSlop={8} style={{ opacity: attaching ? 0.5 : 1, ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}) }}>
-              <Ionicons name={attaching ? 'ellipsis-horizontal' : 'add-circle-outline'} size={18} color={colors.accent} />
+            {/* Attach media (image / video). Same 44x44 circular button as the
+                mic + send controls so all composer actions are uniformly sized
+                (it was a bare icon with no button chrome, so it read smaller). */}
+            <Pressable
+              onPress={handleAttach}
+              disabled={attaching}
+              hitSlop={8}
+              style={({ pressed }) => ({
+                width: 44, height: 44, borderRadius: 22,
+                backgroundColor: pressed ? colors.surfaceHover : colors.surface,
+                borderWidth: 0.5, borderColor: colors.glassBorder,
+                alignItems: 'center', justifyContent: 'center',
+                opacity: attaching ? 0.5 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+              })}
+            >
+              <Ionicons name={attaching ? 'ellipsis-horizontal' : 'add-circle-outline'} size={20} color={colors.accent} />
             </Pressable>
             <TextInput
               placeholder="Type a message..."
