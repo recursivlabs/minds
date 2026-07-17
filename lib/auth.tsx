@@ -68,6 +68,11 @@ interface User {
   // Network-level role from /users/me. Gates the admin nav + badge. Optional
   // because older cached user JSON (pre-this-field) won't have it.
   role?: 'user' | 'admin';
+  // Membership tiers from /users/me, so the signed-in user's OWN badges
+  // (Minds+/Pro/Founder) render in the sidebar/account menu.
+  plus?: boolean;
+  pro?: boolean;
+  founder?: boolean;
 }
 
 interface AuthContextValue {
@@ -164,6 +169,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   image: me.image ?? bootUser?.image ?? null,
                   bio: me.bio || me.briefdescription || bootUser?.bio || '',
                   role: me.role ?? (me.is_admin ? 'admin' : undefined),
+                  plus: me.plus ?? me.is_plus ?? bootUser?.plus,
+                  pro: me.pro ?? me.is_pro ?? bootUser?.pro,
+                  founder: me.founder ?? me.is_founder ?? bootUser?.founder,
                 };
                 if (JSON.stringify(canonical) !== JSON.stringify(bootUser)) {
                   await storage.setItem(KEYS.user, JSON.stringify(canonical));
