@@ -27,18 +27,37 @@ export interface BlockedUser {
   name: string;
   username: string;
   image: string | null;
+  bio?: string | null;
+  blocked_at?: string | null;
 }
 
-export async function getBlockedUsers(): Promise<BlockedUser[]> {
+export interface BlockedPage {
+  data: BlockedUser[];
+  hasMore: boolean;
+}
+
+/**
+ * Page through the accounts the caller has blocked. `search` filters by
+ * name/username server-side; `limit`/`offset` drive infinite scroll. Returns
+ * an empty page (never throws) so the list UI degrades gracefully.
+ */
+export async function getBlockedUsers(
+  opts: { search?: string; limit?: number; offset?: number } = {},
+): Promise<BlockedPage> {
+  const { search = '', limit = 30, offset = 0 } = opts;
   try {
-    const res = await fetch(`${BASE_URL}/profiles/blocked`, {
+    const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (search.trim()) qs.set('search', search.trim());
+    const res = await fetch(`${BASE_URL}/profiles/blocked?${qs.toString()}`, {
       headers: { Authorization: `Bearer ${await apiKey()}` },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { data: [], hasMore: false };
     const json = await res.json();
-    return (json?.data ?? []) as BlockedUser[];
+    const data = (json?.data ?? []) as BlockedUser[];
+    const hasMore = json?.meta?.has_more ?? data.length === limit;
+    return { data, hasMore };
   } catch {
-    return [];
+    return { data: [], hasMore: false };
   }
 }
 
