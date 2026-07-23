@@ -692,6 +692,7 @@ export default function SettingsScreen() {
             <SettingRow first icon="globe-outline" label="Public profile" right={<Toggle value={privacy.profilePublic} onValueChange={v => togglePrivacy('profilePublic', v)} />} />
             <SettingRow icon="mail-unread-outline" label="Show email on profile" right={<Toggle value={privacy.showEmail} onValueChange={v => togglePrivacy('showEmail', v)} />} />
             <SettingRow icon="ban-outline" label="Blocked accounts" sublabel="Manage who you've blocked" onPress={() => router.push('/(tabs)/blocked' as any)} />
+            <SettingRow icon="volume-mute-outline" label="Muted accounts" sublabel="Manage who you've muted" onPress={() => router.push('/(tabs)/muted' as any)} />
           </Section>
         );
 

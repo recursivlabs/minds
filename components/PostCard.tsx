@@ -16,7 +16,7 @@ import { useToast } from './Toast';
 import { isBookmarked, toggleBookmark } from '../lib/bookmarks';
 import { logSignal } from '../lib/signals';
 import { isMuted, toggleMute } from '../lib/muted';
-import { blockUser } from '../lib/moderation';
+import { blockUser, muteUser, unmuteUser } from '../lib/moderation';
 import { getCached } from '../lib/cache';
 import { askAgent, buildPostContextPrompt } from '../lib/askAgent';
 import { LinkPreview } from './LinkPreview';
@@ -1062,12 +1062,20 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
                 )}
                 {!isOwnPost && (
                   <Pressable
-                    onPress={() => {
+                    onPress={async () => {
                       setShowMenu(false);
                       const authorId = author.id;
-                      if (authorId) {
-                        const muted = toggleMute(authorId);
-                        toast.show(muted ? `Muted ${authorName}` : `Unmuted ${authorName}`);
+                      if (!authorId) return;
+                      // Instant local toggle (client-side feed filter), then
+                      // persist to the server so mute follows the account across
+                      // devices and drives server-side feed + notification hiding.
+                      const muted = toggleMute(authorId);
+                      toast.show(muted ? `Muted ${authorName}` : `Unmuted ${authorName}`);
+                      try {
+                        if (muted) await muteUser(authorId); else await unmuteUser(authorId);
+                      } catch {
+                        toggleMute(authorId); // revert local to stay consistent with server
+                        toast.show('Could not update mute', 'error');
                       }
                     }}
                     style={{ padding: spacing.md }}
