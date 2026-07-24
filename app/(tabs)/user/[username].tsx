@@ -19,7 +19,7 @@ import { getBookmarks } from '../../../lib/bookmarks';
 import { getCached, invalidate, fetchDeduped } from '../../../lib/cache';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors } from '../../../lib/theme';
-import { profileFollowerCount, profileFollowingCount, isArticlePost } from '../../../lib/models';
+import { profileFollowerCount, profileFollowingCount } from '../../../lib/models';
 import { formatCount } from '../../../lib/discover';
 
 const getImagePicker = () => Platform.OS !== 'web' ? require('expo-image-picker') : null;
@@ -140,6 +140,15 @@ export default function UserProfileScreen() {
     hasMore: repliesHasMore,
     loadMore: loadMoreReplies,
   } = useProfilePosts(profile?.id, { replies: true, limit: 30 });
+  // Articles tab: server-filtered (title + markdown), NOT a client filter over
+  // the recency-paged posts — legacy blogs are sparse/old and never landed on
+  // the first pages, so the tab looked empty even when the user had them.
+  const {
+    posts: userArticles,
+    loading: articlesLoading,
+    hasMore: articlesHasMore,
+    loadMore: loadMoreArticles,
+  } = useProfilePosts(profile?.id, { articles: true, limit: 30 });
   const [followersList, setFollowersList] = React.useState<any[] | null>(null);
   const [followingList, setFollowingList] = React.useState<any[] | null>(null);
   const [relationsLoading, setRelationsLoading] = React.useState(false);
@@ -224,7 +233,8 @@ export default function UserProfileScreen() {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
     const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
     if (distanceFromBottom > 600) return;
-    if (profileTab === 'posts' || profileTab === 'articles') loadMorePosts();
+    if (profileTab === 'posts') loadMorePosts();
+    else if (profileTab === 'articles') loadMoreArticles();
     else if (profileTab === 'replies') loadMoreReplies();
   }, [profileTab, loadMorePosts, loadMoreReplies]);
 
@@ -599,7 +609,7 @@ export default function UserProfileScreen() {
               {visiblePosts.map((post: any) => (
                 <PostCard key={post.id} post={post} compact />
               ))}
-              {!isTabSearching && postsHasMore && (
+              {!isTabSearching && articlesHasMore && (
                 <View style={{ padding: spacing.xl, alignItems: 'center' }}>
                   <ActivityIndicator color={colors.accent} />
                 </View>
@@ -612,11 +622,10 @@ export default function UserProfileScreen() {
         {/* Articles — long-form posts (title + markdown). PostCard renders them
             as the article card; the 'posts' tab already excludes titled posts. */}
         {profileTab === 'articles' && (() => {
-          const visibleArticles = userPosts
-            .filter((p: any) => isArticlePost(p))
+          const visibleArticles = userArticles
             .filter((p: any) => matchText(p.content, p.title));
           return (
-          postsLoading ? (
+          articlesLoading ? (
             <View style={{ padding: spacing.xl, gap: spacing.lg }}>{[1, 2].map(i => <Skeleton key={i} height={80} />)}</View>
           ) : visibleArticles.length === 0 ? (
             <View style={{ alignItems: 'center', padding: spacing['3xl'] }}>

@@ -469,11 +469,13 @@ export function useTrendingPosts(limit = 5) {
  * for infinite scroll. Set `replies: true` for the Replies tab (server
  * returns the author's replies with the parent post hydrated).
  */
-export function useProfilePosts(authorId: string | undefined, opts?: { replies?: boolean; limit?: number }) {
+export function useProfilePosts(authorId: string | undefined, opts?: { replies?: boolean; articles?: boolean; limit?: number }) {
   const { sdk } = useAuth();
   const replies = !!opts?.replies;
+  const articles = !!opts?.articles;
   const limit = opts?.limit ?? 30;
-  const cacheKey = `profile-posts:${authorId || 'none'}:${replies ? 'replies' : 'posts'}:${limit}`;
+  const mode = replies ? 'replies' : articles ? 'articles' : 'posts';
+  const cacheKey = `profile-posts:${authorId || 'none'}:${mode}:${limit}`;
   const cached = getCached(cacheKey);
   const [posts, setPosts] = React.useState<any[]>(cached || []);
   const [loading, setLoading] = React.useState(!cached && !!authorId);
@@ -496,7 +498,7 @@ export function useProfilePosts(authorId: string | undefined, opts?: { replies?:
       // server for the author's replies with the parent hydrated. Both passed
       // via `as any` because `replies` isn't on the typed ListPostsParams.
       const res: any = await fetchDeduped(`req:${cacheKey}:${offset}`, () =>
-        sdk.posts.list({ author_id: authorId, limit, offset, ...(replies ? { replies: true } : {}) } as any));
+        sdk.posts.list({ author_id: authorId, limit, offset, ...(replies ? { replies: true } : {}), ...(articles ? { articles: true } : {}) } as any));
       if (stale()) return;
       const raw = res.data || [];
       const more = res.meta?.has_more ?? raw.length >= limit;
@@ -512,11 +514,11 @@ export function useProfilePosts(authorId: string | undefined, opts?: { replies?:
       setHasMore(more);
       offsetRef.current = offset + raw.length;
     } catch (err: any) {
-      captureException(err, { hook: 'useProfilePosts', replies });
+      captureException(err, { hook: 'useProfilePosts', replies, articles });
     } finally {
       if (!stale()) { inFlightRef.current = false; setLoading(false); setRefreshing(false); }
     }
-  }, [sdk, authorId, cacheKey, limit, replies]);
+  }, [sdk, authorId, cacheKey, limit, replies, articles]);
 
   // Refetch from scratch whenever the author (or sdk) changes.
   React.useEffect(() => {
