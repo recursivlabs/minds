@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, RightRailLayout } from '../../../components';
 import { Container } from '../../../components/Container';
 import { spacing, radius, typography } from '../../../constants/theme';
-import { useColors } from '../../../lib/theme';
+import { useColors, useInputKeyboardProps } from '../../../lib/theme';
 import { DISCOVER_TABS } from '../../../lib/discover';
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -41,6 +41,7 @@ function hrefForKey(key: string): string {
 
 function DiscoverTabBar({ active, onChange }: { active: string; onChange: (key: string) => void }) {
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
   return (
     <View
       style={{
@@ -80,6 +81,7 @@ function DiscoverTabBar({ active, onChange }: { active: string; onChange: (key: 
 }
 
 export default function DiscoverLayout() {
+  const kbProps = useInputKeyboardProps();
   const router = useRouter();
   const colors = useColors();
   const pathname = usePathname();
@@ -153,6 +155,10 @@ export default function DiscoverLayout() {
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
+              {...kbProps}
               style={{
                 flex: 1, color: colors.text, ...typography.body, paddingVertical: 11,
                 ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),

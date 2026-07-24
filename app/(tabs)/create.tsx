@@ -27,7 +27,7 @@ import { useAuth } from '../../lib/auth';
 import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
-import { useColors } from '../../lib/theme';
+import { useColors, useInputKeyboardProps } from '../../lib/theme';
 
 // Consumer Create surface: Post is the only first-class mode. Community
 // stays as a reachable mode via ?mode=community deep-link from Discover's
@@ -181,6 +181,7 @@ export default function CreateScreen() {
   const quoteContent = typeof params.quoteContent === 'string' ? params.quoteContent : '';
   const { sdk, user } = useAuth();
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
   const initialMode: Mode = (params.mode === 'community' || params.mode === 'article' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
   const [mode, setMode] = React.useState<Mode>(initialMode);
 
@@ -979,6 +980,7 @@ export default function CreateScreen() {
                 value={mode === 'article' ? articleContent : content}
                 onChangeText={mode === 'article' ? setArticleContent : setContent}
                 multiline
+                {...kbProps}
                 autoFocus={false}
                 onKeyPress={(e: any) => {
                   if (mode !== 'article' && Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {

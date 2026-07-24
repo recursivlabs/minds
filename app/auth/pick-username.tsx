@@ -7,7 +7,7 @@ import { Container } from '../../components/Container';
 import { useAuth } from '../../lib/auth';
 import { markUsernamePicked } from '../../lib/onboarding';
 import { spacing, radius, typography } from '../../constants/theme';
-import { useColors } from '../../lib/theme';
+import { useColors, useInputKeyboardProps } from '../../lib/theme';
 
 const USERNAME_RE = /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/;
 
@@ -17,6 +17,7 @@ export default function PickUsernameScreen() {
   const router = useRouter();
   const { sdk, user, refreshUser } = useAuth();
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
   // Pre-fill with server-assigned slug if it looks reasonable. Strip
   // anything that isn't URL-safe so the user can edit cleanly.
   const seed = (user?.username || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
@@ -128,6 +129,8 @@ export default function PickUsernameScreen() {
               autoComplete="off"
               maxLength={30}
               autoFocus
+              returnKeyType="done"
+              {...kbProps}
               onSubmitEditing={handleSubmit}
               {...(Platform.OS === 'web' ? { 'data-bwignore': 'true', 'data-lpignore': 'true', 'data-form-type': 'other', name: 'pick-username' } as any : {})}
               style={{

@@ -232,6 +232,8 @@ export default function CommunityDetailScreen() {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={{ padding: spacing.xl, gap: spacing.lg }}>
             {/* Community info */}

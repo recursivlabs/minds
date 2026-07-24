@@ -10,7 +10,7 @@ import { ORG_ID } from '../lib/recursiv';
 import { invalidate } from '../lib/cache';
 import { useProfiles, useAgents } from '../lib/hooks';
 import { spacing, radius, shadows } from '../constants/theme';
-import { useColors } from '../lib/theme';
+import { useColors, useInputKeyboardProps } from '../lib/theme';
 
 // A single addressable target — either a real person or an AI agent. Both are
 // reachable through chat.dm({ user_id }) because agents are addressable as
@@ -36,6 +36,7 @@ export function NewChatModal({ visible, onClose }: { visible: boolean; onClose: 
   const router = useRouter();
   const { sdk, user } = useAuth();
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
 
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState<Target[]>([]);
@@ -171,7 +172,9 @@ export function NewChatModal({ visible, onClose }: { visible: boolean; onClose: 
                 onChangeText={setQuery}
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="search"
                 autoFocus
+                {...kbProps}
                 {...(Platform.OS === 'web' ? { 'data-form-type': 'other', 'data-lpignore': 'true', name: 'new-chat-search' } as any : {})}
                 style={{ flex: 1, paddingVertical: 10, color: colors.text, fontSize: 15, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
               />

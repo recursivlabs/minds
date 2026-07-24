@@ -60,9 +60,12 @@ export function Container({
       {noAvoidKeyboard || Platform.OS === 'web' ? (
         inner
       ) : (
+        // iOS needs 'padding'; Android must stay undefined — the window
+        // already resizes via adjustResize, and stacking 'height' on top
+        // double-compensated (the content jumped/left a gap).
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={safeTop ? insets.top : 0}
         >
           {inner}

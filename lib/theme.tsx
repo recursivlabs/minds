@@ -186,3 +186,18 @@ export function useColors(): ColorTokens {
 export function useResolvedTheme(): ResolvedTheme {
   return React.useContext(ThemeContext).resolved;
 }
+
+/**
+ * Keyboard-facing props every raw TextInput should spread in: iOS keyboard
+ * chrome matched to the app theme (a light keyboard over the dark UI reads
+ * as broken) and caret/selection in the brand accent, like X. The shared
+ * <Input> component applies these itself; use this for bespoke inputs
+ * (composers, search fields).
+ */
+export function useInputKeyboardProps() {
+  const { colors, resolved } = React.useContext(ThemeContext);
+  return {
+    keyboardAppearance: (resolved === 'dark' ? 'dark' : 'light') as 'dark' | 'light',
+    selectionColor: colors.accent,
+  };
+}

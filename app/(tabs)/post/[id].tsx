@@ -13,7 +13,7 @@ import { ORG_ID } from '../../../lib/recursiv';
 import { setCache, invalidate } from '../../../lib/cache';
 import { captureException } from '../../../lib/monitoring';
 import { spacing, radius, typography } from '../../../constants/theme';
-import { useColors } from '../../../lib/theme';
+import { useColors, useInputKeyboardProps } from '../../../lib/theme';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,6 +21,7 @@ export default function PostDetailScreen() {
   const router = useRouter();
   const { sdk, user } = useAuth();
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
   const { post, setPost, loading, error } = usePost(id);
   // "More like this" — semantically related posts so the page never dead-ends.
   const { posts: similar, loading: similarLoading } = useSimilarPosts(id, 10);
@@ -142,7 +143,7 @@ export default function PostDetailScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}
     >
       <ScreenHeader title="Post" />
@@ -151,6 +152,8 @@ export default function PostDetailScreen() {
       <FlatList
         data={replies}
         keyExtractor={(item) => item.id}
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View>
             {/* X-style conversation context: the chain of posts the focal post
@@ -232,6 +235,7 @@ export default function PostDetailScreen() {
         }}
       >
         <TextInput
+          {...kbProps}
           placeholder="Write a reply..."
           placeholderTextColor={colors.textMuted}
           value={replyText}

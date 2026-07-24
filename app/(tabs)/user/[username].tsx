@@ -337,7 +337,7 @@ export default function UserProfileScreen() {
       <ScreenHeader title={`@${profile.username || username}`} />
 
       <RightRailLayout context="profile">
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <View style={{ paddingTop: spacing['3xl'], paddingHorizontal: spacing.xl }}>
           {/* Top row: avatar + owner action buttons */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>

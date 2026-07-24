@@ -11,7 +11,7 @@ const LOGO_LIGHT = require('../assets/logo-light-mode.svg');
 import { BASE_URL, SITE_URL } from '../lib/recursiv';
 import { Text, Button } from '../components';
 import { colors, spacing } from '../constants/theme';
-import { useTheme } from '../lib/theme';
+import { useTheme, useInputKeyboardProps } from '../lib/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const W = SCREEN_W || 1200;
@@ -360,6 +360,7 @@ export default function LandingScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading, signIn, signUp, sendOtp, verifyOtp } = useAuth();
   const { resolved: globalTheme, setMode: setGlobalTheme } = useTheme();
+  const kbProps = useInputKeyboardProps();
   const { width: viewportW, height: viewportH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // Hero scales down to fit narrow viewports (mobile). Desktop tops out at 96.
@@ -578,6 +579,7 @@ export default function LandingScreen() {
               if (error) setError('');
             }}
             keyboardType="number-pad"
+            {...kbProps}
             inputMode="numeric"
             // textContentType is iOS-only in intent — but React Native
             // Web maps textContentType="oneTimeCode" to the HTML
@@ -638,6 +640,7 @@ export default function LandingScreen() {
             value={otpEmail}
             onChangeText={(t) => { setOtpEmail(t); if (error) setError(''); }}
             keyboardType="email-address"
+            {...kbProps}
             inputMode="email"
             autoCapitalize="none"
             autoCorrect={false}
@@ -705,6 +708,7 @@ export default function LandingScreen() {
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
+            {...kbProps}
                 onSubmitEditing={handleEarlyAccess}
                 style={{
                   backgroundColor: c.inputBg,
@@ -767,6 +771,7 @@ export default function LandingScreen() {
             value={signUpEmail}
             onChangeText={setSignUpEmail}
             keyboardType="email-address"
+            {...kbProps}
             autoCapitalize="none"
             style={{
               backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder,
@@ -781,6 +786,7 @@ export default function LandingScreen() {
             value={signUpPw}
             onChangeText={setSignUpPw}
             secureTextEntry
+            {...kbProps}
             style={{
               backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder,
               borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13,
@@ -847,6 +853,7 @@ export default function LandingScreen() {
             value={loginPw}
             onChangeText={(t) => { setLoginPw(t); setError(''); }}
             secureTextEntry
+            {...kbProps}
             onSubmitEditing={handleLogin}
             style={{
               backgroundColor: c.inputBg,
@@ -996,7 +1003,7 @@ export default function LandingScreen() {
           clicks inside the form bubble up to the wrapper and blur
           the OTP input mid-type/paste. */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
         keyboardVerticalOffset={0}
       >

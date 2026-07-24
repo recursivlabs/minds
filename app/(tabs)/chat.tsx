@@ -27,10 +27,12 @@ import { stripMarkdown } from '../../lib/text';
 import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
 import { publishLocalChat } from '../../lib/chatEvents';
 import { sortThread, isOptimisticRow } from '../../lib/chatOrdering';
+import { useInputKeyboardProps } from '../../lib/theme';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; focused?: string }>();
   const { width } = useWindowDimensions();
@@ -215,6 +217,10 @@ export default function ChatScreen() {
             placeholderTextColor={colors.textMuted}
             value={convoSearch}
             onChangeText={setConvoSearch}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+            {...kbProps}
             style={{ flex: 1, color: colors.text, ...typography.body, paddingVertical: 0, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
           />
           {convoSearch ? (
@@ -246,7 +252,9 @@ export default function ChatScreen() {
               autoCorrect={false}
               autoComplete="off"
               textContentType="none"
+              returnKeyType="go"
               onSubmitEditing={handleNewDM}
+              {...kbProps}
               // Discourage password managers (Bitwarden, 1Password) from
               // matching this as a username/identity field. RN Web maps
               // these props to native HTML attrs.
@@ -408,6 +416,8 @@ export default function ChatScreen() {
             );
           }}
           showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
         />
       )}
     </>
@@ -458,6 +468,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
   const setActiveConvoId = useSetActiveConvoId();
   // Track focus. Two things hang off it: (1) marking this conversation active so
   // the SideNav suppresses its unread dot only for the thread you're reading, and
@@ -1279,7 +1290,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}
     >
       {/* Header */}
@@ -1378,6 +1389,12 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
           // 16ms (~60fps) so the at-bottom test tracks fast streaming growth
           // instead of lagging behind it at 100ms.
           scrollEventThrottle={16}
+          // iMessage/X keyboard feel: drag the thread down to interactively
+          // dismiss the keyboard (iOS), plain on-drag dismiss on Android; and
+          // taps on messages/actions register first-tap while the keyboard is
+          // up instead of only dismissing it.
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled"
           // Only follow new content when the user is already at the bottom, so
           // streaming tokens / incoming messages never interrupt scroll-back.
           // On web we set scrollTop synchronously in the same layout pass the
@@ -1608,6 +1625,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
               placeholder="Type a message..."
               placeholderTextColor={colors.textMuted}
               value={text}
+              {...kbProps}
               onChangeText={(t) => {
                 setText(t);
                 // Emit chat_typing at most once every 3s while the user is

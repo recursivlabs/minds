@@ -2,7 +2,7 @@ import * as React from 'react';
 import { TextInput, type TextInputProps, View, Platform } from 'react-native';
 import { Text } from './Text';
 import { spacing, radius, typography } from '../constants/theme';
-import { useColors } from '../lib/theme';
+import { useTheme } from '../lib/theme';
 
 interface Props extends TextInputProps {
   label?: string;
@@ -10,7 +10,7 @@ interface Props extends TextInputProps {
 }
 
 export function Input({ label, error, style, ...props }: Props) {
-  const colors = useColors();
+  const { colors, isDark } = useTheme();
   const [focused, setFocused] = React.useState(false);
 
   return (
@@ -22,6 +22,10 @@ export function Input({ label, error, style, ...props }: Props) {
       ) : null}
       <TextInput
         placeholderTextColor={colors.textMuted}
+        // iOS keyboard chrome matches the app theme (a light keyboard over the
+        // dark UI reads as broken); caret/selection in brand accent, like X.
+        keyboardAppearance={isDark ? 'dark' : 'light'}
+        selectionColor={colors.accent}
         onFocus={(e) => {
           setFocused(true);
           props.onFocus?.(e);

@@ -25,7 +25,7 @@ import { SharePostSheet } from './SharePostSheet';
 import { ArticleCard } from './ArticleCard';
 import { Badge, getBadges } from './Badge';
 import { spacing, radius, borders, typography } from '../constants/theme';
-import { useColors } from '../lib/theme';
+import { useColors, useInputKeyboardProps } from '../lib/theme';
 import { formatTimestamp } from '../lib/time';
 import { renderMarkdownToHtml, parseMarkdownSegments, isSafeUrl, looksLikeLegacyHtml, stripHtmlToText, sanitizeLegacyHtml } from '../lib/markdown';
 
@@ -118,6 +118,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
   const { sdk, user } = useAuth();
   const toast = useToast();
   const colors = useColors();
+  const kbProps = useInputKeyboardProps();
   const [userVote, setUserVote] = React.useState<'upvote' | 'downvote' | null>(postUserVote(post));
   const [score, setScore] = React.useState(postScore(post));
   const [showMenu, setShowMenu] = React.useState(false);
@@ -724,6 +725,7 @@ export const PostCard = React.memo(function PostCard({ post, onVoteChange, onPos
             onChangeText={setEditContent}
             multiline
             autoFocus
+            {...kbProps}
             style={{
               backgroundColor: colors.surface,
               borderWidth: 1,

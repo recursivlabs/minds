@@ -5,7 +5,7 @@ import { Container } from '../../components';
 export default function AuthLayout() {
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}
     >
       <Container centered maxWidth={400}>
