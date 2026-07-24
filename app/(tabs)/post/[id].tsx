@@ -14,6 +14,7 @@ import { setCache, invalidate } from '../../../lib/cache';
 import { captureException } from '../../../lib/monitoring';
 import { spacing, radius, typography } from '../../../constants/theme';
 import { useColors, useInputKeyboardProps } from '../../../lib/theme';
+import { useKeyboardVisible } from '../../../lib/useKeyboardVisible';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,6 +23,7 @@ export default function PostDetailScreen() {
   const { sdk, user } = useAuth();
   const colors = useColors();
   const kbProps = useInputKeyboardProps();
+  const keyboardVisible = useKeyboardVisible();
   const { post, setPost, loading, error } = usePost(id);
   // "More like this" — semantically related posts so the page never dead-ends.
   const { posts: similar, loading: similarLoading } = useSimilarPosts(id, 10);
@@ -231,7 +233,8 @@ export default function PostDetailScreen() {
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
           borderTopColor: colors.borderSubtle,
-          paddingBottom: insets.bottom || spacing.md,
+          // Collapse the home-indicator inset while the keyboard covers it.
+          paddingBottom: keyboardVisible ? spacing.sm : (insets.bottom || spacing.md),
         }}
       >
         <TextInput

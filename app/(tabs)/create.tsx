@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Modal,
+  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ import { useCommunities } from '../../lib/hooks';
 import { ORG_ID } from '../../lib/recursiv';
 import { spacing, radius, typography } from '../../constants/theme';
 import { useColors, useInputKeyboardProps } from '../../lib/theme';
+import { useKeyboardVisible } from '../../lib/useKeyboardVisible';
 
 // Consumer Create surface: Post is the only first-class mode. Community
 // stays as a reachable mode via ?mode=community deep-link from Discover's
@@ -182,6 +184,7 @@ export default function CreateScreen() {
   const { sdk, user } = useAuth();
   const colors = useColors();
   const kbProps = useInputKeyboardProps();
+  const keyboardVisible = useKeyboardVisible();
   const initialMode: Mode = (params.mode === 'community' || params.mode === 'article' || params.mode === 'agent' || params.mode === 'app') ? params.mode : 'post';
   const [mode, setMode] = React.useState<Mode>(initialMode);
 
@@ -1371,7 +1374,9 @@ export default function CreateScreen() {
             alignItems: 'center',
             gap: spacing.xs,
             paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.md,
+            // Tight to the keyboard when it's up — the toolbar should sit ON
+            // the keyboard like iMessage's accessory bar, not float above it.
+            paddingVertical: keyboardVisible ? spacing.sm : spacing.md,
             borderTopWidth: 0.5,
             borderTopColor: colors.borderSubtle,
           }}
@@ -1447,6 +1452,17 @@ export default function CreateScreen() {
                 colors={colors}
               />
             </View>
+          )}
+
+          {/* Escape hatch: the editor fills the screen, so there's no scroll
+              surface to drag-dismiss with — this chevron always collapses the
+              keyboard. You must never be stuck inside it. */}
+          {keyboardVisible && (
+            <ToolbarIconButton
+              icon="chevron-down"
+              onPress={() => Keyboard.dismiss()}
+              colors={colors}
+            />
           )}
 
         </View>

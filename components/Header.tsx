@@ -113,7 +113,8 @@ export function Header({ showBack, title }: Props) {
         >
           <Image
             source={isDark ? LOGO_DARK : LOGO_LIGHT}
-            style={{ width: 78, height: 30 }}
+            // Same height as the sm avatar beside it (32px) — reads as one row.
+            style={{ width: 83, height: 32 }}
             contentFit="contain"
             accessibilityLabel="Minds"
           />

@@ -494,21 +494,8 @@ export default function FeedScreen() {
         </>
       )}
 
-      {/* Floating compose button — mobile only; on web the sidebar has Create. */}
-      {Platform.OS !== 'web' && (
-        <Pressable
-          onPress={() => router.push('/(tabs)/create')}
-          style={({ pressed }) => ({
-            position: 'absolute', bottom: spacing.xl, right: spacing.xl,
-            width: 56, height: 56, borderRadius: 28,
-            backgroundColor: pressed ? colors.accentHover : colors.accent,
-            alignItems: 'center', justifyContent: 'center',
-            elevation: 4, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 8,
-          })}
-        >
-          <Ionicons name="add" size={28} color={colors.textOnAccent} />
-        </Pressable>
-      )}
+      {/* Floating compose button removed — the pill nav's bottom-center
+          Create tab covers it; two + buttons stacked was redundant. */}
     </Container>
   );
 }

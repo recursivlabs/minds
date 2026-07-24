@@ -28,6 +28,7 @@ import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
 import { publishLocalChat } from '../../lib/chatEvents';
 import { sortThread, isOptimisticRow } from '../../lib/chatOrdering';
 import { useInputKeyboardProps } from '../../lib/theme';
+import { useKeyboardVisible } from '../../lib/useKeyboardVisible';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -209,7 +210,7 @@ export default function ChatScreen() {
       </View>
 
       {/* Search / filter the conversation list */}
-      <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}>
+      <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 7 }}>
           <Ionicons name="search" size={16} color={colors.textMuted} />
           <TextInput
@@ -469,6 +470,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
   const { sdk, user } = useAuth();
   const colors = useColors();
   const kbProps = useInputKeyboardProps();
+  const keyboardVisible = useKeyboardVisible();
   const setActiveConvoId = useSetActiveConvoId();
   // Track focus. Two things hang off it: (1) marking this conversation active so
   // the SideNav suppresses its unread dot only for the thread you're reading, and
@@ -1564,7 +1566,10 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
           paddingVertical: spacing.md,
           borderTopWidth: 0.5,
           borderTopColor: colors.borderSubtle,
-          paddingBottom: insets.bottom || spacing.md,
+          // The home-indicator inset only matters while the keyboard is DOWN —
+          // with it up, keeping that 34px strip left a dead gap between the
+          // composer and the keyboard (iMessage/Claude collapse it too).
+          paddingBottom: keyboardVisible ? spacing.sm : (insets.bottom || spacing.md),
           // Match the message column width on web so the composer sits in the
           // same centered Claude-width column instead of stretching full-bleed.
           ...(Platform.OS === 'web' ? { maxWidth: 760, width: '100%', alignSelf: 'center' } as any : {}),

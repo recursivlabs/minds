@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
 import { useTheme } from '../lib/theme';
 import { spacing } from '../constants/theme';
+import { useKeyboardVisible } from '../lib/useKeyboardVisible';
 
 // Floating pill bottom nav (KEMPT-style) in Minds colors: a rounded raised
 // bar with a soft gold glow behind the active tab. Icon-only — five
@@ -34,11 +35,21 @@ export function NavPill({
 }: BottomTabBarProps & { badges?: Record<string, number> }) {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const keyboardVisible = useKeyboardVisible();
 
   // A custom tabBar receives EVERY route — `href: null` no longer hides
   // anything, so filter to the five primary tabs explicitly.
   const routes = state.routes.filter((r) => ICONS[r.name]);
-  const activeKey = state.routes[state.index]?.key;
+  // Some tabs are fronts for other routes (Search redirects to /discover) —
+  // without the alias the pill showed no active glow on those screens.
+  const ROUTE_ALIAS: Record<string, string> = { discover: 'explore' };
+  const activeName = state.routes[state.index]?.name ?? '';
+  const effectiveActive = ROUTE_ALIAS[activeName] ?? activeName;
+
+  // X behavior: the bottom bar gets out of the way while typing — otherwise
+  // it either peeks above the keyboard (Android) or holds dead layout space
+  // beneath it, pushing composers up short of the keyboard.
+  if (keyboardVisible) return null;
 
   return (
     <View
@@ -68,7 +79,7 @@ export function NavPill({
         }}
       >
         {routes.map((route) => {
-          const focused = route.key === activeKey;
+          const focused = route.name === effectiveActive;
           const icon = ICONS[route.name];
           const badge = badges[route.name] || 0;
           const label = (descriptors[route.key]?.options as any)?.title ?? route.name;
