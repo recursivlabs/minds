@@ -26,6 +26,7 @@ import { conversationUnreadCount, isAiActor } from '../../lib/models';
 import { stripMarkdown } from '../../lib/text';
 import { resolvePersonalAgent } from '../../lib/resolvePersonalAgent';
 import { publishLocalChat } from '../../lib/chatEvents';
+import { sortThread, isOptimisticRow } from '../../lib/chatOrdering';
 
 export default function ChatScreen() {
   const { sdk, user } = useAuth();
@@ -453,54 +454,6 @@ export default function ChatScreen() {
   );
 }
 
-// Three dots that pulse in sequence while the agent is composing a
-// reply. Generic CSS animation on web, RN Animated on native.
-function TypingIndicator() {
-  const colors = useColors();
-  const dot = (delay: number, key: number) => (
-    <View
-      key={key}
-      style={{
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: colors.textMuted,
-        ...(Platform.OS === 'web'
-          ? ({
-              animationName: 'mindsTypingPulse',
-              animationDuration: '1200ms',
-              animationIterationCount: 'infinite',
-              animationDelay: `${delay}ms`,
-            } as any)
-          : {}),
-      }}
-    />
-  );
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-      }}
-    >
-      {Platform.OS === 'web' && (
-        <style>{`
-          @keyframes mindsTypingPulse {
-            0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-            40% { opacity: 1; transform: translateY(-2px); }
-          }
-        `}</style>
-      )}
-      {dot(0, 0)}
-      {dot(200, 1)}
-      {dot(400, 2)}
-    </View>
-  );
-}
-
 function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 }: { conversationId: string; onBack: () => void; hideBack?: boolean; initialUnread?: number }) {
   const insets = useSafeAreaInsets();
   const { sdk, user } = useAuth();
@@ -583,6 +536,9 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
   const autoSentPromptRef = React.useRef<string | null>(null);
   const [agentTyping, setAgentTyping] = React.useState(false);
   const [agentStatus, setAgentStatus] = React.useState<'thinking' | 'generating' | 'done' | null>(null);
+  // True while a local stream is revealing text on screen — server
+  // agent_thinking events must not re-raise the pill over streaming text.
+  const streamRevealingRef = React.useRef(false);
   const [humanTyping, setHumanTyping] = React.useState<{ userId: string; userName: string } | null>(null);
   const flatListRef = React.useRef<FlatList>(null);
 
@@ -641,6 +597,14 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
   const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const messageIdsRef = React.useRef<Set<string>>(new Set(cachedSorted.map((m: any) => m.id)));
   const pollInFlightRef = React.useRef(false);
+  // Synchronous send guard. `sending` state is async — a fast double-tap or a
+  // web Enter keypress could start a SECOND handleSend before React re-rendered
+  // the disabled button, double-sending the message (and, in agent chats,
+  // kicking off two concurrent streams whose replies interleaved). A ref flips
+  // atomically in the same tick.
+  const sendInFlightRef = React.useRef(false);
+  // Monotonic local ordering for optimistic rows (see sortThread).
+  const seqRef = React.useRef(0);
 
   // One reconcile fetch: pull the latest server messages and MERGE them into
   // state by id. Merging (not replacing) matters: a wholesale setMessages used
@@ -662,23 +626,23 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
       })).filter((m: any) => m.content); // Skip blank messages
       setMessages(prev => {
         // Drop optimistic placeholders once the real server row with the same
-        // content has arrived. The WS path already does this, but the poll/
-        // catch-up merge did not — so in AGENT chats (where the user's temp row
-        // is never id-reconciled, because chat.send is skipped) the temp/
-        // streaming row and the reconciled server row BOTH rendered: the
-        // transient double-send that cleared only on refresh.
-        const incomingContents = new Set(incoming.map((m: any) => (m.content || '').trim()));
+        // sender + content has arrived. The WS path already does this, but the
+        // poll/catch-up merge did not — so in AGENT chats (where the user's
+        // temp row is never id-reconciled, because chat.send is skipped) the
+        // temp/streaming row and the reconciled server row BOTH rendered: the
+        // transient double-send that cleared only on refresh. Keyed by sender
+        // too so a same-text message from the OTHER party can't swallow your
+        // still-pending row.
+        const senderContentKey = (m: any) =>
+          `${m.sender?.id ?? m.senderId ?? ''}\n${(m.content || '').trim()}`;
+        const incomingKeys = new Set(incoming.map(senderContentKey));
         const byId = new Map<string, any>();
         for (const m of prev) {
-          const isOptimistic = typeof m.id === 'string'
-            && (m.id.startsWith('temp-') || m.id.startsWith('agent-') || m.id.startsWith('streaming-'));
-          if (isOptimistic && incomingContents.has((m.content || '').trim())) continue;
+          if (isOptimisticRow(m) && incomingKeys.has(senderContentKey(m))) continue;
           byId.set(m.id, m);
         }
         for (const m of incoming) byId.set(m.id, m);
-        return Array.from(byId.values()).sort(
-          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
+        return sortThread(Array.from(byId.values()));
       });
     } catch {} finally { pollInFlightRef.current = false; }
   }, [conversationId, sdk]);
@@ -727,6 +691,11 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
     setPartnerInfo(cachedOther || null);
     atBottomRef.current = true;
     setShowJump(false);
+    // Indicators belong to the previous thread — never carry them across.
+    streamRevealingRef.current = false;
+    setAgentTyping(false);
+    setAgentStatus(null);
+    setHumanTyping(null);
   }, [conversationId, cachedSorted, cachedConvo, cachedOther]);
 
   // Agent conversations render Claude-style (full-width assistant text);
@@ -850,12 +819,15 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
           }
 
           setMessages(prev => {
-            // If a streaming row from this same sender is still on screen, it's
-            // the in-progress smooth-reveal of THIS very message — let it finish
-            // typing out and skip the WS echo (which carries the full text and
-            // would otherwise double it mid-reveal or snap it to the end). It
-            // reconciles to the real server row on the next load.
-            if (prev.some(m => m.id.startsWith('streaming-') && (m.sender?.id) === newMsg.sender?.id)) {
+            // If a streaming row from this same sender is still ACTIVELY
+            // revealing (streaming: true), it's the in-progress smooth-reveal of
+            // THIS very message — let it finish typing out and skip the WS echo
+            // (which carries the full text and would snap it to the end). Once
+            // the reveal finalizes (streaming: false) echoes flow through again
+            // and the content-dedupe below swaps the placeholder for the real
+            // server row — previously the skip matched finalized rows too, so
+            // the server id was never adopted until the next refetch.
+            if (prev.some(m => m.streaming === true && (m.sender?.id) === newMsg.sender?.id)) {
               return prev;
             }
             // Drop any optimistic row whose content matches the
@@ -884,9 +856,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
             const byId = new Map<string, any>();
             for (const m of filtered) byId.set(m.id, m);
             byId.set(newMsg.id, newMsg);
-            return Array.from(byId.values()).sort(
-              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            );
+            return sortThread(Array.from(byId.values()));
           });
         });
       } catch {
@@ -922,6 +892,10 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
             setAgentStatus('done');
             setAgentTyping(false);
             clearStuckTimer();
+          } else if (streamRevealingRef.current) {
+            // Text is already typing out on screen — keep the status fresh but
+            // never bring the pill back over it.
+            setAgentStatus(evt?.status ?? 'generating');
           } else {
             setAgentStatus(evt?.status ?? 'thinking');
             setAgentTyping(true);
@@ -1033,6 +1007,11 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
   const handleSend = async (overrideText?: string) => {
     const messageText = (typeof overrideText === 'string' ? overrideText : text).trim();
     if (!messageText || !sdk) return;
+    // Synchronous re-entrancy guard — state-based disabling is too slow for a
+    // double-tap or the web Enter path, which used to double-send (and run two
+    // agent streams at once → interleaved/out-of-order replies).
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     if (typeof overrideText !== 'string') setText('');
     // Capture + clear the reply target up front so the banner dismisses instantly.
     const replyId = replyingTo?.id && !String(replyingTo.id).startsWith('temp-') ? replyingTo.id : undefined;
@@ -1047,14 +1026,15 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
     // with the real server id when the response lands. iMessage feel.
     const tempId = `temp-${Date.now()}`;
     const optimisticCreatedAt = new Date().toISOString();
-    setMessages(prev => [...prev, {
+    setMessages(prev => sortThread([...prev, {
       id: tempId,
       content: messageText,
       sender: { id: user?.id, name: user?.name },
       createdAt: optimisticCreatedAt,
       reply_to_id: replyId,
       pending: true,
-    }]);
+      seq: seqRef.current++,
+    }]));
     // Tell the sidebar inbox NOW (not after the WS echo) so its preview text,
     // ordering, and — for a brand-new DM — the row itself update in lockstep
     // with the thread view. Reconciles against server truth on the next refetch.
@@ -1098,14 +1078,31 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
       // streaming. Net effect: Claude-style typed-out reply instead
       // of a long pause followed by a paste.
       if (isAgent && otherId) {
+        // Thinking pill turns on LOCALLY the moment the request leaves — the
+        // old code waited for a server `agent_thinking` socket event that
+        // sometimes never arrived, which is why the indicator felt unreliable.
+        // Server events still enrich the status text; this owns the lifecycle.
+        setAgentStatus('thinking');
+        setAgentTyping(true);
+
         const streamingId = `streaming-${Date.now()}`;
-        setMessages(prev => [...prev, {
-          id: streamingId,
-          content: '',
-          sender: { id: otherId, name: otherName, is_ai: true },
-          createdAt: new Date().toISOString(),
-          streaming: true,
-        }]);
+        // The streaming bubble is inserted lazily on the FIRST text delta (not
+        // up front) so an empty bubble never sits next to the thinking pill.
+        let inserted = false;
+        const ensureStreamingRow = () => {
+          if (inserted) return;
+          inserted = true;
+          streamRevealingRef.current = true;
+          setAgentTyping(false); // pill hands off to the streaming text
+          setMessages(prev => sortThread([...prev, {
+            id: streamingId,
+            content: '',
+            sender: { id: otherId, name: otherName, is_ai: true },
+            createdAt: new Date().toISOString(),
+            streaming: true,
+            seq: seqRef.current++,
+          }]));
+        };
         // SMOOTH STREAMING (Claude-style). The network delivers tokens in
         // irregular bursts; rendering each burst as it lands shows the network's
         // chunkiness. Instead we accumulate into `received` and reveal it via a
@@ -1119,6 +1116,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
         let streamDone = false;
         let rafId: ReturnType<typeof requestAnimationFrame> | null = null;
         const renderTo = (n: number, final = false) => {
+          ensureStreamingRow();
           setMessages(prev => prev.map(m => m.id === streamingId
             ? { ...m, content: received.slice(0, n), ...(final ? { streaming: false } : {}) }
             : m));
@@ -1191,6 +1189,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
           if (rafId != null) cancelAnimationFrame(rafId);
           setMessages(prev => prev.filter(m => m.id !== streamingId));
         }
+        streamRevealingRef.current = false;
         setAgentTyping(false);
       }
     } catch (err) {
@@ -1200,6 +1199,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
         : m));
       captureException(err, { action: 'chat_send', conversationId });
     } finally {
+      sendInFlightRef.current = false;
       setSending(false);
     }
   };
@@ -1254,6 +1254,9 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
   const retryMessage = React.useCallback((msg: any) => {
     const body = (msg?.content || '').trim();
     if (!body) return;
+    // Never drop the failed row while another send is in flight — handleSend
+    // would refuse to run and the message text would vanish.
+    if (sendInFlightRef.current) return;
     setMessages(prev => prev.filter(m => m.id !== msg.id));
     void handleSend(body);
     // handleSend is stable enough for this purpose; intentionally not in deps to
@@ -1640,7 +1643,9 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
               }}
             />
             {text.trim() ? (
-              // Text present → send button.
+              // Text present → send button. Dimmed while a send/stream is in
+              // flight (the ref guard is what actually blocks re-entry — this
+              // is just the visual affordance).
               <Pressable
                 onPress={() => handleSend()}
                 disabled={sending}
@@ -1648,6 +1653,7 @@ function ConversationView({ conversationId, onBack, hideBack, initialUnread = 0 
                   width: 44, height: 44, borderRadius: 22,
                   backgroundColor: pressed ? colors.accentHover : colors.accent,
                   alignItems: 'center', justifyContent: 'center',
+                  opacity: sending ? 0.45 : 1,
                 })}
               >
                 <Ionicons name="send" size={18} color={colors.textOnAccent} />

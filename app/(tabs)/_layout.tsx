@@ -11,6 +11,7 @@ import { isUsernamePicked } from '../../lib/onboarding';
 import { subscribeToInvalidations } from '../../lib/cache';
 import { SideNav, useSidebarState } from '../../components/SideNav';
 import { MobileDrawerProvider } from '../../components/MobileDrawer';
+import { NavPill } from '../../components/NavPill';
 
 export default function TabLayout() {
   const { width } = useWindowDimensions();
@@ -140,26 +141,15 @@ export default function TabLayout() {
     );
   }
 
-  // X-style bottom nav: five self-explanatory icons, no labels, filled
-  // variant when active. Profile lives in the header avatar + drawer.
+  // Floating pill bottom nav (KEMPT-style, Minds colors): five
+  // self-explanatory icons, no labels, gold glow behind the active tab.
+  // Profile lives in the header avatar + drawer.
   return (
     <MobileDrawerProvider>
     <Tabs
+      tabBar={(props) => <NavPill {...props} badges={{ notifications: unreadCount }} />}
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.bg,
-          borderTopColor: colors.borderSubtle,
-          borderTopWidth: 0.5,
-          elevation: 0,
-          height: 56 + insets.bottom,
-          paddingBottom: insets.bottom + 4,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarShowLabel: false,
-        tabBarIconStyle: { marginTop: 0 },
       }}
     >
       <Tabs.Screen
