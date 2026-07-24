@@ -10,6 +10,7 @@ import { ORG_ID } from '../../lib/recursiv';
 import { isUsernamePicked } from '../../lib/onboarding';
 import { subscribeToInvalidations } from '../../lib/cache';
 import { SideNav, useSidebarState } from '../../components/SideNav';
+import { MobileDrawerProvider } from '../../components/MobileDrawer';
 
 export default function TabLayout() {
   const { width } = useWindowDimensions();
@@ -139,7 +140,10 @@ export default function TabLayout() {
     );
   }
 
+  // X-style bottom nav: five self-explanatory icons, no labels, filled
+  // variant when active. Profile lives in the header avatar + drawer.
   return (
+    <MobileDrawerProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -149,25 +153,21 @@ export default function TabLayout() {
           borderTopWidth: 0.5,
           elevation: 0,
           height: 56 + insets.bottom,
-          paddingBottom: insets.bottom + 6,
-          paddingTop: 6,
+          paddingBottom: insets.bottom + 4,
+          paddingTop: 8,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '400',
-          letterSpacing: 0.2,
-        },
+        tabBarShowLabel: false,
         tabBarIconStyle: { marginTop: 0 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Feed',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="newspaper-outline" size={22} color={color} />
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={27} color={color} />
           ),
         }}
       />
@@ -175,8 +175,8 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: 'Search',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="search-outline" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={27} color={color} />
           ),
         }}
       />
@@ -184,8 +184,8 @@ export default function TabLayout() {
         name="create"
         options={{
           title: 'Create',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="add-circle-outline" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={29} color={color} />
           ),
         }}
       />
@@ -193,8 +193,8 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="chatbubble-outline" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={26} color={color} />
           ),
         }}
       />
@@ -202,8 +202,8 @@ export default function TabLayout() {
         name="notifications"
         options={{
           title: 'Alerts',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="notifications-outline" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={27} color={color} />
           ),
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.error, fontSize: 10 },
@@ -211,6 +211,9 @@ export default function TabLayout() {
       />
       {/* Profile moved to the header avatar — not a primary tab. */}
       <Tabs.Screen name="profile" options={{ href: null }} />
+      {/* Root-level /<username> compat route — without href:null expo-router
+          auto-registers it as a visible tab (the stray "[username]" item). */}
+      <Tabs.Screen name="[username]" options={{ href: null }} />
       <Tabs.Screen name="wallet" options={{ href: null }} />
       <Tabs.Screen name="boost" options={{ href: null }} />
       <Tabs.Screen name="discover" options={{ href: null }} />
@@ -233,5 +236,6 @@ export default function TabLayout() {
       <Tabs.Screen name="blocked" options={{ href: null }} />
       <Tabs.Screen name="muted" options={{ href: null }} />
     </Tabs>
+    </MobileDrawerProvider>
   );
 }
